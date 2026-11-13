@@ -180,3 +180,62 @@ a{color:${BORDEAUX}}.lien{color:#fff}.vert{background:#2f6b3a}.gris{background:#
 export function resume(i) {
   return `<dl><dt>Cliente</dt><dd>${esc(i.nom)}</dd><dt>Soin</dt><dd>${esc(i.soin)}${i.options ? " + " + esc(i.options) : ""}</dd><dt>Quand</dt><dd>${esc(quand(i))}</dd><dt>Téléphone</dt><dd><a href="tel:${esc(String(i.telephone).replace(/[^\d+]/g, ""))}">${esc(i.telephone)}</a></dd></dl>`;
 }
+
+// 5. Pour la cliente : sa facture (PDF joint).
+export function factureCliente(f, lien) {
+  const prenom = String((f.cliente && f.cliente.nom) || "").trim();
+  const montant = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(f.montant) || 0);
+  const sujet = `Votre facture Coco Nail's n° ${f.numero}`;
+  const p = f.prestation || {};
+  const html = gabarit("Votre facture", [
+    para(`Bonjour ${esc(prenom)},`),
+    para("Merci pour votre visite chez Coco Nail's ! Vous trouverez votre facture en pièce jointe."),
+    tableau([
+      ["Facture", esc(f.numero)],
+      ["Prestation", esc([p.soin, p.options].filter(Boolean).join(" + "))],
+      ["Date", p.date ? esc(jourLong(p.date)) : ""],
+      ["Montant", esc(montant) + " (payé)"],
+    ]),
+    `<p style="margin:18px 0">${bouton(lien, "Voir ma facture")}</p>`,
+    para("À très bientôt !<br>Coralie"),
+  ].join(""));
+  const texte = `Bonjour ${prenom},
+
+Merci pour votre visite chez Coco Nail's ! Vous trouverez votre facture n° ${f.numero} en pièce jointe (${montant}, payé).
+Vous pouvez aussi la consulter ici : ${lien}
+
+À très bientôt !
+Coralie — Coco Nail's`;
+  return { sujet, html, texte };
+}
+
+// 6. Pour Coralie : rappel de déclaration URSSAF.
+// periodes : [{libelle, total, echeance, aValider}] ; relance : true si la date limite approche.
+export function rappelUrssaf(periodes, origine, relance = false) {
+  const eur = (n) => new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+  const date = (d) => new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" }).format(new Date(d + "T00:00:00Z"));
+  const p0 = periodes[0];
+  const sujet = relance
+    ? `Rappel : déclaration URSSAF de ${p0.libelle} avant le ${date(p0.echeance)}`
+    : `Déclaration URSSAF de ${p0.libelle} : ${eur(p0.total)} à déclarer`;
+  const html = gabarit(relance ? "N'oubliez pas l'URSSAF" : "C'est le moment de déclarer", [
+    para("Bonjour Coralie,"),
+    para(relance ? "Petit rappel : cette déclaration n'est pas encore marquée comme faite dans votre compta." : "Votre déclaration de chiffre d'affaires à l'URSSAF est à faire :"),
+    tableau(periodes.flatMap((p) => [
+      ["Période", `<span style="text-transform:capitalize">${esc(p.libelle)}</span>`],
+      ["À déclarer", `<span style="font-size:20px">${esc(eur(p.total))}</span>`],
+      ["Avant le", esc(date(p.echeance))],
+      ["À valider", p.aValider ? `<span style="color:#b3261e">${p.aValider} rendez-vous pas encore validé${p.aValider > 1 ? "s" : ""}</span>` : ""],
+    ])),
+    periodes.some((p) => p.aValider) ? para("Validez d'abord ces rendez-vous dans votre compta : le montant à déclarer se mettra à jour.") : "",
+    `<p style="margin:18px 0">${bouton(origine + "/compta/#urssaf", "Ouvrir ma compta")}</p>`,
+    para(`<span style="color:#7a5a60;font-size:13px">Une fois la déclaration faite sur le site de l'URSSAF, touchez « C'est déclaré » dans votre compta pour arrêter les rappels.</span>`),
+  ].join(""));
+  const texte = `Bonjour Coralie,
+
+${relance ? "Petit rappel : cette déclaration n'est pas encore marquée comme faite." : "Votre déclaration de chiffre d'affaires à l'URSSAF est à faire :"}
+${periodes.map((p) => `- ${p.libelle} : ${eur(p.total)} à déclarer avant le ${date(p.echeance)}${p.aValider ? ` (${p.aValider} rendez-vous à valider d'abord)` : ""}`).join("\n")}
+
+Ouvrir ma compta : ${origine}/compta/#urssaf`;
+  return { sujet, html, texte };
+}

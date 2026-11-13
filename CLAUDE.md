@@ -20,7 +20,15 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
     + e-mail de confirmation (.ics joint) ; refuser = suppression + e-mail invitant à rechoisir.
 - `netlify/lib/agenda.mjs` (JWT compte de service, Agenda, Gmail via délégation `sub`, jours fériés, règles)
   et `netlify/lib/messages.mjs` (gabarits d'e-mails et pages).
+- Compta privée (étape 1, livrée le 13/11/2026) : page `public/compta/index.html` (mot de passe), API `netlify/functions/compta.mjs`
+  (`/api/compta`), facture PDF `facture.mjs` (`/api/facture?n=&s=`, lien signé), rappel URSSAF planifié `rappel-urssaf.mjs`
+  (tous les jours 7 h UTC : le 5 du mois + 5 jours avant l'échéance). Logique dans `netlify/lib/compta.mjs` (tableau Google Sheets
+  privé, onglets Rendez-vous / Factures / Déclarations URSSAF / Réglages, créés automatiquement), PDF dans `netlify/lib/facture.mjs`
+  (dépendance `pdf-lib` 1.17.1). Les RDV confirmés de l'agenda (extendedProperties.private.id, sans « À confirmer ») sont importés
+  à l'ouverture de la page. Facture créée seulement à la validation, numéros F2026-001… sans trou, contenu figé en JSON.
+  Test : `node outils-de-test/test-compta.mjs` (Google simulé).
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
+  Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
 - Google : projet Cloud `coco-nails-514415`, compte de service `coconails@coco-nails-514415.iam.gserviceaccount.com`
   (ID client 116446334886747443278), API Calendar + Gmail activées, délégation domaine scope `gmail.send` uniquement.
 - Domaine chez Squarespace (via Google Workspace) : A @ 75.2.60.5, CNAME www → silly-kataifi-f31ee1.netlify.app,
@@ -39,6 +47,9 @@ Toujours tester localement avant (Google simulé) et montrer un aperçu avant de
 - Fiche Google Business en cours de validation : horaires détaillés, adresse visible, logo, photos, lien d'avis à coller
   dans Pages CMS > Horaires et coordonnées. Vérifier qu'il n'existe pas de fiche en double.
 - Assurance (avenant habitation), bio Instagram, double authentification sur tous les comptes.
+
+- Compta étape 2 (proposée) : argent à mettre de côté, alerte des seuils, sauvegarde, rappel la veille aux clientes, demande d'avis Google.
+  Étape 3 : dépenses, tableau de bord, export annuel, avoirs, bons cadeaux, fidélité.
 
 ## Horaires actuels
 Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h · dim fermé. Tél. 07 68 22 70 15 (WhatsApp actif).

@@ -3,6 +3,9 @@
 //   GOOGLE_CLIENT_EMAIL  adresse du compte de service Google
 //   GOOGLE_PRIVATE_KEY   clé privée du compte de service (avec les \n)
 //   GOOGLE_CALENDAR_ID   identifiant de l'agenda de Coralie (souvent son adresse Gmail)
+// Pour la compta (page /compta) :
+//   COMPTA_SHEET_ID      identifiant du tableau Google Sheets « Comptabilité Coco Nail's »
+//   COMPTA_MOT_DE_PASSE  mot de passe de la page compta
 // Facultatif :
 //   GOOGLE_SENDER        adresse qui envoie les e-mails (par défaut GOOGLE_CALENDAR_ID)
 //   NOTIFICATION_EMAIL   adresse qui reçoit les nouvelles demandes (par défaut GOOGLE_SENDER)
@@ -13,6 +16,7 @@ const JOUR_MS = 86400000;
 const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 const SCOPE_AGENDA = "https://www.googleapis.com/auth/calendar";
 const SCOPE_MAIL = "https://www.googleapis.com/auth/gmail.send";
+export const SCOPE_TABLEAUX = "https://www.googleapis.com/auth/spreadsheets";
 
 export function configuree() {
   return Boolean(process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CALENDAR_ID);
@@ -27,7 +31,7 @@ function b64url(x) {
 const jetons = new Map();
 // Jeton d'accès Google. Avec « sub », le compte de service agit au nom de cette adresse
 // (délégation au niveau du domaine, nécessaire pour envoyer des e-mails).
-async function jeton(scope = SCOPE_AGENDA, sub) {
+export async function jeton(scope = SCOPE_AGENDA, sub) {
   const maintenant = Math.floor(Date.now() / 1000);
   const k = scope + "|" + (sub || "");
   const c = jetons.get(k);
@@ -79,7 +83,7 @@ const urlEvenements = () => `https://www.googleapis.com/calendar/v3/calendars/${
 // Identifiant d'événement choisi par le site (lettres a-v et chiffres, accepté par Google Agenda).
 export const nouvelId = () => "coco" + randomUUID().replace(/-/g, "");
 
-export async function creerRendezVous({ id, date, debut, fin, titre, description, infos }) {
+export async function creerRendezVous({ id, date, debut, fin, titre, description, infos, couleur = "5" }) {
   const rep = await fetch(urlEvenements(), {
     method: "POST",
     headers: { Authorization: `Bearer ${await jeton()}`, "Content-Type": "application/json" },
@@ -87,7 +91,7 @@ export async function creerRendezVous({ id, date, debut, fin, titre, description
       ...(id ? { id } : {}),
       summary: titre,
       description,
-      colorId: "5",
+      colorId: couleur,
       start: { dateTime: `${date}T${hhmm(debut)}:00`, timeZone: FUSEAU },
       end: { dateTime: `${date}T${hhmm(fin)}:00`, timeZone: FUSEAU },
       reminders: { useDefault: true },
@@ -117,6 +121,21 @@ export async function modifierRendezVous(id, changements) {
   return rep.json();
 }
 
+// Tous les événements entre deux instants (ISO), répétitions dépliées.
+export async function listerRendezVous(debutIso, finIso) {
+  const tous = [];
+  let page = "";
+  do {
+    const q = new URLSearchParams({ timeMin: debutIso, timeMax: finIso, singleEvents: "true", orderBy: "startTime", maxResults: "2500", ...(page ? { pageToken: page } : {}) });
+    const rep = await fetch(`${urlEvenements()}?${q}`, { headers: { Authorization: `Bearer ${await jeton()}` } });
+    if (!rep.ok) throw new Error(`Lecture de l'agenda impossible (${rep.status})`);
+    const d = await rep.json();
+    tous.push(...(d.items || []));
+    page = d.nextPageToken || "";
+  } while (page);
+  return tous.filter((e) => e.status !== "cancelled");
+}
+
 export async function supprimerRendezVous(id) {
   const rep = await fetch(`${urlEvenements()}/${encodeURIComponent(id)}`, { method: "DELETE", headers: { Authorization: `Bearer ${await jeton()}` } });
   if (!rep.ok && rep.status !== 404 && rep.status !== 410) throw new Error(`Suppression du rendez-vous impossible (${rep.status})`);
@@ -140,7 +159,8 @@ const enteteUtf8 = (t) => `=?UTF-8?B?${Buffer.from(t).toString("base64")}?=`;
 const b64lignes = (t) => Buffer.from(t).toString("base64").replace(/.{76}/g, "$&\r\n");
 const sansSaut = (t) => String(t).replace(/[\r\n]+/g, " ");
 
-export async function envoyerMail({ a, sujet, texte, html, ics, repondreA }) {
+// pieces : [{ nom, type, donnees (Buffer) }] — par exemple une facture PDF.
+export async function envoyerMail({ a, sujet, texte, html, ics, repondreA, pieces = [] }) {
   const de = expediteur();
   const f = "m" + randomUUID().replace(/-/g, ""), g = "a" + randomUUID().replace(/-/g, "");
   const lignes = [
@@ -160,6 +180,11 @@ export async function envoyerMail({ a, sujet, texte, html, ics, repondreA }) {
   ];
   if (ics) lignes.push(`--${f}`, 'Content-Type: text/calendar; charset=UTF-8; method=PUBLISH; name="rendez-vous-coco-nails.ics"',
     'Content-Disposition: attachment; filename="rendez-vous-coco-nails.ics"', "Content-Transfer-Encoding: base64", "", b64lignes(ics));
+  for (const p of pieces) {
+    const nom = sansSaut(p.nom).replace(/["\\]/g, "");
+    lignes.push(`--${f}`, `Content-Type: ${p.type}; name="${nom}"`, `Content-Disposition: attachment; filename="${nom}"`,
+      "Content-Transfer-Encoding: base64", "", Buffer.from(p.donnees).toString("base64").replace(/.{76}/g, "$&\r\n"));
+  }
   lignes.push(`--${f}--`, "");
   const rep = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",

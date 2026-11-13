@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#5e0f1c">
+<title>Ma compta — Coco Nail's</title>
+<link rel="icon" type="image/png" href="/images/favicon.png">
+<link rel="apple-touch-icon" href="/compta/icone-180.png">
+<link rel="manifest" href="/compta/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ma compta">
+<style>
+@font-face{font-family:"Coco Serif";src:url("/fonts/lora-italic.woff") format("woff");font-style:italic;font-weight:400 700;font-display:swap}
+:root{
+  --poudre:#fbe6e8;--rose:#f2c3c4;--vernis:#c8102e;--bordeaux:#5e0f1c;--caramel:#b9804a;--encre:#24161a;--gris:#6d585c;--blanc:#fffafa;
+  --vert:#2f6b3a;--vert-clair:#e7f3e9;--wa:#1f7a4a;--alerte:#b3261e;--alerte-clair:#fdecea;--jaune:#fff4d6;
+  --display:"Coco Serif",Georgia,serif;
+  --texte:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --ombre:0 10px 30px -18px rgba(94,15,28,.45);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--poudre);color:var(--encre);font-family:var(--texte);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+[hidden]{display:none!important}
+a{color:var(--bordeaux)}
+:focus-visible{outline:3px solid var(--vernis);outline-offset:2px;border-radius:8px}
+h1,h2,h3{font-family:var(--display);font-style:italic;font-weight:600;color:var(--bordeaux);line-height:1.1;margin:0}
+.ic{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wrap{width:min(760px,100% - 32px);margin-inline:auto}
+
+/* Boutons */
+button{font:inherit;color:inherit}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 20px;border-radius:999px;font-weight:700;font-size:1rem;
+  text-decoration:none;border:2px solid var(--bordeaux);background:var(--bordeaux);color:#fff;cursor:pointer;transition:transform .1s,background .2s}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.55;cursor:wait}
+.btn-trait{background:#fff;color:var(--bordeaux)}
+.btn-vert{background:var(--vert);border-color:var(--vert)}
+.btn-wa{background:var(--wa);border-color:var(--wa)}
+.btn-gris{background:#fff;color:var(--gris);border-color:#d9c6c8}
+.btn-large{width:100%}
+.btn-rond{width:48px;min-width:48px;padding:0}
+.lien-btn{background:none;border:0;color:var(--bordeaux);font-weight:700;text-decoration:underline;cursor:pointer;padding:8px 0}
+
+/* Connexion */
+.connexion{min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.connexion form{width:min(400px,100%);background:#fff;border-radius:26px;padding:34px 26px 28px;text-align:center;box-shadow:var(--ombre)}
+.connexion img{width:110px;height:110px;border-radius:50%;margin:0 auto 10px;display:block;box-shadow:0 0 0 5px var(--poudre)}
+.connexion h1{font-size:2.4rem;margin-bottom:4px}
+.connexion p{color:var(--gris);margin:0 0 20px}
+.connexion input{text-align:center}
+
+/* En-tête */
+.entete{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--poudre) 92%,transparent);backdrop-filter:blur(10px);padding-top:env(safe-area-inset-top)}
+.entete .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:66px}
+.marque{display:flex;align-items:center;gap:10px;text-decoration:none}
+.marque img{width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 3px #fff}
+.marque span{font-family:var(--display);font-style:italic;font-weight:700;font-size:1.5rem;color:var(--bordeaux)}
+.marque small{display:block;font-family:var(--texte);font-style:normal;font-weight:600;font-size:.78rem;color:var(--gris);margin-top:-2px}
+.deco{background:none;border:0;color:var(--gris);display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;padding:10px 4px}
+
+main{padding:8px 0 calc(60px + env(safe-area-inset-bottom))}
+
+/* Alertes */
+.alerte{display:flex;gap:10px;align-items:flex-start;background:var(--jaune);border:1px solid #ecd48b;color:#5a4700;border-radius:14px;padding:12px 14px;margin:0 0 10px;font-size:.93rem}
+.alerte .ic{color:#9a7a00;margin-top:1px}
+
+/* Résumé du mois */
+.resume{position:relative;overflow:hidden;background:var(--bordeaux);color:#fff;border-radius:24px;padding:22px 22px 20px;margin:6px 0 16px;box-shadow:var(--ombre)}
+.resume::after{content:"";position:absolute;right:-30px;top:-30px;width:170px;height:170px;border-radius:50%;background:radial-gradient(circle,rgba(242,195,196,.35),transparent 70%)}
+.resume .periode{font-size:.95rem;opacity:.85}
+.resume .total{font-family:var(--display);font-style:italic;font-weight:700;font-size:clamp(2.6rem,10vw,3.4rem);line-height:1.05;margin:2px 0 6px}
+.resume .details{display:flex;flex-wrap:wrap;gap:8px}
+.pastille{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-size:.85rem;font-weight:600;background:rgba(255,255,255,.14)}
+.pastille.attention{background:#fff;color:var(--alerte)}
+
+/* Ajouts */
+.ajouts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.ajout{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid transparent;border-radius:20px;padding:14px;min-height:76px;cursor:pointer;text-align:left;box-shadow:var(--ombre);font-weight:700;line-height:1.2;color:var(--encre)}
+.ajout:active{transform:scale(.98)}
+.ajout .rond{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;flex:none;color:#fff;background:var(--bordeaux)}
+.ajout .rond.msg{background:var(--wa)}
+.ajout small{display:block;font-weight:500;color:var(--gris);font-size:.82rem;margin-top:2px}
+@media (max-width:420px){.ajout{flex-direction:column;align-items:flex-start;gap:8px}}
+
+/* Onglets */
+.onglets{display:flex;background:#fff;border-radius:999px;padding:5px;gap:4px;margin-bottom:16px;box-shadow:var(--ombre);position:sticky;top:calc(66px + env(safe-area-inset-top));z-index:10}
+.onglets button{flex:1;border:0;background:none;border-radius:999px;min-height:44px;font-weight:700;font-size:.95rem;color:var(--gris);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.onglets button[aria-selected="true"]{background:var(--bordeaux);color:#fff}
+.compteur{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--vernis);color:#fff;font-size:.75rem}
+.onglets button[aria-selected="true"] .compteur{background:#fff;color:var(--bordeaux)}
+
+.titre-groupe{font-family:var(--display);font-style:italic;font-size:1.35rem;color:var(--bordeaux);margin:22px 4px 10px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.titre-groupe small{font-family:var(--texte);font-style:normal;font-size:.85rem;color:var(--gris);font-weight:600}
+.vide{background:#fff;border-radius:20px;padding:26px 20px;text-align:center;color:var(--gris)}
+.vide strong{display:block;font-family:var(--display);font-style:italic;font-size:1.3rem;color:var(--bordeaux);margin-bottom:4px}
+
+/* Cartes */
+.carte{background:#fff;border-radius:20px;padding:16px;margin-bottom:12px;box-shadow:var(--ombre)}
+.carte .haut{display:flex;align-items:center;gap:10px}
+.origine{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;flex:none;background:var(--poudre);color:var(--bordeaux)}
+.origine.Message{background:#e3f2ea;color:var(--wa)}
+.origine .ic{width:18px;height:18px}
+.quand{font-weight:700;flex:1;line-height:1.25}
+.quand small{display:block;font-weight:500;color:var(--gris);font-size:.82rem}
+.somme{font-family:var(--display);font-style:italic;font-weight:700;font-size:1.45rem;color:var(--bordeaux);white-space:nowrap}
+.cliente{font-size:1.12rem;font-weight:700;margin:10px 0 0}
+.soin{color:var(--encre)}
+.petit{color:var(--gris);font-size:.86rem}
+.avert{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--alerte);background:var(--alerte-clair);border-radius:10px;padding:6px 10px;font-size:.86rem;font-weight:600}
+.avert .ic{width:18px;height:18px}
+.actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.actions .btn{flex:1;min-width:0;padding:10px 12px}
+.actions .btn-rond{flex:none}
+.carte.annulee{opacity:.7}
+details.annulees summary{cursor:pointer;font-weight:700;color:var(--gris);padding:12px 4px;list-style:none}
+details.annulees summary::-webkit-details-marker{display:none}
+
+/* Factures */
+.recherche{display:flex;align-items:center;gap:8px;background:#fff;border-radius:999px;padding:0 16px;margin-bottom:6px;box-shadow:var(--ombre)}
+.recherche .ic{color:var(--gris)}
+.recherche input{border:0;background:none;min-height:50px;flex:1;font:inherit;outline:none;padding:0}
+.numero{font-weight:800;color:var(--bordeaux);letter-spacing:.02em}
+.envoi{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:.84rem;color:var(--vert);font-weight:600}
+.envoi.non{color:var(--caramel)}
+.envoi .ic{width:16px;height:16px}
+.paiement{display:inline-flex;align-items:center;gap:6px;color:var(--gris);font-size:.86rem}
+.paiement .ic{width:18px;height:18px}
+
+/* URSSAF */
+.reglage{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-radius:18px;padding:12px 16px;box-shadow:var(--ombre);margin-bottom:6px;flex-wrap:wrap}
+.reglage label{font-weight:600}
+.reglage select{width:auto;min-width:150px;min-height:44px;border-radius:12px;border:2px solid var(--rose);padding:0 12px;font:inherit;background:#fff;color:var(--encre)}
+.statut{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-size:.84rem;font-weight:700}
+.statut .ic{width:16px;height:16px}
+.statut.ok{background:var(--vert-clair);color:var(--vert)}
+.statut.attend{background:var(--poudre);color:var(--bordeaux)}
+.statut.retard{background:var(--alerte-clair);color:var(--alerte)}
+.statut.cours{background:#f1ecec;color:var(--gris)}
+.periode-titre{font-weight:700;text-transform:capitalize;flex:1}
+
+/* Fenêtres */
+dialog{border:0;padding:0;width:min(560px,100%);max-height:94vh;border-radius:26px 26px 0 0;margin:auto auto 0;background:var(--blanc);color:var(--encre);box-shadow:0 -10px 40px rgba(36,22,26,.25)}
+@media (min-width:640px){dialog{border-radius:26px;margin:auto}}
+dialog::backdrop{background:rgba(36,22,26,.45)}
+dialog form{display:flex;flex-direction:column;max-height:94vh}
+.d-tete{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:20px 20px 8px}
+.d-tete h2{font-size:1.65rem}
+.fermer{background:#f3e7e8;border:0;border-radius:50%;width:40px;height:40px;display:grid;place-items:center;cursor:pointer;color:var(--gris);flex:none}
+.d-corps{padding:6px 20px 12px;overflow:auto}
+.d-pied{display:flex;gap:10px;padding:12px 20px calc(18px + env(safe-area-inset-bottom));border-top:1px solid #f1e1e2;background:var(--blanc)}
+.d-pied .btn{flex:1;white-space:nowrap;padding:10px 14px}
+.champ{display:block;margin:0 0 14px}
+.champ>span{display:block;font-weight:700;font-size:.92rem;margin-bottom:5px}
+.champ>span small{font-weight:500;color:var(--gris)}
+input[type=text],input[type=tel],input[type=email],input[type=date],input[type=time],input[type=password],input[type=search],select,textarea{
+  width:100%;min-height:50px;border:2px solid var(--rose);border-radius:14px;padding:10px 14px;font:inherit;background:#fff;color:var(--encre);appearance:none;-webkit-appearance:none}
+textarea{min-height:76px;resize:vertical}
+select{background-image:linear-gradient(45deg,transparent 50%,var(--bordeaux) 50%),linear-gradient(135deg,var(--bordeaux) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
+input:focus,select:focus,textarea:focus{border-color:var(--bordeaux);outline:none}
+.deux{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.deux>*{min-width:0}
+input[type=date],input[type=time]{min-width:0;max-width:100%}
+.montant-champ{position:relative}
+.montant-champ input{font-size:1.6rem;font-weight:800;color:var(--bordeaux);padding-right:44px}
+.montant-champ::after{content:"€";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:1.4rem;font-weight:800;color:var(--bordeaux)}
+.cases{display:flex;flex-direction:column;gap:8px}
+.case{display:flex;align-items:center;gap:12px;border:2px solid var(--rose);border-radius:14px;padding:10px 14px;cursor:pointer;background:#fff}
+.case input{width:22px;height:22px;accent-color:var(--bordeaux);flex:none;margin:0}
+.case:has(input:checked){border-color:var(--bordeaux);background:#fff6f7}
+.case .petit{display:block}
+.puces{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.puce{position:relative}
+.puce input{position:absolute;opacity:0;inset:0}
+.puce span{display:flex;align-items:center;gap:8px;justify-content:center;min-height:52px;border:2px solid var(--rose);border-radius:14px;font-weight:700;background:#fff;cursor:pointer;padding:6px 10px;text-align:center;line-height:1.15}
+.puce input:checked+span{border-color:var(--bordeaux);background:var(--bordeaux);color:#fff}
+.puce input:focus-visible+span{outline:3px solid var(--vernis);outline-offset:2px}
+.recap{background:var(--poudre);border-radius:16px;padding:12px 14px;margin-bottom:16px}
+.recap strong{display:block}
+.erreur{color:var(--alerte);font-weight:600;margin:4px 0 0;min-height:0}
+.erreur:empty{display:none}
+.plus summary{cursor:pointer;font-weight:700;color:var(--bordeaux);padding:6px 0 12px}
+.grand-montant{font-family:var(--display);font-style:italic;font-weight:700;font-size:3.2rem;color:var(--bordeaux);text-align:center;line-height:1;margin:6px 0}
+.etapes-d{margin:14px 0 0;padding:0;list-style:none;counter-reset:e}
+.etapes-d li{counter-increment:e;display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.etapes-d li::before{content:counter(e);flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--bordeaux);color:#fff;font-weight:800}
+.etapes-d li>div{flex:1}
+.envoi-bloc{background:#fff;border:2px solid var(--rose);border-radius:18px;padding:14px;margin-bottom:12px}
+.envoi-bloc .ligne{display:flex;gap:8px;margin-top:8px}
+.envoi-bloc .ligne input{flex:1;min-width:0}
+.envoi-bloc .titre{display:flex;align-items:center;gap:8px;font-weight:800}
+.succes{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;margin-bottom:14px}
+.succes .rond{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:var(--vert-clair);color:var(--vert)}
+.succes .rond .ic{width:30px;height:30px;stroke-width:2.6}
+
+/* Messages */
+.toast[popover]{inset:auto;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));margin:0;border:0;overflow:visible}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translate(-50%,30px);opacity:0;background:var(--encre);color:#fff;padding:12px 20px;border-radius:999px;font-weight:600;z-index:100;transition:.25s;max-width:calc(100% - 32px);text-align:center;pointer-events:none}
+.toast.voir{opacity:1;transform:translate(-50%,0)}
+.toast.mauvais{background:var(--alerte)}
+.chargement{display:grid;place-items:center;min-height:60vh;color:var(--gris)}
+.roue{width:38px;height:38px;border:4px solid var(--rose);border-top-color:var(--bordeaux);border-radius:50%;animation:tourne .8s linear infinite;margin:0 auto 12px}
+@keyframes tourne{to{transform:rotate(1turn)}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-tel" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><path d="M8 10.5h8M8 13.5h5"/></symbol>
+  <symbol id="i-site" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-modif" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-retour" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+  <symbol id="i-facture" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 24 24"><path d="M3 21l1.65-4.95A8.5 8.5 0 1 1 7.9 19.4z"/><path d="M9.2 8.6c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.6 1.5c.1.2 0 .4-.1.6l-.5.6c.4.9 1.2 1.8 2.3 2.4l.6-.6c.2-.2.4-.2.6-.1l1.5.7c.2.1.3.3.3.5v.5c0 .4-.2.8-.6 1-.8.4-1.9.4-3.2-.2a8 8 0 0 1-3.6-3.6c-.6-1.3-.5-2.5.3-3.2z"/></symbol>
+  <symbol id="i-carte" viewBox="0 0 24 24"><rect x="1.5" y="4.5" width="21" height="15" rx="2.5"/><path d="M1.5 9.5h21M5.5 15h4"/></symbol>
+  <symbol id="i-especes" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></symbol>
+  <symbol id="i-cheque" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M5.5 10h7M5.5 14h3.5M12.5 14.5c.9-1.6 1.6.6 2.4-.8s1.4.7 2.2-.4"/></symbol>
+  <symbol id="i-virement" viewBox="0 0 24 24"><path d="M3 21h18M5 18v-7M9.5 18v-7M14.5 18v-7M19 18v-7M12 3l9 5H3z"/></symbol>
+  <symbol id="i-agenda" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-sortir" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-copier" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-ouvrir" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></symbol>
+  <symbol id="i-chercher" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></symbol>
+  <symbol id="i-alerte" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+  <symbol id="i-urssaf" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></symbol>
+  <symbol id="i-horloge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-cadenas" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+</svg>
+
+<!-- Connexion -->
+<div class="connexion" id="ecran-connexion" hidden>
+  <form id="f-connexion">
+    <img src="/images/logo-coco-nails.webp" alt="Coco Nail's">
+    <h1>Ma compta</h1>
+    <p>Espace privé de Coco Nail's</p>
+    <label class="champ"><span class="sr" hidden>Mot de passe</span>
+      <input type="password" name="motdepasse" autocomplete="current-password" placeholder="Mot de passe" required aria-label="Mot de passe"></label>
+    <button class="btn btn-large" type="submit"><svg class="ic"><use href="#i-cadenas"/></svg> Entrer</button>
+    <p class="erreur" id="err-connexion" role="alert"></p>
+  </form>
+</div>
+
+<div id="ecran-chargement" class="chargement"><div><div class="roue"></div>Chargement de votre compta…</div></div>
+
+<!-- Application -->
+<div id="ecran-app" hidden>
+  <header class="entete">
+    <div class="wrap">
+      <a class="marque" href="#valider"><img src="/images/logo-coco-nails.webp" alt=""><span>Ma compta<small>Coco Nail's</small></span></a>
+      <button class="deco" id="b-deco" type="button"><svg class="ic"><use href="#i-sortir"/></svg> Quitter</button>
+    </div>
+  </header>
+  <main class="wrap">
+    <div id="alertes"></div>
+    <section class="resume" id="resume" aria-live="polite"></section>
+    <div class="ajouts">
+      <button class="ajout" type="button" data-act="ajouter" data-origine="Téléphone"><span class="rond"><svg class="ic"><use href="#i-tel"/></svg></span><span>RDV par téléphone<small>Ajouter une ligne</small></span></button>
+      <button class="ajout" type="button" data-act="ajouter" data-origine="Message"><span class="rond msg"><svg class="ic"><use href="#i-msg"/></svg></span><span>RDV par message<small>WhatsApp, SMS, Instagram</small></span></button>
+    </div>
+    <nav class="onglets" role="tablist" aria-label="Rubriques">
+      <button role="tab" id="t-valider" aria-controls="v-valider" data-onglet="valider">À valider <span class="compteur" id="c-valider" hidden></span></button>
+      <button role="tab" id="t-factures" aria-controls="v-factures" data-onglet="factures">Factures</button>
+      <button role="tab" id="t-urssaf" aria-controls="v-urssaf" data-onglet="urssaf">URSSAF <span class="compteur" id="c-urssaf" hidden></span></button>
+    </nav>
+    <section id="v-valider" role="tabpanel" aria-labelledby="t-valider"></section>
+    <section id="v-factures" role="tabpanel" aria-labelledby="t-factures" hidden>
+      <label class="recherche"><svg class="ic"><use href="#i-chercher"/></svg><input type="search" id="recherche" placeholder="Chercher une cliente ou un n° de facture" aria-label="Chercher une facture"></label>
+      <div id="liste-factures"></div>
+    </section>
+    <section id="v-urssaf" role="tabpanel" aria-labelledby="t-urssaf" hidden></section>
+  </main>
+</div>
+
+<!-- Ajouter / modifier un rendez-vous -->
+<dialog id="d-saisie" aria-labelledby="d-saisie-titre">
+  <form method="dialog" id="f-saisie" novalidate>
+    <div class="d-tete"><h2 id="d-saisie-titre">Rendez-vous</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps">
+      <label class="champ"><span>Cliente</span><input type="text" name="cliente" list="l-clientes" autocomplete="off" required placeholder="Prénom et nom"></label>
+      <datalist id="l-clientes"></datalist>
+      <div class="deux">
+        <label class="champ"><span>Téléphone <small>(facultatif)</small></span><input type="tel" name="telephone" inputmode="tel" autocomplete="off"></label>
+        <label class="champ"><span>E-mail <small>(facultatif)</small></span><input type="email" name="email" inputmode="email" autocomplete="off"></label>
+      </div>
+      <div class="deux">
+        <label class="champ"><span>Date</span><input type="date" name="date" required></label>
+        <label class="champ"><span>Heure <small>(facultatif)</small></span><input type="time" name="heure" step="300"></label>
+      </div>
+      <label class="champ"><span>Soin</span><select name="soin" required></select></label>
+      <label class="champ" id="c-autre" hidden><span>Nom de la prestation</span><input type="text" name="autre" placeholder="Par exemple : réparation d'un ongle"></label>
+      <div class="champ" id="c-options" hidden><span>Options</span><div class="cases" id="options"></div></div>
+      <label class="champ"><span>Montant prévu <small id="tarif-aide"></small></span><span class="montant-champ"><input type="text" name="montant" inputmode="decimal" autocomplete="off"></span></label>
+      <label class="case" id="c-agenda" hidden><input type="checkbox" name="agenda" checked><span><strong>Bloquer ce créneau dans mon agenda</strong><span class="petit">Il ne sera plus proposé aux clientes sur le site.</span></span></label>
+      <label class="champ" style="margin-top:14px"><span>Note <small>(facultatif)</small></span><textarea name="note" rows="2"></textarea></label>
+      <p class="erreur" role="alert"></p>
+    </div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Annuler</button><button class="btn" type="submit">Enregistrer</button></div>
+  </form>
+</dialog>
+
+<!-- Valider (paiement reçu) -->
+<dialog id="d-valider" aria-labelledby="d-valider-titre">
+  <form method="dialog" id="f-valider" novalidate>
+    <div class="d-tete"><h2 id="d-valider-titre">Paiement reçu</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps">
+      <div class="recap" id="valider-recap"></div>
+      <label class="champ"><span>Montant encaissé</span><span class="montant-champ"><input type="text" name="montant" inputmode="decimal" autocomplete="off" required></span></label>
+      <div class="champ"><span>Moyen de paiement</span><div class="puces" id="puces-paiement"></div></div>
+      <label class="champ"><span>Payé le</span><input type="date" name="paye_le" required></label>
+      <details class="plus"><summary>Coordonnées de la cliente sur la facture</summary>
+        <label class="champ"><span>Nom</span><input type="text" name="cliente" autocomplete="off"></label>
+        <div class="deux">
+          <label class="champ"><span>Téléphone</span><input type="tel" name="telephone" inputmode="tel" autocomplete="off"></label>
+          <label class="champ"><span>E-mail</span><input type="email" name="email" inputmode="email" autocomplete="off"></label>
+        </div>
+        <label class="champ"><span>Adresse <small>(si la cliente la demande)</small></span><input type="text" name="adresse" autocomplete="off"></label>
+      </details>
+      <p class="petit">La facture reçoit le numéro suivant et ne pourra plus être modifiée.</p>
+      <p class="erreur" role="alert"></p>
+    </div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Annuler</button><button class="btn btn-vert" type="submit"><svg class="ic"><use href="#i-ok"/></svg> Valider</button></div>
+  </form>
+</dialog>
+
+<!-- Envoyer une facture -->
+<dialog id="d-envoi" aria-labelledby="d-envoi-titre">
+  <form method="dialog" id="f-envoi" novalidate>
+    <div class="d-tete"><h2 id="d-envoi-titre">Facture</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps">
+      <div class="succes" id="envoi-succes" hidden><span class="rond"><svg class="ic"><use href="#i-ok"/></svg></span><strong>C'est validé !</strong></div>
+      <div class="recap" id="envoi-recap"></div>
+      <a class="btn btn-trait btn-large" id="envoi-voir" target="_blank" rel="noopener"><svg class="ic"><use href="#i-facture"/></svg> Voir la facture</a>
+      <div style="height:12px"></div>
+      <div class="envoi-bloc">
+        <div class="titre"><svg class="ic"><use href="#i-mail"/></svg> Par e-mail</div><div class="petit">La facture part en PDF, depuis contact@coconails72.com.</div>
+        <div class="ligne"><input type="email" name="email" inputmode="email" placeholder="Adresse e-mail de la cliente" aria-label="E-mail de la cliente"><button class="btn" type="button" id="b-mail">Envoyer</button></div>
+      </div>
+      <div class="envoi-bloc">
+        <div class="titre" style="color:var(--wa)"><svg class="ic"><use href="#i-wa"/></svg> Par WhatsApp</div>
+        <div class="ligne"><input type="tel" name="telephone" inputmode="tel" placeholder="Numéro de la cliente" aria-label="Téléphone de la cliente"><a class="btn btn-wa" id="b-wa" target="_blank" rel="noopener">Ouvrir</a></div>
+        <p class="petit" style="margin:8px 0 0">WhatsApp s'ouvre avec le message déjà écrit : il ne reste qu'à appuyer sur Envoyer.</p>
+      </div>
+      <p class="petit" id="envoi-historique"></p>
+      <p class="erreur" role="alert"></p>
+    </div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Fermer</button></div>
+  </form>
+</dialog>
+
+<!-- Déclarer à l'URSSAF -->
+<dialog id="d-declarer" aria-labelledby="d-declarer-titre">
+  <form method="dialog" id="f-declarer" novalidate>
+    <div class="d-tete"><h2 id="d-declarer-titre">Déclarer à l'URSSAF</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps" id="declarer-corps"></div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Plus tard</button><button class="btn btn-vert" type="submit"><svg class="ic"><use href="#i-ok"/></svg> C'est déclaré</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+let V = null;            // tout ce que renvoie le serveur
+let onglet = "valider";
+
+// ---------- Petits outils ----------
+const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const ic = (n) => `<svg class="ic" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const eur = (n) => { n = Number(n) || 0; return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: n % 1 ? 2 : 0 }).format(n); };
+const dt = (d) => { const [a, m, j] = d.split("-").map(Number); return new Date(Date.UTC(a, m - 1, j)); };
+const jourCourt = (d) => d ? new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(dt(d)) : "";
+const jourNum = (d) => d ? new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(dt(d)) : "";
+const jourLong = (d) => d ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(dt(d)) : "";
+const moisAnnee = (d) => new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }).format(dt(d));
+const envoisFr = (t) => String(t || "").replace(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/g, "$3/$2/$1 à $4 h $5");
+const heureFr = (h) => h ? h.replace(/^0/, "").replace(":", " h ").replace(/ h 00$/, " h") : "";
+const prixMin = (t) => { const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(t || "")); return m ? Number(m[1].replace(",", ".")) : 0; };
+const nombre = (t) => Number(String(t).replace(/\s/g, "").replace(",", "."));
+const ICONE_ORIGINE = { Site: ["site", "Réservé sur le site"], "Téléphone": ["tel", "Pris par téléphone"], Message: ["msg", "Pris par message"] };
+const ICONE_PAIEMENT = { "Carte bancaire": "carte", "Espèces": "especes", "Chèque": "cheque", "Virement": "virement" };
+function telInternational(t) {
+  let c = String(t || "").replace(/[^\d+]/g, "").replace(/^\+/, "").replace(/^00/, "");
+  if (/^0\d{9}$/.test(c)) c = "33" + c.slice(1);
+  return c;
+}
+function toast(msg, mauvais = false) {
+  const t = $("#toast");
+  // En « popover », le message passe au-dessus des fenêtres ouvertes.
+  if (t.showPopover) { try { t.hidePopover(); } catch {} try { t.showPopover(); } catch {} }
+  t.textContent = msg; t.classList.toggle("mauvais", mauvais);
+  requestAnimationFrame(() => t.classList.add("voir"));
+  clearTimeout(toast.m); toast.m = setTimeout(() => { t.classList.remove("voir"); setTimeout(() => { try { t.hidePopover(); } catch {} }, 300); }, 3200);
+}
+
+// ---------- Échanges avec le serveur ----------
+async function api(action, donnees = {}) {
+  let r, j = {};
+  try {
+    r = await fetch("/api/compta", action
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ action, ...donnees }) }
+      : { credentials: "same-origin", cache: "no-store" });
+    j = await r.json();
+  } catch { throw new Error("Pas de connexion internet ? Réessayez dans un instant."); }
+  if (r.status === 401 && j.connexion) { montrer("connexion"); throw new Error(j.erreur); }
+  if (!r.ok || !j.ok) { const e = new Error(j.erreur || "Un problème est survenu. Réessayez."); e.code = j.code; e.configuration = j.configuration; throw e; }
+  if (j.vue) { V = j.vue; rendre(); }
+  return j;
+}
+async function occupe(bouton, fn) {
+  if (bouton) bouton.disabled = true;
+  try { return await fn(); } finally { if (bouton) bouton.disabled = false; }
+}
+function montrer(ecran) {
+  $("#ecran-connexion").hidden = ecran !== "connexion";
+  $("#ecran-app").hidden = ecran !== "app";
+  $("#ecran-chargement").hidden = ecran !== "chargement";
+  if (ecran === "connexion") setTimeout(() => $("#f-connexion input").focus(), 50);
+}
+
+// ---------- Affichage ----------
+function rendre() {
+  if (!V) return;
+  $("#alertes").innerHTML = V.alertes.map((a) => `<div class="alerte">${ic("alerte")}<span>${esc(a)}</span></div>`).join("");
+  rendreResume(); rendreValider(); rendreFactures(); rendreUrssaf();
+  $("#l-clientes").innerHTML = V.clientes.map((c) => `<option value="${esc(c.nom)}">`).join("");
+}
+
+function periodeCourante() { return V.periodes.find((p) => p.du <= V.aujourdhui && V.aujourdhui <= p.au) || V.periodes[0]; }
+const aDeclarer = () => V.periodes.filter((p) => p.terminee && !p.declaration);
+
+function rendreResume() {
+  const p = periodeCourante();
+  const attente = V.lignes.filter((l) => l.etat === "À valider" && l.date <= V.aujourdhui).length;
+  const dec = aDeclarer();
+  $("#resume").innerHTML = `<div class="periode">${esc(V.reglages.periodicite === "trimestrielle" ? "Encaissé au " + p.libelle : "Encaissé en " + p.libelle)}</div>
+    <div class="total">${eur(p.total)}</div>
+    <div class="details"><span class="pastille">${ic("facture")} ${p.nb} facture${p.nb > 1 ? "s" : ""}</span>
+    ${attente ? `<span class="pastille">${ic("horloge")} ${attente} à valider</span>` : ""}
+    ${dec.length ? `<span class="pastille attention">${ic("urssaf")} Déclaration URSSAF à faire</span>` : ""}</div>`;
+  const cv = $("#c-valider"); cv.hidden = !attente; cv.textContent = attente;
+  const cu = $("#c-urssaf"); cu.hidden = !dec.length; cu.textContent = dec.length;
+}
+
+function carteLigne(l) {
+  const [io, to] = ICONE_ORIGINE[l.origine] || ICONE_ORIGINE["Téléphone"];
+  const quoi = [l.soin, l.options].filter(Boolean).join(" + ");
+  const attente = l.etat === "À valider";
+  return `<article class="carte ${l.etat === "Annulée" ? "annulee" : ""}">
+    <div class="haut"><span class="origine ${esc(l.origine)}" title="${esc(to)}" aria-label="${esc(to)}">${ic(io)}</span>
+      <span class="quand">${esc(jourCourt(l.date))}${l.heure ? " · " + esc(heureFr(l.heure)) : ""}<small>${esc(to)}</small></span>
+      <span class="somme">${l.montant !== "" ? eur(l.montant) : ""}</span></div>
+    <p class="cliente">${esc(l.cliente)}</p>
+    <div class="soin">${esc(quoi)}</div>
+    ${l.tarif ? `<div class="petit">Tarif : ${esc(l.tarif)}</div>` : ""}
+    ${l.note ? `<div class="petit">${esc(l.note)}</div>` : ""}
+    ${l.absent ? `<div class="avert">${ic("alerte")} Ce rendez-vous n'est plus dans votre agenda.</div>` : ""}
+    <div class="actions">${attente
+      ? `<button class="btn btn-vert" type="button" data-act="valider" data-id="${esc(l.id)}">${ic("ok")} Valider</button>
+         <button class="btn btn-trait btn-rond" type="button" data-act="modifier" data-id="${esc(l.id)}" aria-label="Modifier" title="Modifier">${ic("modif")}</button>
+         <button class="btn btn-gris btn-rond" type="button" data-act="annuler" data-id="${esc(l.id)}" aria-label="Annulée, la cliente n'est pas venue" title="Annulée">${ic("x")}</button>`
+      : `<button class="btn btn-gris" type="button" data-act="retablir" data-id="${esc(l.id)}">${ic("retour")} Remettre à valider</button>`}</div>
+  </article>`;
+}
+
+function rendreValider() {
+  const att = V.lignes.filter((l) => l.etat === "À valider");
+  const tri = (a, b) => (a.date + a.heure < b.date + b.heure ? -1 : 1);
+  const passes = att.filter((l) => l.date <= V.aujourdhui).sort(tri);
+  const avenir = att.filter((l) => l.date > V.aujourdhui).sort(tri);
+  const annulees = V.lignes.filter((l) => l.etat === "Annulée").sort(tri).reverse().slice(0, 20);
+  let h = `<h2 class="titre-groupe">Prêts à valider <small>${passes.length}</small></h2>`;
+  h += passes.length ? passes.map(carteLigne).join("") : `<div class="vide"><strong>Tout est à jour</strong>Les rendez-vous passés apparaissent ici pour être validés.</div>`;
+  if (avenir.length) h += `<h2 class="titre-groupe">À venir <small>${avenir.length}</small></h2>` + avenir.map(carteLigne).join("");
+  if (annulees.length) h += `<details class="annulees"><summary>Voir les rendez-vous annulés (${annulees.length})</summary>${annulees.map(carteLigne).join("")}</details>`;
+  $("#v-valider").innerHTML = h;
+}
+
+function rendreFactures() {
+  const q = $("#recherche").value.trim().toLowerCase();
+  const fs = V.factures.filter((f) => !q || (f.numero + " " + f.cliente).toLowerCase().includes(q)).sort((a, b) => (a.numero < b.numero ? 1 : -1));
+  if (!V.factures.length) { $("#liste-factures").innerHTML = `<div class="vide" style="margin-top:12px"><strong>Aucune facture pour l'instant</strong>Elles se créent toutes seules quand vous validez un rendez-vous.</div>`; return; }
+  if (!fs.length) { $("#liste-factures").innerHTML = `<div class="vide" style="margin-top:12px">Aucune facture ne correspond à « ${esc(q)} ».</div>`; return; }
+  const groupes = new Map();
+  for (const f of fs) { const k = f.date.slice(0, 7); if (!groupes.has(k)) groupes.set(k, []); groupes.get(k).push(f); }
+  $("#liste-factures").innerHTML = [...groupes].map(([k, liste]) => `<h2 class="titre-groupe"><span style="text-transform:capitalize">${esc(moisAnnee(k + "-01"))}</span><small>${eur(liste.reduce((a, f) => a + f.montant, 0))}</small></h2>` +
+    liste.map((f) => `<article class="carte">
+      <div class="haut"><span class="quand"><span class="numero">${esc(f.numero)}</span><small>Le ${esc(jourNum(f.date))}</small></span><span class="somme">${eur(f.montant)}</span></div>
+      <p class="cliente">${esc(f.cliente)}</p>
+      <div class="soin">${esc([f.prestation.soin, f.prestation.options].filter(Boolean).join(" + "))}</div>
+      <span class="paiement">${ic(ICONE_PAIEMENT[f.paiement] || "carte")} ${esc(f.paiement)}</span>
+      <div class="envoi ${f.envois ? "" : "non"}">${f.envois ? ic("ok") + " Envoyée : " + esc(envoisFr(f.envois)) : ic("horloge") + " Pas encore envoyée"}</div>
+      <div class="actions">
+        <a class="btn btn-trait" href="${esc(f.lien)}" target="_blank" rel="noopener">${ic("facture")} Voir</a>
+        <button class="btn" type="button" data-act="envoyer" data-id="${esc(f.numero)}">${ic("mail")} ${ic("wa")} Envoyer</button>
+      </div></article>`).join("")).join("");
+}
+
+function rendreUrssaf() {
+  const auj = V.aujourdhui;
+  let h = `<div class="reglage"><label for="periodicite">Je déclare chaque</label>
+    <select id="periodicite"><option value="mensuelle">mois</option><option value="trimestrielle">trimestre</option></select></div>
+    <p class="petit" style="margin:6px 4px 0">Le montant à déclarer est le total des paiements reçus pendant la période (date « Payé le »).</p>`;
+  h += V.periodes.map((p) => {
+    let statut;
+    if (p.declaration) statut = `<span class="statut ok">${ic("ok")} Déclaré le ${esc(jourNum(p.declaration.le.slice(0, 10)))}</span>`;
+    else if (!p.terminee) statut = `<span class="statut cours">${ic("horloge")} En cours</span>`;
+    else if (p.echeance < auj) statut = `<span class="statut retard">${ic("alerte")} En retard (avant le ${esc(jourLong(p.echeance))})</span>`;
+    else statut = `<span class="statut attend">${ic("urssaf")} À déclarer avant le ${esc(jourLong(p.echeance))}</span>`;
+    return `<article class="carte">
+      <div class="haut"><span class="periode-titre">${esc(p.libelle)}</span><span class="somme">${eur(p.declaration ? p.declaration.montant : p.total)}</span></div>
+      <div class="petit" style="margin:4px 0 10px">${p.nb} facture${p.nb > 1 ? "s" : ""}</div>${statut}
+      ${!p.declaration && p.aValider ? `<div class="avert">${ic("alerte")} ${p.aValider} rendez-vous de cette période ${p.aValider > 1 ? "sont" : "est"} encore à valider.</div>` : ""}
+      ${p.terminee && !p.declaration ? `<div class="actions"><button class="btn btn-vert" type="button" data-act="declarer" data-id="${esc(p.periode)}">${ic("urssaf")} Déclarer</button></div>` : ""}
+    </article>`;
+  }).join("");
+  $("#v-urssaf").innerHTML = h;
+  $("#periodicite").value = V.reglages.periodicite;
+}
+
+// ---------- Onglets ----------
+function choisirOnglet(nom, maj = true) {
+  if (!["valider", "factures", "urssaf"].includes(nom)) nom = "valider";
+  onglet = nom;
+  for (const b of $$(".onglets button")) b.setAttribute("aria-selected", String(b.dataset.onglet === nom));
+  for (const n of ["valider", "factures", "urssaf"]) $("#v-" + n).hidden = n !== nom;
+  if (maj && location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
+}
+window.addEventListener("hashchange", () => choisirOnglet(location.hash.slice(1), false));
+
+// ---------- Ajouter / modifier ----------
+const fs = $("#f-saisie");
+let saisieLigne = null, saisieOrigine = "Téléphone", montantTouche = false;
+
+function remplirSoins(courant) {
+  const cats = [];
+  for (const s of V.soins.soins) if (!cats.includes(s.categorie || "Autres soins")) cats.push(s.categorie || "Autres soins");
+  const connu = V.soins.soins.some((s) => s.nom === courant);
+  fs.soin.innerHTML = `<option value="">Choisir…</option>` + cats.map((c) => `<optgroup label="${esc(c)}">${V.soins.soins.filter((s) => (s.categorie || "Autres soins") === c)
+    .map((s) => `<option value="${esc(s.nom)}">${esc(s.nom)}${s.prix ? " — " + esc(s.prix) : ""}</option>`).join("")}</optgroup>`).join("")
+    + `<option value="__autre">Autre prestation…</option>`;
+  fs.soin.value = !courant ? "" : connu ? courant : "__autre";
+  fs.autre.value = courant && !connu ? courant : "";
+}
+function remplirOptions(cochees = []) {
+  const s = V.soins.soins.find((x) => x.nom === fs.soin.value);
+  const possible = fs.soin.value === "__autre" || (s && s.options_possibles !== false);
+  $("#c-options").hidden = !possible || !V.soins.options.length;
+  $("#c-autre").hidden = fs.soin.value !== "__autre";
+  $("#options").innerHTML = V.soins.options.map((o) => `<label class="case"><input type="checkbox" name="opt" value="${esc(o.nom)}" ${cochees.includes(o.nom) ? "checked" : ""}>
+    <span><strong>${esc(o.nom)}</strong><span class="petit">${esc(o.prix || "")}</span></span></label>`).join("");
+}
+function optionsCochees() { return $("#c-options").hidden ? [] : $$("input[name=opt]:checked", fs).map((i) => i.value); }
+function majTarif() {
+  const s = V.soins.soins.find((x) => x.nom === fs.soin.value);
+  const opts = optionsCochees().map((n) => V.soins.options.find((o) => o.nom === n)).filter(Boolean);
+  const total = (s ? prixMin(s.prix) : 0) + opts.reduce((a, o) => a + prixMin(o.prix), 0);
+  const variable = opts.some((o) => /à|-/.test(o.prix || ""));
+  $("#tarif-aide").textContent = s ? `(tarif : ${eur(total)}${variable ? " minimum" : ""})` : "";
+  if (!montantTouche && s) fs.montant.value = String(total).replace(".", ",");
+}
+function majAgenda() {
+  $("#c-agenda").hidden = !(V.agenda && !saisieLigne && fs.heure.value && fs.date.value >= V.aujourdhui);
+}
+function ouvrirSaisie(origine, ligne) {
+  saisieLigne = ligne || null; saisieOrigine = origine; montantTouche = Boolean(ligne);
+  $("#d-saisie-titre").textContent = ligne ? "Modifier le rendez-vous" : origine === "Message" ? "RDV pris par message" : "RDV pris par téléphone";
+  fs.reset();
+  $(".erreur", fs).textContent = "";
+  fs.cliente.value = ligne ? ligne.cliente : "";
+  fs.telephone.value = ligne ? ligne.telephone : "";
+  fs.email.value = ligne ? ligne.email : "";
+  fs.date.value = ligne ? ligne.date : V.aujourdhui;
+  fs.heure.value = ligne ? ligne.heure : "";
+  fs.note.value = ligne ? ligne.note : "";
+  remplirSoins(ligne ? ligne.soin : "");
+  remplirOptions(ligne && ligne.options ? ligne.options.split(",").map((x) => x.trim()) : []);
+  fs.montant.value = ligne && ligne.montant !== "" ? String(ligne.montant).replace(".", ",") : "";
+  majTarif(); majAgenda();
+  $("#d-saisie").showModal();
+}
+fs.soin.addEventListener("change", () => { remplirOptions(optionsCochees()); majTarif(); });
+fs.addEventListener("change", (e) => { if (e.target.name === "opt") majTarif(); if (["date", "heure"].includes(e.target.name)) majAgenda(); });
+fs.heure.addEventListener("input", majAgenda);
+fs.montant.addEventListener("input", () => (montantTouche = fs.montant.value.trim() !== ""));
+fs.cliente.addEventListener("change", () => {
+  const c = V.clientes.find((x) => x.nom.toLowerCase() === fs.cliente.value.trim().toLowerCase());
+  if (!c) return;
+  if (!fs.telephone.value) fs.telephone.value = c.telephone;
+  if (!fs.email.value) fs.email.value = c.email;
+});
+fs.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $(".erreur", fs); err.textContent = "";
+  const soin = fs.soin.value === "__autre" ? fs.autre.value.trim() : fs.soin.value;
+  if (fs.cliente.value.trim().length < 2) return (err.textContent = "Indiquez le nom de la cliente.");
+  if (!soin) return (err.textContent = "Choisissez le soin.");
+  const m = fs.montant.value.trim() === "" ? "" : nombre(fs.montant.value);
+  if (m !== "" && !(m >= 0)) return (err.textContent = "Le montant n'est pas valide.");
+  const d = { cliente: fs.cliente.value, telephone: fs.telephone.value, email: fs.email.value, date: fs.date.value, heure: fs.heure.value,
+    soin, options: optionsCochees(), montant: m, note: fs.note.value, origine: saisieOrigine, agenda: !$("#c-agenda").hidden && fs.agenda.checked };
+  const bouton = $("button[type=submit]", fs);
+  await occupe(bouton, async () => {
+    try {
+      if (saisieLigne) await api("modifier", { ...d, id: saisieLigne.id });
+      else {
+        try { await api("ajouter", d); }
+        catch (x) {
+          if (x.code !== "occupe" || !confirm("Ce créneau est déjà occupé dans votre agenda. L'ajouter quand même ?")) throw x;
+          await api("ajouter", { ...d, forcer: true });
+        }
+      }
+      $("#d-saisie").close();
+      toast(saisieLigne ? "Rendez-vous modifié" : "Rendez-vous ajouté");
+      choisirOnglet("valider");
+    } catch (x) { err.textContent = x.message; }
+  });
+});
+
+// ---------- Valider ----------
+const fv = $("#f-valider");
+let ligneAValider = null;
+function ouvrirValider(l) {
+  ligneAValider = l;
+  fv.reset(); $(".erreur", fv).textContent = "";
+  $("#valider-recap").innerHTML = `<strong>${esc(l.cliente)}</strong>${esc([l.soin, l.options].filter(Boolean).join(" + "))}<div class="petit">${esc(jourCourt(l.date))}${l.heure ? " · " + esc(heureFr(l.heure)) : ""}</div>`;
+  fv.montant.value = l.montant !== "" ? String(l.montant).replace(".", ",") : "";
+  fv.paye_le.value = V.aujourdhui > l.date && l.date >= V.aujourdhui.slice(0, 8) + "01" ? l.date : V.aujourdhui;
+  fv.paye_le.max = V.aujourdhui;
+  $("#puces-paiement").innerHTML = V.moyens.map((m, i) => `<label class="puce"><input type="radio" name="paiement" value="${esc(m)}" ${i === 0 ? "checked" : ""}><span>${ic(ICONE_PAIEMENT[m] || "carte")} ${esc(m)}</span></label>`).join("");
+  fv.cliente.value = l.cliente; fv.telephone.value = l.telephone; fv.email.value = l.email; fv.adresse.value = l.adresse;
+  $("#d-valider").showModal();
+}
+fv.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $(".erreur", fv); err.textContent = "";
+  const montant = nombre(fv.montant.value);
+  if (!(montant > 0)) return (err.textContent = "Indiquez le montant encaissé.");
+  const paiement = (fv.querySelector("input[name=paiement]:checked") || {}).value;
+  if (!paiement) return (err.textContent = "Choisissez le moyen de paiement.");
+  await occupe($("button[type=submit]", fv), async () => {
+    try {
+      const r = await api("valider", { id: ligneAValider.id, montant, paiement, paye_le: fv.paye_le.value, cliente: fv.cliente.value, telephone: fv.telephone.value, email: fv.email.value, adresse: fv.adresse.value });
+      $("#d-valider").close();
+      ouvrirEnvoi(r.facture, true);
+    } catch (x) { err.textContent = x.message; }
+  });
+});
+
+// ---------- Envoyer la facture ----------
+const fe = $("#f-envoi");
+let factureCourante = null;
+function lienWhatsapp(f, tel) {
+  const prenom = String(f.cliente || "").trim().split(/\s+/)[0];
+  const texte = `Bonjour ${prenom}, merci pour votre visite chez Coco Nail's 💅\nVoici votre facture n° ${f.numero} (${eur(f.montant)}) : ${f.lien}\nÀ bientôt !\nCoralie`;
+  const n = telInternational(tel);
+  return `https://wa.me/${n.length >= 8 ? n : ""}?text=${encodeURIComponent(texte)}`;
+}
+function majEnvoi() {
+  const f = factureCourante; if (!f) return;
+  $("#b-wa").href = lienWhatsapp(f, fe.telephone.value);
+  $("#envoi-historique").textContent = f.envois ? "Déjà envoyée : " + envoisFr(f.envois) : "";
+}
+function ouvrirEnvoi(numero, apresValidation = false) {
+  const f = V.factures.find((x) => x.numero === numero); if (!f) return;
+  factureCourante = f;
+  $(".erreur", fe).textContent = "";
+  $("#envoi-succes").hidden = !apresValidation;
+  $("#d-envoi-titre").textContent = apresValidation ? "Facture créée" : "Envoyer la facture";
+  $("#envoi-recap").innerHTML = `<strong>${esc(f.numero)} · ${eur(f.montant)}</strong>${esc(f.cliente)} — ${esc([f.prestation.soin, f.prestation.options].filter(Boolean).join(" + "))}`;
+  $("#envoi-voir").href = f.lien;
+  fe.email.value = f.email || ""; fe.telephone.value = f.telephone || "";
+  majEnvoi();
+  if (!$("#d-envoi").open) $("#d-envoi").showModal();
+}
+fe.telephone.addEventListener("input", majEnvoi);
+fe.addEventListener("submit", (e) => e.preventDefault());
+$("#b-mail").addEventListener("click", async (e) => {
+  const err = $(".erreur", fe); err.textContent = "";
+  if (!/^\S+@\S+\.\S+$/.test(fe.email.value.trim())) return (err.textContent = "Indiquez l'adresse e-mail de la cliente.");
+  await occupe(e.currentTarget, async () => {
+    try {
+      const r = await api("envoyer", { numero: factureCourante.numero, email: fe.email.value.trim() });
+      factureCourante = V.factures.find((x) => x.numero === factureCourante.numero); majEnvoi();
+      toast("Facture envoyée à " + r.envoye);
+    } catch (x) { err.textContent = x.message; }
+  });
+});
+$("#b-wa").addEventListener("click", () => {
+  const numero = factureCourante.numero;
+  setTimeout(() => api("whatsapp", { numero }).then(() => { factureCourante = V.factures.find((x) => x.numero === numero); majEnvoi(); }).catch(() => {}), 300);
+});
+
+// ---------- Déclarer ----------
+let periodeADeclarer = null;
+function ouvrirDeclarer(p) {
+  periodeADeclarer = p;
+  const arrondi = Math.round(p.total);
+  $("#declarer-corps").innerHTML = `<div class="recap" style="text-align:center"><strong style="text-transform:capitalize">${esc(p.libelle)}</strong>
+      <div class="grand-montant">${eur(arrondi)}</div>
+      <div class="petit">${p.nb} facture${p.nb > 1 ? "s" : ""}${arrondi !== p.total ? ` · montant exact ${eur(p.total)}, arrondi à l'euro comme le demande l'URSSAF` : ""}</div></div>
+    ${p.aValider ? `<div class="avert" style="margin-bottom:12px">${ic("alerte")} ${p.aValider} rendez-vous de cette période ${p.aValider > 1 ? "sont" : "est"} encore à valider : validez-les d'abord pour que le montant soit juste.</div>` : ""}
+    <ol class="etapes-d">
+      <li><div><strong>Copiez le montant</strong><br><button class="btn btn-trait" type="button" id="b-copier" style="margin-top:6px">${ic("copier")} Copier ${arrondi}</button></div></li>
+      <li><div><strong>Déclarez sur le site de l'URSSAF</strong><br><span class="petit">Dans la ligne des prestations de services artisanales (BIC).</span><br>
+        <a class="btn" href="https://www.autoentrepreneur.urssaf.fr/" target="_blank" rel="noopener" style="margin-top:6px">${ic("ouvrir")} Ouvrir l'URSSAF</a></div></li>
+      <li><div><strong>Revenez ici</strong> et touchez « C'est déclaré » : les rappels s'arrêtent.</div></li>
+    </ol><p class="erreur" role="alert"></p>`;
+  $("#b-copier").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(String(arrondi)); toast("Montant copié : " + arrondi); } catch { toast("Copie impossible : notez " + arrondi + " €"); }
+  });
+  $("#d-declarer").showModal();
+}
+$("#f-declarer").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await occupe($("#f-declarer button[type=submit]"), async () => {
+    try { await api("declarer", { periode: periodeADeclarer.periode }); $("#d-declarer").close(); toast("Bravo, c'est noté !"); }
+    catch (x) { $("#declarer-corps .erreur").textContent = x.message; }
+  });
+});
+
+// ---------- Clics ----------
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-fermer]")) { e.target.closest("dialog").close(); return; }
+  const o = e.target.closest("[data-onglet]"); if (o) { choisirOnglet(o.dataset.onglet); return; }
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = b.dataset.id, l = V && V.lignes.find((x) => x.id === id);
+  switch (b.dataset.act) {
+    case "ajouter": return ouvrirSaisie(b.dataset.origine);
+    case "modifier": return l && ouvrirSaisie(l.origine, l);
+    case "valider": return l && ouvrirValider(l);
+    case "envoyer": return ouvrirEnvoi(id);
+    case "declarer": return ouvrirDeclarer(V.periodes.find((p) => p.periode === id));
+    case "annuler":
+      if (!confirm(`${l.cliente} : marquer ce rendez-vous comme annulé (pas de facture) ?`)) return;
+      return occupe(b, () => api("annuler", { id }).then(() => toast("Rendez-vous annulé")).catch((x) => toast(x.message, true)));
+    case "retablir":
+      return occupe(b, () => api("retablir", { id }).then(() => toast("Remis à valider")).catch((x) => toast(x.message, true)));
+  }
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "periodicite") api("reglage", { periodicite: e.target.value }).then(() => toast("Réglage enregistré")).catch((x) => toast(x.message, true));
+});
+$("#recherche").addEventListener("input", rendreFactures);
+$$("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+
+// ---------- Connexion ----------
+$("#f-connexion").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#err-connexion"); err.textContent = "";
+  await occupe($("#f-connexion button"), async () => {
+    try { await api("connexion", { motdepasse: e.target.motdepasse.value }); e.target.reset(); montrer("app"); choisirOnglet(location.hash.slice(1)); }
+    catch (x) { err.textContent = x.message; }
+  });
+});
+$("#b-deco").addEventListener("click", async () => {
+  if (!confirm("Quitter la compta sur cet appareil ?")) return;
+  try { await api("deconnexion"); } catch {}
+  V = null; montrer("connexion");
+});
+
+(async () => {
+  try { await api(); montrer("app"); choisirOnglet(location.hash.slice(1)); }
+  catch (x) {
+    if (!$("#ecran-connexion").hidden) return;
+    montrer("connexion");
+    $("#err-connexion").textContent = x.message;
+  }
+})();
+</script>
+</body>
+</html>
