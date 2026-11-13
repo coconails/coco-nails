@@ -1,0 +1,6 @@
+{
+  "name": "coco-nails",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" }
+}

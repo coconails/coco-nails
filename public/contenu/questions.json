@@ -1,0 +1,32 @@
+{
+  "questions": [
+    {
+      "question": "Semi-permanent, gainage ou rallongement : quelle différence ?",
+      "reponse": "Le semi-permanent est une couleur longue tenue sur l'ongle naturel. Le gainage ajoute une fine couche de gel pour renforcer l'ongle naturel sans l'allonger. Le rallongement gel donne à l'ongle la forme et la longueur que vous choisissez."
+    },
+    {
+      "question": "Tous les combien faut-il faire un remplissage ?",
+      "reponse": "Toutes les trois semaines. Le tarif dépend du délai depuis votre dernière pose : 35 € à trois semaines, 40 € à quatre semaines, 45 € à cinq semaines ou plus."
+    },
+    {
+      "question": "Je peux venir avec une photo d'inspiration ?",
+      "reponse": "Oui, avec plaisir. Envoyez-la avant le rendez-vous pour prévoir le temps nécessaire."
+    },
+    {
+      "question": "Combien de temps dure un rendez-vous ?",
+      "reponse": "Comptez environ 1 h pour un semi-permanent et 1 h 30 à 1 h 45 pour un gainage, un rallongement ou un remplissage gel. Un nail art ajoute environ 45 minutes."
+    },
+    {
+      "question": "Comment se passe la réservation en ligne ?",
+      "reponse": "Choisissez votre soin, vos options, puis une date et une heure libres. Le créneau est aussitôt bloqué dans l'agenda de Coralie, qui vous confirme le rendez-vous par e-mail ou par téléphone."
+    },
+    {
+      "question": "Et si je dois annuler ?",
+      "reponse": "Merci de prévenir au moins 48 heures à l'avance. Sinon, la prestation reste due."
+    },
+    {
+      "question": "Comment je peux payer ?",
+      "reponse": "Sur place, le jour du rendez-vous, par carte bancaire, en espèces ou par virement. Rien n'est à payer en ligne."
+    }
+  ]
+}

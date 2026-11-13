@@ -1,0 +1,74 @@
+{
+  "soins": [
+    {
+      "nom": "Pose semi-permanent",
+      "categorie": "Les poses",
+      "prix": "30 €",
+      "duree": 60,
+      "options_possibles": true,
+      "description": "Une couleur brillante qui tient longtemps sur vos ongles naturels."
+    },
+    {
+      "nom": "Gainage d'ongles",
+      "categorie": "Les poses",
+      "prix": "40 €",
+      "duree": 105,
+      "options_possibles": true,
+      "description": "Une fine couche de gel sur vos ongles naturels pour les renforcer, sans les rallonger."
+    },
+    {
+      "nom": "Rallongement gel",
+      "categorie": "Les poses",
+      "prix": "55 €",
+      "duree": 105,
+      "options_possibles": true,
+      "description": "Des ongles rallongés au gel, dans la forme et la longueur que vous choisissez."
+    },
+    {
+      "nom": "Remplissage 3 semaines",
+      "categorie": "Les remplissages",
+      "prix": "35 €",
+      "duree": 105,
+      "options_possibles": true,
+      "description": "L'entretien de votre pose gel, trois semaines après le dernier rendez-vous."
+    },
+    {
+      "nom": "Remplissage 4 semaines",
+      "categorie": "Les remplissages",
+      "prix": "40 €",
+      "duree": 105,
+      "options_possibles": true,
+      "description": "L'entretien de votre pose gel, quatre semaines après le dernier rendez-vous."
+    },
+    {
+      "nom": "Remplissage 5 semaines ou plus",
+      "categorie": "Les remplissages",
+      "prix": "45 €",
+      "duree": 105,
+      "options_possibles": true,
+      "description": "L'entretien de votre pose gel, cinq semaines ou plus après le dernier rendez-vous."
+    },
+    {
+      "nom": "Dépose",
+      "categorie": "La dépose",
+      "prix": "20 €",
+      "duree": 30,
+      "options_possibles": false,
+      "description": "Le retrait de votre pose, en douceur pour l'ongle naturel."
+    }
+  ],
+  "options": [
+    {
+      "nom": "Nail art",
+      "prix": "de 5 € à 10 € pour les 10 doigts",
+      "duree": 45,
+      "description": "Petits dessins peints à la main : fleurs, léopard, fruits, feuille d'or… Le prix dépend de la complexité du décor (à partir de 0,50 € par ongle)."
+    },
+    {
+      "nom": "French ou baby boomer",
+      "prix": "5 € pour les 10 doigts",
+      "duree": 30,
+      "description": "Le bout blanc classique, ou un dégradé tout en douceur (0,50 € par ongle)."
+    }
+  ]
+}

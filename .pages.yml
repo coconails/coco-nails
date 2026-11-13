@@ -1,0 +1,405 @@
+# Espace de gestion de Coco Nail's (Pages CMS)
+media:
+  input: public/images/uploads
+  output: /images/uploads
+  rename: safe
+  categories: [image]
+
+content:
+  - name: photos
+    label: Mes photos
+    type: file
+    path: public/contenu/photos.json
+    format: json
+    fields:
+      - name: photos
+        label: Photos de réalisations
+        description: "Les 5 premières s'affichent en haut du site, en forme d'ongles. Glissez pour changer l'ordre."
+        type: object
+        list: true
+        fields:
+          - name: image
+            label: Photo
+            type: image
+            required: true
+          - name: description
+            label: Description courte
+            description: "Ce que montre la photo, par exemple : French rouge avec un cœur. Elle sert aux personnes malvoyantes et à Google."
+            type: string
+
+  - name: teintes
+    label: Teintes du moment
+    type: file
+    path: public/contenu/teintes.json
+    format: json
+    fields:
+      - name: teintes
+        label: Teintes du moment
+        type: object
+        list:
+          max: 10
+        fields:
+          - name: couleur
+            label: Couleur
+            type: select
+            options:
+              values: ["Nude rosé", "Rose poudré", "Rose bonbon", "Fuchsia", "Corail", "Rouge vernis", "Bordeaux", "Prune", "Lilas", "Bleu ciel", "Bleu nuit", "Vert pomme", "Vert sapin", "Jaune soleil", "Orange", "Caramel", "Chocolat", "Taupe", "Blanc", "Noir", "Or pailleté", "Argent pailleté"]
+          - name: code
+            label: Couleur exacte (facultatif)
+            description: "Pour une couleur absente de la liste : un code comme #c8102e. Sinon, laisser vide."
+            type: string
+
+  - name: evenement
+    label: À ne pas manquer
+    type: file
+    path: public/contenu/evenement.json
+    format: json
+    fields:
+      - name: afficher
+        label: Afficher cette partie sur le site
+        type: boolean
+      - name: titre
+        label: Titre
+        type: string
+      - name: texte
+        label: Texte
+        type: text
+      - name: prix
+        label: Prix mis en avant (facultatif)
+        description: "Par exemple : 30 €"
+        type: string
+      - name: precision_prix
+        label: Ce que comprend ce prix
+        type: string
+      - name: date
+        label: Date et heures
+        type: string
+      - name: lieu
+        label: Lieu
+        type: string
+      - name: affiche
+        label: Affiche ou photo (facultatif)
+        type: image
+      - name: description_affiche
+        label: Description de l'affiche
+        type: string
+
+  - name: soins
+    label: Carte des soins et tarifs
+    type: file
+    path: public/contenu/soins.json
+    format: json
+    fields:
+      - name: soins
+        label: Soins
+        description: "L'ordre ici est l'ordre sur le site. La durée sert à calculer les créneaux de réservation."
+        type: object
+        list: true
+        fields:
+          - name: nom
+            label: Nom du soin
+            type: string
+            required: true
+          - name: categorie
+            label: Rubrique
+            type: select
+            options:
+              values: ["Les poses", "Les remplissages", "La dépose", "Les soins des pieds", "Autres soins"]
+          - name: prix
+            label: Prix
+            description: "Par exemple : 35 €. Vide = « prix sur demande »."
+            type: string
+          - name: duree
+            label: Durée à bloquer (en minutes)
+            description: "60 = 1 h, 90 = 1 h 30, 105 = 1 h 45. Vide = soin non réservable en ligne."
+            type: number
+          - name: options_possibles
+            label: Les options (nail art, French) sont possibles avec ce soin
+            type: boolean
+          - name: description
+            label: Description
+            type: text
+      - name: options
+        label: Options
+        type: object
+        list: true
+        fields:
+          - name: nom
+            label: Nom de l'option
+            type: string
+            required: true
+          - name: prix
+            label: Prix
+            description: "Par exemple : de 5 € à 10 € pour les 10 doigts"
+            type: string
+          - name: duree
+            label: Temps en plus (en minutes)
+            type: number
+          - name: description
+            label: Description
+            type: text
+
+  - name: paiement
+    label: Moyens de paiement
+    type: file
+    path: public/contenu/paiement.json
+    format: json
+    fields:
+      - name: titre
+        label: Titre affiché
+        type: string
+      - name: moyens
+        label: Moyens de paiement acceptés sur place
+        description: "Ils s'affichent dans cet ordre, avec leur pictogramme. Glissez pour changer l'ordre."
+        type: object
+        list:
+          max: 4
+        fields:
+          - name: moyen
+            label: Moyen de paiement
+            type: select
+            options:
+              values: ["Carte bancaire", "Espèces", "Chèque", "Virement"]
+      - name: precision
+        label: Phrase sous les pictogrammes (facultatif)
+        type: text
+
+  - name: questions
+    label: Questions fréquentes
+    type: file
+    path: public/contenu/questions.json
+    format: json
+    fields:
+      - name: questions
+        label: Questions
+        type: object
+        list: true
+        fields:
+          - name: question
+            label: Question
+            type: string
+            required: true
+          - name: reponse
+            label: Réponse
+            type: text
+
+  - name: coordonnees
+    label: Horaires et coordonnées
+    type: file
+    path: public/contenu/coordonnees.json
+    format: json
+    fields:
+      - name: semaine
+        label: Horaires de la semaine
+        description: "Heures au format 09:00. Le site calcule tout seul « Ouvert / Fermé », les jours fériés et les créneaux."
+        type: object
+        fields:
+          - name: lundi
+            label: Lundi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: mardi
+            label: Mardi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: mercredi
+            label: Mercredi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: jeudi
+            label: Jeudi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: vendredi
+            label: Vendredi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: samedi
+            label: Samedi
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+          - name: dimanche
+            label: Dimanche
+            type: object
+            fields:
+              - name: ouvert
+                label: Ouvert ce jour-là
+                type: boolean
+              - name: debut
+                label: Ouverture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+              - name: fin
+                label: Fermeture
+                type: string
+                pattern: "^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^$"
+      - name: fermetures
+        label: Fermetures exceptionnelles (vacances, formation…)
+        description: "Pendant ces dates, le site affiche « Fermé » et ne propose aucun créneau."
+        type: object
+        list: true
+        fields:
+          - name: du
+            label: Du
+            type: date
+            required: true
+          - name: au
+            label: Au (inclus)
+            type: date
+          - name: motif
+            label: Motif (facultatif)
+            type: string
+      - name: telephone
+        label: Téléphone (affiche les boutons Appeler et WhatsApp)
+        type: string
+      - name: whatsapp
+        label: Ce numéro a WhatsApp
+        type: boolean
+        default: true
+      - name: message_whatsapp
+        label: Message déjà écrit quand une cliente ouvre WhatsApp
+        type: string
+      - name: email
+        label: E-mail professionnel
+        type: string
+      - name: instagram
+        label: Nom du compte Instagram
+        type: string
+      - name: adresse
+        label: Adresse
+        type: string
+      - name: code_postal
+        label: Code postal
+        type: string
+      - name: ville
+        label: Ville
+        type: string
+      - name: lien_google_maps
+        label: Lien de la fiche Google Maps
+        type: string
+      - name: lien_avis_google
+        label: Lien « Laisser un avis » Google (facultatif)
+        description: "À copier depuis la fiche Google, bouton « Demander des avis »."
+        type: string
+
+  - name: legal
+    label: Informations légales
+    type: file
+    path: public/contenu/legal.json
+    format: json
+    fields:
+      - name: nom_entreprise
+        label: Nom de l'entreprise
+        type: string
+      - name: siren
+        label: SIREN
+        type: string
+      - name: siret
+        label: SIRET
+        type: string
+      - name: rne
+        label: Immatriculation
+        type: string
+      - name: tva
+        label: Numéro de TVA intracommunautaire
+        type: string
+      - name: directrice_publication
+        label: Directrice de la publication
+        type: string
+      - name: hebergeur
+        label: Hébergeur (nom, adresse, téléphone)
+        type: text
+      - name: mediateur
+        label: Médiateur de la consommation (nom et coordonnées)
+        type: text
+      - name: duree_conservation
+        label: Durée de conservation des messages
+        description: "Par exemple : 3 ans après notre dernier échange"
+        type: string
+
+  - name: reservation
+    label: Réglages de la réservation
+    type: file
+    path: public/contenu/reservation.json
+    format: json
+    fields:
+      - name: active
+        label: Réservation en ligne activée
+        type: boolean
+      - name: intervalle_minutes
+        label: Un créneau toutes les … minutes
+        description: "15 = 9 h, 9 h 15, 9 h 30…"
+        type: number
+      - name: delai_min_jours
+        label: Réservable au plus tôt dans … jours
+        description: "1 = à partir de demain, 0 = le jour même"
+        type: number
+      - name: delai_max_jours
+        label: Réservable au plus tard dans … jours
+        type: number

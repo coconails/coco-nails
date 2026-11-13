@@ -1,0 +1,6 @@
+{
+  "active": true,
+  "intervalle_minutes": 15,
+  "delai_min_jours": 1,
+  "delai_max_jours": 60
+}

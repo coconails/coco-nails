@@ -1,0 +1,15 @@
+{
+  "titre": "Paiement accepté sur place",
+  "moyens": [
+    {
+      "moyen": "Carte bancaire"
+    },
+    {
+      "moyen": "Espèces"
+    },
+    {
+      "moyen": "Virement"
+    }
+  ],
+  "precision": "Aucun paiement n'est demandé en ligne : vous réglez directement lors de votre rendez-vous."
+}

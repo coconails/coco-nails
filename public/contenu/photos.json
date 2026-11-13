@@ -1,0 +1,56 @@
+{
+  "photos": [
+    {
+      "image": "/images/nails-fleurs-roses.webp",
+      "description": "Ongles nude avec fleurs roses peintes à la main"
+    },
+    {
+      "image": "/images/nails-noir-or-leopard.webp",
+      "description": "Ongles noirs et dorés pailletés aux motifs léopard"
+    },
+    {
+      "image": "/images/nails-french-rouge.webp",
+      "description": "French rouge sur base rose avec un cœur dessiné"
+    },
+    {
+      "image": "/images/nails-bordeaux-leopard.webp",
+      "description": "Ongles bordeaux avec deux ongles roses à motif léopard"
+    },
+    {
+      "image": "/images/nails-citrons.webp",
+      "description": "Ongles nude avec French jaune et citrons peints à la main"
+    },
+    {
+      "image": "/images/nails-bordeaux-feuille-or.webp",
+      "description": "Ongles bordeaux et clairs décorés de fleurs rouges et de feuille d'or"
+    },
+    {
+      "image": "/images/nails-caramel-paillettes.webp",
+      "description": "Ongles caramel avec un ongle blanc et or et un ongle à paillettes dorées"
+    },
+    {
+      "image": "/images/nails-vert-leopard.webp",
+      "description": "Ongles vert pomme avec un motif zébré et un motif léopard"
+    },
+    {
+      "image": "/images/nails-cerises.webp",
+      "description": "Ongles rouges en amande avec un ongle nude décoré de cerises"
+    },
+    {
+      "image": "/images/nails-chocolat-leopard.webp",
+      "description": "Ongles chocolat et nude avec rayures dorées et petits motifs léopard"
+    },
+    {
+      "image": "/images/nails-french-fleurs.webp",
+      "description": "French blanche sur base rose avec petites fleurs"
+    },
+    {
+      "image": "/images/nails-automne.webp",
+      "description": "Ongles d'automne taupe, beige et moutarde avec un ongle à feuilles dorées"
+    },
+    {
+      "image": "/images/nails-rouge-fleur.webp",
+      "description": "Ongles courts rouges avec un ongle nude orné d'une fleur rouge"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "telephone": "",
+  "whatsapp": true,
+  "message_whatsapp": "Bonjour Coralie, je vous contacte depuis le site Coco Nail's.",
+  "email": "contact@coconails72.com",
+  "instagram": "coconails72430",
+  "adresse": "23 rue du Bonvouloir",
+  "code_postal": "72430",
+  "ville": "Saint-Jean-du-Bois",
+  "lien_google_maps": "https://www.google.com/maps/place/Coco+Nail's/@47.8712565,-0.0441137,17z/data=!4m6!3m5!1s0x4808270b40f0cf0b:0xf9db4aaf342257b3!8m2!3d47.8712565!4d-0.0441137!16s%2Fg%2F11z_f7801d",
+  "lien_avis_google": "",
+  "semaine": {
+    "lundi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "19:00"
+    },
+    "mardi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "19:00"
+    },
+    "mercredi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "12:00"
+    },
+    "jeudi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "19:00"
+    },
+    "vendredi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "19:00"
+    },
+    "samedi": {
+      "ouvert": true,
+      "debut": "09:00",
+      "fin": "12:00"
+    },
+    "dimanche": {
+      "ouvert": false,
+      "debut": "",
+      "fin": ""
+    }
+  },
+  "fermetures": []
+}
