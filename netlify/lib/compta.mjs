@@ -16,7 +16,7 @@ export class Refus extends Error {
 
 // ---- Les onglets du tableau ----
 export const ONGLET = { lignes: "Rendez-vous", factures: "Factures", declarations: "Déclarations URSSAF", reglages: "Réglages",
-  depenses: "Dépenses", abonnements: "Abonnements" };
+  depenses: "Dépenses", abonnements: "Abonnements", clientes: "Clientes", rappels: "Rappels envoyés" };
 const ENTETES = {
   lignes: ["N°", "État", "Origine", "Date du RDV", "Heure", "Cliente", "Téléphone", "E-mail", "Adresse", "Soin", "Options",
     "Prix du tarif", "Montant encaissé", "Paiement", "Payé le", "Facture", "Réf. agenda", "Note", "Créée le", "Modifiée le", "Réf. SumUp"],
@@ -27,11 +27,16 @@ const ENTETES = {
     "Justificatif (lien)", "Réf. justificatif", "Empreinte du justificatif (SHA-256)", "Note", "Créée le", "Modifiée le"],
   abonnements: ["N°", "Nom", "Fournisseur", "Catégorie", "Montant TTC", "Rythme (mensuel / annuel)", "Jour du prélèvement",
     "Mois (si annuel, 1 à 12)", "Actif (oui / non)", "Depuis le", "Note"],
+  clientes: ["N°", "Clé (téléphone ou e-mail)", "Nom", "Téléphone", "E-mail", "Rappel la veille (oui / non)", "Message « prochain soin » (oui / non)",
+    "Accord donné par", "Accord donné le", "STOP reçu le", "Modifiée le"],
+  rappels: ["Envoyé le", "Type", "Canal", "N° cliente", "Cliente", "Référence", "Résultat", "Détail"],
 };
 const CHAMPS_LIGNE = ["id", "etat", "origine", "date", "heure", "cliente", "telephone", "email", "adresse", "soin", "options",
   "tarif", "montant", "paiement", "paye_le", "facture", "rdv", "note", "cree", "modifie", "sumup"];
 const CHAMPS_DEPENSE = ["id", "etat", "date", "fournisseur", "categorie", "libelle", "montant", "paiement", "source", "ref",
   "justificatif", "justificatif_id", "empreinte", "note", "cree", "modifie"];
+const CHAMPS_CLIENTE = ["id", "cle", "nom", "telephone", "email", "ok_veille", "ok_prochain", "accord_par", "accord_le", "stop_le", "modifie"];
+const CHAMPS_RAPPEL = ["le", "type", "canal", "client", "cliente", "ref", "resultat", "detail"];
 const CHAMPS_ABONNEMENT = ["id", "nom", "fournisseur", "categorie", "montant", "rythme", "jour", "mois", "actif", "depuis", "note"];
 const CHAMPS_FACTURE = ["numero", "date", "ligne", "cliente", "montant", "paiement", "envois", "contenu"];
 const CHAMPS_DECLARATION = ["periode", "montant", "declare_le", "nb"];
@@ -111,7 +116,7 @@ export async function lireTout() {
   await preparer();
   const q = Object.values(ONGLET).map((o) => "ranges=" + plage(o, "A2:" + colonne(ENTETES.lignes.length))).join("&");
   const d = await tableau(`/values:batchGet?${q}&valueRenderOption=UNFORMATTED_VALUE`);
-  const [l, f, dc, r, dp, ab] = (d.valueRanges || []).map((v) => v.values || []);
+  const [l, f, dc, r, dp, ab, cl, rp] = (d.valueRanges || []).map((v) => v.values || []);
   const garder = (rangee) => rangee && rangee.some((x) => texte(x).trim() !== "");
   const donnees = {
     lignes: (l || []).map((x, i) => garder(x) && versObjet(CHAMPS_LIGNE, x, i + 2)).filter(Boolean),
@@ -120,6 +125,8 @@ export async function lireTout() {
     reglages: Object.fromEntries((r || []).filter(garder).map((x) => [texte(x[0]).trim(), texte(x[1]).trim()])),
     depenses: (dp || []).map((x, i) => garder(x) && versObjet(CHAMPS_DEPENSE, x, i + 2)).filter(Boolean),
     abonnements: (ab || []).map((x, i) => garder(x) && versObjet(CHAMPS_ABONNEMENT, x, i + 2)).filter(Boolean),
+    clientes: (cl || []).map((x, i) => garder(x) && versObjet(CHAMPS_CLIENTE, x, i + 2)).filter(Boolean),
+    rappels: (rp || []).map((x, i) => garder(x) && versObjet(CHAMPS_RAPPEL, x, i + 2)).filter(Boolean),
   };
   donnees.reglages.periodicite = donnees.reglages.periodicite === "trimestrielle" ? "trimestrielle" : "mensuelle";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(donnees.reglages.depuis || "")) donnees.reglages.depuis = aujourdhui().slice(0, 8) + "01";
@@ -147,6 +154,8 @@ async function nouvellesRangees(cle, onglet, champs, objets, donnees) {
 }
 export const nouvellesDepenses = (xs, d) => nouvellesRangees("depenses", ONGLET.depenses, CHAMPS_DEPENSE, xs, d);
 export const nouvelAbonnement = (x, d) => nouvellesRangees("abonnements", ONGLET.abonnements, CHAMPS_ABONNEMENT, [x], d);
+export const majCliente = (x) => (x.modifie = horodatage(), majRangee(ONGLET.clientes, CHAMPS_CLIENTE, x));
+export const noterRappel = (x, d) => nouvellesRangees("rappels", ONGLET.rappels, CHAMPS_RAPPEL, [{ le: horodatage(), ...x }], d);
 export async function nouvellesLignes(lignes, donnees) {
   const prochain = donnees.lignes.reduce((m, l) => Math.max(m, l._rang), 1) + 1;
   lignes.forEach((l, i) => { l._rang = prochain + i; l.cree = l.cree || horodatage(); l.modifie = l.cree; });
@@ -176,8 +185,8 @@ async function reparer(donnees) {
 
 // ---- Dates (heure de Paris) ----
 export const aujourdhui = () => new Date(aujourdhuiParis()).toISOString().slice(0, 10);
-export function horodatage() {
-  const ms = Date.now() + decalageParis(Date.now()) * 60000;
+export function horodatage(instantMs = Date.now()) {
+  const ms = instantMs + decalageParis(instantMs) * 60000;
   return new Date(ms).toISOString().slice(0, 16).replace("T", " ");
 }
 export const dateValide = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "") && !Number.isNaN(Date.parse(d + "T00:00:00Z")) && new Date(d + "T00:00:00Z").toISOString().startsWith(d);
@@ -208,6 +217,7 @@ export async function synchroniser(donnees, soins) {
   const debut = new Date(instant(depuis, 0)).toISOString();
   const fin = new Date(aujourdhuiParis() + 120 * JOUR_MS).toISOString();
   const evs = await listerRendezVous(debut, fin);
+  donnees.evenements = evs;
   const parRdv = new Map(donnees.lignes.filter((l) => l.rdv).map((l) => [l.rdv, l]));
   const vus = new Set();
   const nouvelles = [];
@@ -222,6 +232,10 @@ export async function synchroniser(donnees, soins) {
       if (l.etat === ETATS.attente && (l.date !== date || l.heure !== heure)) { l.date = date; l.heure = heure; await majLigne(l); }
       continue;
     }
+    // Choix de rappels faits sur le site au moment de la réservation
+    if (p.ok_veille || p.ok_prochain)
+      await enregistrerAccord(donnees, { nom: p.nom, telephone: p.telephone, email: p.email, ok_veille: p.ok_veille !== "non", ok_prochain: p.ok_prochain === "oui",
+        par: "la cliente, sur le site (réservation)", le: p.accord_le && !Number.isNaN(Date.parse(p.accord_le)) ? horodatage(Date.parse(p.accord_le)) : horodatage() });
     const options = String(p.options || "").split(",").map((x) => x.trim()).filter(Boolean);
     const t = tarifDe(soins, p.soin, options);
     nouvelles.push({
@@ -377,3 +391,55 @@ export function bilan(donnees) {
     ...m, recettes: Math.round(m.recettes * 100) / 100, depenses: Math.round(m.depenses * 100) / 100,
     benefice: Math.round((m.recettes - m.depenses) * 100) / 100, libelle: `${MOIS_COURTS[Number(m.mois.slice(5)) - 1]} ${m.mois.slice(0, 4)}` }));
 }
+
+// ---- Clientes et accords pour les rappels ----
+// Une cliente est reconnue par son portable (format +33…), sinon par son e-mail.
+export function cleCliente(telephone, email) {
+  let c = String(telephone || "").replace(/[^\d+]/g, "");
+  if (c.startsWith("00")) c = "+" + c.slice(2);
+  if (/^0\d{9}$/.test(c)) c = "+33" + c.slice(1);
+  if (/^33\d{9}$/.test(c)) c = "+" + c;
+  if (c.replace(/\D/g, "").length >= 9) return c.startsWith("+") ? c : "+" + c;
+  const e = String(email || "").trim().toLowerCase();
+  return e.includes("@") ? e : "";
+}
+export function trouverCliente(donnees, telephone, email) {
+  const k1 = cleCliente(telephone, ""), k2 = cleCliente("", email);
+  return donnees.clientes.find((c) => (k1 && c.cle === k1) || (k2 && (c.cle === k2 || c.email.toLowerCase() === k2))) || null;
+}
+export const nouvelIdCliente = () => "C" + Date.now().toString(36).toUpperCase() + randomUUID().slice(0, 4).toUpperCase();
+
+// Enregistre le choix le plus récent d'une cliente (avec qui l'a donné et quand : c'est la preuve de l'accord).
+export async function enregistrerAccord(donnees, { nom, telephone, email, ok_veille, ok_prochain, par, le }) {
+  const cle = cleCliente(telephone, email);
+  if (!cle) return null;
+  const quand = le || horodatage();
+  let c = trouverCliente(donnees, telephone, email);
+  const val = (b) => (b ? "oui" : "non");
+  if (c) {
+    if (c.accord_le && c.accord_le > quand) return c; // un choix plus récent existe déjà
+    Object.assign(c, { nom: nom || c.nom, telephone: telephone || c.telephone, email: email || c.email, ok_veille: val(ok_veille),
+      ok_prochain: c.stop_le ? "non" : val(ok_prochain), accord_par: par, accord_le: quand });
+    await majCliente(c);
+  } else {
+    c = { id: nouvelIdCliente(), cle, nom: nom || "", telephone: telephone || "", email: email || "", ok_veille: val(ok_veille), ok_prochain: val(ok_prochain),
+      accord_par: par, accord_le: quand, stop_le: "" };
+    await nouvellesRangees("clientes", ONGLET.clientes, CHAMPS_CLIENTE, [c], donnees);
+  }
+  return c;
+}
+
+// Délai du message « prochain soin » pour un soin (case de Pages CMS, sinon d'après le nom du soin). 0 = pas de message.
+export function joursRappel(soins, nomSoin) {
+  const s = (soins.soins || []).find((x) => x.nom === nomSoin);
+  if (s && s.rappel_jours !== undefined && s.rappel_jours !== null && s.rappel_jours !== "") return Math.max(0, Number(s.rappel_jours) || 0);
+  const n = String(nomSoin || "").toLowerCase();
+  if (/d[ée]pose|r[ée]paration/.test(n)) return 0;
+  const sem = /(\d)\s*semaines?/.exec(n);
+  if (sem) return Number(sem[1]) * 7 - 3;
+  return s ? 21 : 0;
+}
+
+// Lien « Gérer mes messages » envoyé à la cliente (signé : personne d'autre ne peut le fabriquer).
+export const lienGestion = (origine, id) => `${origine}/api/desinscription?id=${encodeURIComponent(id)}&s=${signer(id, "desinscription")}`;
+export const lienGestionValide = (id, s) => signatureValide(id, "desinscription", s);

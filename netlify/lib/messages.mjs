@@ -239,3 +239,52 @@ ${periodes.map((p) => `- ${p.libelle} : ${eur(p.total)} à déclarer avant le ${
 Ouvrir ma compta : ${origine}/compta/#urssaf`;
   return { sujet, html, texte };
 }
+
+// 7. Pour la cliente : rappel la veille du rendez-vous (message de service).
+export function rappelVeilleMail(i, c, lienDesinscription) {
+  const adr = adresseComplete(c);
+  const sujet = `Rappel : votre rendez-vous demain à ${heure(Number(i.debut))} chez Coco Nail's`;
+  const html = gabarit("À demain !", [
+    para(`Bonjour ${esc(i.nom)},`),
+    para("Petit rappel de votre rendez-vous chez Coco Nail's :"),
+    tableau([...lignesRdv(i), ["Adresse", esc(adr) + (c.lien_google_maps ? `<br><a href="${esc(c.lien_google_maps)}" style="color:${BORDEAUX};font-weight:400">Voir sur Google Maps</a>` : "")]]),
+    para(`Un empêchement ? Merci de prévenir Coralie le plus tôt possible${c.telephone ? "&nbsp;:" : ", en répondant à cet e-mail."}`),
+    blocContact(c),
+    lienDesinscription ? para(`<span style="color:#7a5a60;font-size:12px">Vous ne souhaitez plus recevoir de rappels ? <a href="${esc(lienDesinscription)}" style="color:#7a5a60">Gérer mes messages</a></span>`) : "",
+  ].join(""));
+  const texte = `Bonjour ${i.nom},
+
+Petit rappel de votre rendez-vous chez Coco Nail's :
+Soin : ${i.soin}${i.options ? "\nOptions : " + i.options : ""}
+Quand : ${quand(i)}
+Adresse : ${adr}
+
+Un empêchement ? Merci de prévenir Coralie le plus tôt possible.${texteContact(c)}
+Coco Nail's${lienDesinscription ? "\n\nNe plus recevoir de rappels : " + lienDesinscription : ""}`;
+  return { sujet, html, texte };
+}
+
+// 8. Pour la cliente : « votre prochain soin approche » (uniquement si elle l'a accepté).
+export function prochainSoinMail({ nom, soin, relance }, origine, lienDesinscription) {
+  const prenom = String(nom || "").trim().split(/\s+/)[0];
+  const sujet = relance ? "Coco Nail's : on garde une place pour vous ?" : "Coco Nail's : c'est bientôt le moment de reprendre rendez-vous";
+  const html = gabarit(relance ? "Envie de vous faire plaisir ?" : "C'est bientôt le moment !", [
+    para(`Bonjour ${esc(prenom)},`),
+    para(relance
+      ? "Cela fait un moment que nous ne nous sommes pas vues ! Coralie serait ravie de s'occuper à nouveau de vos ongles."
+      : `Votre dernier soin (${esc(soin)}) date déjà de quelques semaines : c'est le bon moment pour réserver le prochain et garder de jolis ongles.`),
+    `<p style="margin:18px 0">${bouton(origine + "/rdv", "Réserver mon créneau")}</p>`,
+    para("À très bientôt,<br>Coralie"),
+    para(`<span style="color:#7a5a60;font-size:12px">Vous recevez ce message car vous avez accepté d'être prévenue de votre prochain soin. <a href="${esc(lienDesinscription)}" style="color:#7a5a60">Ne plus recevoir ces messages</a></span>`),
+  ].join(""));
+  const texte = `Bonjour ${prenom},
+
+${relance ? "Cela fait un moment que nous ne nous sommes pas vues ! Coralie serait ravie de s'occuper à nouveau de vos ongles." : `Votre dernier soin (${soin}) date déjà de quelques semaines : c'est le bon moment pour réserver le prochain.`}
+Réservez en 1 minute : ${origine}/rdv
+
+À très bientôt,
+Coralie — Coco Nail's
+
+Ne plus recevoir ces messages : ${lienDesinscription}`;
+  return { sujet, html, texte };
+}

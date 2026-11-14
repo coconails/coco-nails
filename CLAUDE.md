@@ -34,9 +34,19 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   carte, colonne « Réf. SumUp » ; commission du mois écoulé ajoutée aux dépenses, réf. `sumup:<AAAA-MM>`).
   Test : `node outils-de-test/test-compta.mjs` (Google, Drive et SumUp simulés).
   Installable comme application (manifest `public/compta/manifest.webmanifest`, icônes 180/192/512 + masquable).
+- Rappels clientes (15/11/2026) : `netlify/functions/rappels.mjs` planifiée chaque jour 9 h UTC — rappel la veille (service, SMS sans STOP)
+  et « prochain soin » (publicité, uniquement si accord, SMS avec STOP géré par OVH, jamais dimanche/férié, 1 relance à +21 j,
+  rien si un autre RDV existe). SMS via OVHcloud (`netlify/lib/sms.mjs`, API signée, textes ramenés au jeu GSM ≤160 car.),
+  sinon e-mail. Accords : 2 cases sur le formulaire de réservation (veille cochée, prochain soin décochée, stockées dans
+  extendedProperties.private ok_veille/ok_prochain/accord_le), cases dans la compta pour les RDV téléphone/message, fiche
+  « Mes clientes ». Onglets Sheets « Clientes » (choix + preuve : par qui, quand ; STOP) et « Rappels envoyés ».
+  Lien signé « Gérer mes messages » : `netlify/functions/desinscription.mjs` (`/api/desinscription`). Délai par soin :
+  champ Pages CMS `rappel_jours` (sinon N semaines → 7N−3 jours, dépose → aucun, autre → 21). Adresse courte `/rdv`.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
+  SMS OVHcloud (100 crédits achetés le 14/11/2026) : `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY` (secrètes),
+  `OVH_SMS_SERVICE` (ex. sms-ab12345-1), `OVH_SMS_EXPEDITEUR` (« CocoNails » une fois validé chez OVH).
 - Google : projet Cloud `coco-nails-514415`, compte de service `coconails@coco-nails-514415.iam.gserviceaccount.com`
   (ID client 116446334886747443278), API Calendar + Gmail activées (+ Sheets et Drive à activer pour la compta), délégation domaine scopes `gmail.send`
   (+ `drive.file` à ajouter pour les tickets).
@@ -49,16 +59,16 @@ GitHub web ignore souvent les fichiers commençant par un point (.pages.yml) : l
 Toujours tester localement avant (Google simulé) et montrer un aperçu avant de livrer.
 
 ## Reste à faire
-- Remplacer dans `public/index.html` la phrase « Coralie vous reçoit dans un mobile-home entièrement aménagé en espace beauté. »
-  par « Coralie vous reçoit dans un espace beauté entièrement aménagé, calme et chaleureux. » (proposé, pas encore fait).
 - Mentions légales (Pages CMS > Informations légales) : SIRET (en attente CMA), médiateur CM2C (adhésion à faire),
   TVA = « TVA non applicable, article 293 B du CGI ».
 - Fiche Google Business en cours de validation : horaires détaillés, adresse visible, logo, photos, lien d'avis à coller
   dans Pages CMS > Horaires et coordonnées. Vérifier qu'il n'existe pas de fiche en double.
 - Assurance (avenant habitation), bio Instagram, double authentification sur tous les comptes.
 
-- Compta, idées restantes : argent à mettre de côté, alerte des seuils, sauvegarde, rappel la veille aux clientes, demande d'avis
-  Google, tableau de bord, export annuel, avoirs, bons cadeaux, fidélité.
+- Compta, idées restantes : argent à mettre de côté, alerte des seuils, sauvegarde, demande d'avis Google, tableau de bord,
+  export annuel, avoirs, bons cadeaux, fidélité, compteur de visites sans cookies.
+- Netlify gratuit (300 crédits/mois, 15 par publication) ; badge « Powered by Netlify » non désactivable gratuitement
+  (boutons flottants du site remontés au-dessus). Brevo écarté (SMS réservés aux forfaits payants) → OVHcloud.
 - SumUp : compte pas encore créé ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %). Workspace payé au mois, pas de Freebox.
 
 ## Horaires actuels

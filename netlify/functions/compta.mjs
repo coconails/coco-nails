@@ -7,6 +7,7 @@ import * as C from "../lib/compta.mjs";
 import { pdfFacture } from "../lib/facture.mjs";
 import { factureCliente } from "../lib/messages.mjs";
 import * as S from "../lib/sumup.mjs";
+import { smsConfigure } from "../lib/sms.mjs";
 import { deposer, TYPES_ACCEPTES, TAILLE_MAX } from "../lib/drive.mjs";
 
 const COOKIE = "coco_compta";
@@ -104,7 +105,7 @@ function vue(ctx) {
     if (!k) continue;
     const c = clientes.get(k) || { nom: l.cliente.trim(), telephone: "", email: "", adresse: "", visites: 0 };
     for (const champ of ["telephone", "email", "adresse"]) if (l[champ]) c[champ] = l[champ];
-    if (l.etat === C.ETATS.validee) c.visites++;
+    if (l.etat === C.ETATS.validee) { c.visites++; c.dernier_soin = l.soin; c.derniere_visite = l.date; }
     clientes.set(k, c);
   }
   return {
@@ -127,7 +128,9 @@ function vue(ctx) {
     soins: { soins: (soins.soins || []).map(({ nom, categorie, prix, duree, options_possibles }) => ({ nom, categorie, prix, duree, options_possibles })),
       options: (soins.options || []).map(({ nom, prix, duree }) => ({ nom, prix, duree })) },
     moyens: moyens(ctx),
-    clientes: [...clientes.values()],
+    clientes: ficheClientes(ctx, [...clientes.values()]),
+    rappels: { auto: d.reglages.rappels_auto !== "non", sms: smsConfigure(),
+      envoyes: d.rappels.slice(-300).reverse().map(({ _rang, ...r }) => r) },
     agenda: configuree(),
     alertes,
   };
@@ -145,6 +148,19 @@ function vueSumup(ctx) {
     return { mois: m, sumup: somme(sumup, (p) => p.montant), nbSumup: sumup.length, factures: somme(factures, (l) => l.montant), nbFactures: factures.length };
   });
   return { actif: true, libres: sumupLibres(ctx), controle };
+}
+
+// Clientes connues (d'après les rendez-vous) + leur fiche de choix et leurs derniers rappels.
+function ficheClientes(ctx, depuisLignes) {
+  const { d } = ctx;
+  const res = depuisLignes.map((c) => ({ ...c }));
+  for (const f of d.clientes) {
+    let c = res.find((x) => (C.cleCliente(x.telephone, x.email) === f.cle) || (f.email && x.email && x.email.toLowerCase() === f.email.toLowerCase()));
+    if (!c) { c = { nom: f.nom, telephone: f.telephone, email: f.email, adresse: "", visites: 0 }; res.push(c); }
+    Object.assign(c, { fiche: f.id, ok_veille: f.ok_veille, ok_prochain: f.ok_prochain, accord_par: f.accord_par, accord_le: f.accord_le, stop_le: f.stop_le,
+      rappels: d.rappels.filter((r) => r.client === f.id).slice(-5).reverse().map(({ _rang, ...r }) => r) });
+  }
+  return res.sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
 
 // Champs d'une dépense.
@@ -216,6 +232,10 @@ const ACTIONS = {
       l.rdv = id;
     }
     await C.nouvellesLignes([l], ctx.d);
+    // Choix de la cliente pour les rappels, demandés par Coralie au téléphone ou par message.
+    if (x.ok_veille !== undefined && (saisie.telephone || saisie.email))
+      await C.enregistrerAccord(ctx.d, { nom: saisie.cliente, telephone: saisie.telephone, email: saisie.email, ok_veille: Boolean(x.ok_veille),
+        ok_prochain: Boolean(x.ok_prochain), par: `la cliente, à l'oral (${origine === "Message" ? "par message" : "au téléphone"}), noté par Coralie` });
     return { ligne: l.id };
   },
 
@@ -396,8 +416,20 @@ const ACTIONS = {
   },
 
   async reglage(ctx, x) {
+    if (x.rappels_auto !== undefined) { await C.majReglage("rappels_auto", x.rappels_auto ? "oui" : "non", ctx.d); return {}; }
     if (!["mensuelle", "trimestrielle"].includes(x.periodicite)) throw new C.Refus("Réglage inconnu.");
     await C.majReglage("periodicite", x.periodicite, ctx.d);
+    return {};
+  },
+
+  // Fiche cliente : Coralie change les choix de rappels (à la demande de la cliente).
+  async cliente(ctx, x) {
+    const telephone = t(x.telephone, 30), email = t(x.email, 120), nom = t(x.nom, 80);
+    if (email && !EMAIL.test(email)) throw new C.Refus("L'adresse e-mail n'est pas valide.");
+    if (!C.cleCliente(telephone, email)) throw new C.Refus("Il faut au moins un téléphone ou un e-mail pour enregistrer les choix.");
+    const c = await C.enregistrerAccord(ctx.d, { nom, telephone, email, ok_veille: Boolean(x.ok_veille), ok_prochain: Boolean(x.ok_prochain),
+      par: "la cliente, à l'oral, noté par Coralie (fiche cliente)" });
+    if (c && c.stop_le && x.ok_prochain) throw new C.Refus("Cette cliente a répondu STOP : elle ne peut plus recevoir de message « prochain soin ».", 409);
     return {};
   },
 };

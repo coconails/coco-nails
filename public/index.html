@@ -241,8 +241,8 @@ footer button{all:unset;color:#fff;text-decoration:underline;cursor:pointer}
 /* Bouton flottant mobile */
 .flottant{display:none}
 @media (max-width:860px){
-  .flottant{display:flex;position:fixed;left:16px;right:16px;bottom:14px;z-index:50;box-shadow:0 14px 30px -10px rgba(94,15,28,.7)}
-  body{padding-bottom:84px}
+  .flottant{display:flex;position:fixed;left:16px;right:16px;bottom:66px;z-index:50;box-shadow:0 14px 30px -10px rgba(94,15,28,.7)}
+  body{padding-bottom:136px}
 }
 
 /* Visionneuse */
@@ -272,7 +272,7 @@ dialog[open]{animation:ouvre .3s ease-out}
 .joindre .btn{gap:10px}
 .btn-wa{background:#1f7a4a;border-color:#1f7a4a;color:#fff}
 .btn-wa:hover{background:#17603a;border-color:#17603a}
-.bulle-contact{position:fixed;right:16px;bottom:16px;z-index:60;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--bordeaux);box-shadow:0 6px 18px rgba(94,15,28,.35);transition:transform .2s}
+.bulle-contact{position:fixed;right:16px;bottom:76px;z-index:60;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--bordeaux);box-shadow:0 6px 18px rgba(94,15,28,.35);transition:transform .2s}
 .bulle-contact.wa{background:#1f7a4a;box-shadow:0 6px 18px rgba(23,96,58,.35)}
 .bulle-contact:hover{transform:scale(1.06)}
 .bulle-contact:focus-visible{outline:3px solid var(--bordeaux);outline-offset:3px}
@@ -281,7 +281,7 @@ dialog[open]{animation:ouvre .3s ease-out}
 .btn-clair,.contact a.btn-clair{background:#fff;color:var(--bordeaux);border-color:#fff;text-decoration:none}
 .contact a.btn-wa{color:#fff;text-decoration:none}
 .btn-clair:hover,.contact a.btn-clair:hover{background:var(--rose);border-color:var(--rose)}
-@media (max-width:860px){.bulle-contact{bottom:80px}.bulle-contact.tel:not([hidden]){display:grid}footer{padding-bottom:72px}}
+@media (max-width:860px){.bulle-contact{bottom:132px}.bulle-contact.tel:not([hidden]){display:grid}footer{padding-bottom:124px}}
 @media (prefers-reduced-motion:reduce){.bulle-contact{transition:none}}
 
 /* Ajouts v3 */
@@ -294,6 +294,11 @@ dialog[open]{animation:ouvre .3s ease-out}
 .formulaire .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .piege{position:absolute;left:-5000px}
 .formulaire small{color:var(--gris);font-size:.82rem;line-height:1.45}
+.formulaire .accords{border:0;margin:0;padding:0;display:grid;gap:10px}
+.formulaire .accords legend{font-weight:600;font-size:.95rem;margin-bottom:6px;padding:0}
+.formulaire label.accord{display:flex;align-items:flex-start;gap:10px;font-weight:500;font-size:.92rem;line-height:1.4;cursor:pointer}
+.formulaire label.accord input{width:22px;height:22px;flex:none;margin:0;padding:0;accent-color:var(--bordeaux)}
+.recap .formulaire label.accord input{accent-color:var(--rose)}
 .formulaire .btn{width:100%;cursor:pointer;font-family:inherit}
 @media (max-width:560px){.formulaire .duo{grid-template-columns:1fr}}
 .contact .bulle a{color:var(--bordeaux)}
@@ -534,6 +539,11 @@ dialog[open]{animation:ouvre .3s ease-out}
           <label>Téléphone<input type="tel" name="telephone" required autocomplete="tel"></label>
         </div>
         <label>Un mot pour Coralie (facultatif)<textarea name="message" placeholder="Une idée de décor, une couleur…" style="min-height:80px"></textarea></label>
+        <fieldset class="accords">
+          <legend>Rappels par SMS</legend>
+          <label class="accord"><input type="checkbox" name="ok_veille" value="oui" checked> Recevoir un rappel la veille de mon rendez-vous</label>
+          <label class="accord"><input type="checkbox" name="ok_prochain" value="oui"> Recevoir un petit message quand il sera temps de reprendre rendez-vous (désinscription à tout moment)</label>
+        </fieldset>
         <p class="message-resa" data-message-resa role="alert" hidden></p>
         <button class="btn btn-plein" type="submit" data-envoyer disabled>Choisissez un soin, un jour et une heure</button>
         <small>Vos informations servent uniquement à organiser votre rendez-vous. Détails dans les <a href="#mentions-legales">mentions légales</a>.</small>
@@ -546,7 +556,7 @@ dialog[open]{animation:ouvre .3s ease-out}
   <div class="wrap">
     <div>
       <h2 id="t-venir">Un espace rien que pour vous</h2>
-      <p>Coralie vous reçoit dans un mobile-home entièrement aménagé en espace beauté.</p>
+      <p>Coralie vous reçoit dans un espace beauté entièrement aménagé, calme et chaleureux.</p>
       <p class="adresse" data-adresse>23 rue du Bonvouloir<br>72430 Saint-Jean-du-Bois</p>
       <a class="btn btn-plein" data-maps href="#" rel="noopener">Voir sur Google Maps</a>
     </div>
@@ -836,7 +846,7 @@ dialog[open]{animation:ouvre .3s ease-out}
       if(window.__CONTENU__){montrer("Aperçu : l'envoi fonctionnera une fois le site en ligne.");return}
       if(!form.reportValidity())return;
       envoyer.disabled=true;var ancien=envoyer.textContent;envoyer.textContent='Envoi en cours…';
-      var donnees={soin:etat.soin.nom,options:etat.options.map(function(o){return o.nom}),date:cle(etat.jour),debut:etat.heure,nom:form.nom.value,email:form.email.value,telephone:form.telephone.value,message:form.message.value,'bot-field':form['bot-field'].value};
+      var donnees={soin:etat.soin.nom,options:etat.options.map(function(o){return o.nom}),date:cle(etat.jour),debut:etat.heure,nom:form.nom.value,email:form.email.value,telephone:form.telephone.value,message:form.message.value,ok_veille:form.ok_veille.checked,ok_prochain:form.ok_prochain.checked,'bot-field':form['bot-field'].value};
       fetch('/api/reserver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(donnees)})
         .then(function(r){return r.json().catch(function(){return {}}).then(function(j){return {statut:r.status,j:j}})})
         .then(function(x){

@@ -33,7 +33,9 @@ export default async (req) => {
     const id = nouvelId();
     const opts = v.options.map((o) => o.nom).join(", ");
     liens = { confirmer: lienAction(origine, id, "confirmer"), refuser: lienAction(origine, id, "refuser") };
-    infos = { id, nom, email, telephone: tel, message, soin: v.soin.nom, prix: v.soin.prix || "", options: opts, date: d.date, debut: String(debut), fin: String(fin) };
+    infos = { id, nom, email, telephone: tel, message, soin: v.soin.nom, prix: v.soin.prix || "", options: opts, date: d.date, debut: String(debut), fin: String(fin),
+      // Choix de la cliente pour les rappels (preuve de l'accord : date et origine)
+      ok_veille: d.ok_veille === false ? "non" : "oui", ok_prochain: d.ok_prochain === true ? "oui" : "non", accord_le: new Date(Date.now()).toISOString() };
     await creerRendezVous({
       id, date: d.date, debut, fin,
       titre: `À confirmer : ${nom}, ${v.soin.nom}${opts ? " + " + opts : ""}`,

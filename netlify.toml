@@ -23,3 +23,9 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     X-Frame-Options = "DENY"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Adresse courte pour réserver (rappels SMS, Instagram, fiche Google)
+[[redirects]]
+  from = "/rdv"
+  to = "/#reserver"
+  status = 301

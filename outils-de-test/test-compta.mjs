@@ -12,7 +12,7 @@ const contenus = Object.fromEntries(["soins", "coordonnees", "reservation", "pai
 
 // ---------- Google simulé ----------
 export const G = { evs: new Map(), mails: [], feuilles: new Map(), appelsTableau: 0, tableauPartage: true,
-  sumup: [], versements: [], drive: [], driveDelegation: false };
+  sumup: [], versements: [], drive: [], driveDelegation: false, sms: [], stop: [] };
 const R = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
 const versParis = (iso) => (/[+-]\d\d:\d\d$/.test(iso) ? iso : /Z$/.test(iso) ? new Date(Date.parse(iso) + 3600e3).toISOString().slice(0, 19) + "+01:00" : iso + "+01:00");
 const col = (l) => l.split("").reduce((a, c) => a * 26 + c.charCodeAt(0) - 64, 0);
@@ -61,6 +61,16 @@ globalThis.fetch = async (url, opt = {}) => {
   if (url.includes("gmail.googleapis.com")) {
     const raw = Buffer.from(JSON.parse(corps).raw, "base64url").toString();
     G.mails.push(raw); return R({ id: "m" + G.mails.length });
+  }
+  if (url.startsWith("https://eu.api.ovh.com/1.0")) {
+    const u = new URL(url);
+    if (u.pathname === "/1.0/auth/time") return new Response(String(Math.floor(Date.now() / 1000)));
+    const { createHash } = await import("node:crypto");
+    const h = opt.headers, attendu = "$1$" + createHash("sha1").update(["secret-ovh", "conso-ovh", opt.method || "GET", url, corps || "", h["X-Ovh-Timestamp"]].join("+")).digest("hex");
+    if (h["X-Ovh-Application"] !== "appli-ovh" || h["X-Ovh-Signature"] !== attendu) return R({ message: "Invalid signature" }, 400);
+    if (u.pathname === "/1.0/sms/sms-test-1/jobs" && opt.method === "POST") { const b = JSON.parse(corps); G.sms.push(b); return R({ ids: [1000 + G.sms.length], validReceivers: b.receivers, invalidReceivers: [], totalCreditsRemoved: 1 }); }
+    if (u.pathname === "/1.0/sms/sms-test-1/blacklists") return R(G.stop);
+    return R({ message: "inconnu" }, 404);
   }
   if (url.startsWith("https://api.sumup.com")) {
     if (opt.headers.Authorization !== "Bearer sup_sk_test") return R({ error_code: "NOT_AUTHORIZED" }, 401);
@@ -112,6 +122,9 @@ const rdv = (await imp("netlify/functions/rdv.mjs")).default;
 const compta = (await imp("netlify/functions/compta.mjs")).default;
 const facture = (await imp("netlify/functions/facture.mjs")).default;
 const { verifierRappel } = await imp("netlify/functions/rappel-urssaf.mjs");
+const { executerRappels, smsVeille, smsProchain } = await imp("netlify/functions/rappels.mjs");
+const desinscription = (await imp("netlify/functions/desinscription.mjs")).default;
+const { enGsm } = await imp("netlify/lib/sms.mjs");
 export const fonctions = { reserver, rdv, compta, facture };
 
 let echecs = 0;
@@ -126,6 +139,7 @@ async function api(action, donnees = {}, avecCookie = true) {
 }
 const sujet = (raw) => Buffer.from(raw.match(/^Subject: =\?UTF-8\?B\?(.+?)\?=/m)[1], "base64").toString();
 const to = (raw) => raw.match(/^To: (.*)$/m)[1];
+const corpsHtml = (raw) => Buffer.from(raw.split(/Content-Type: text\/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n/)[1].split("\r\n--")[0].replace(/\r\n/g, ""), "base64").toString();
 const reservationConfirmee = async (b) => {
   await reserver(new Request(O + "/api/reserver", { method: "POST", body: JSON.stringify(b) }));
   const ev = [...G.evs.values()].at(-1);
@@ -148,7 +162,7 @@ if (process.argv[2] !== "--serveur") {
   ok(r.statut === 401 && performance.now() - debut > 1400 && !cookie, "Mauvais mot de passe : refusé après une pause anti-devinette");
   r = await api("connexion", { motdepasse: "Vernis-Rouge-2026" });
   ok(r.statut === 200 && cookie.startsWith("coco_compta="), "Bon mot de passe : connectée");
-  ok([...G.feuilles.keys()].join(",") === "Rendez-vous,Factures,Déclarations URSSAF,Réglages,Dépenses,Abonnements", "Onglets créés dans le tableau : " + [...G.feuilles.keys()].join(", "));
+  ok([...G.feuilles.keys()].join(",") === "Rendez-vous,Factures,Déclarations URSSAF,Réglages,Dépenses,Abonnements,Clientes,Rappels envoyés", "Onglets créés dans le tableau : " + [...G.feuilles.keys()].join(", "));
   ok(r.vue.reglages.depuis === "2026-11-01" && r.vue.reglages.periodicite === "mensuelle", "Réglages par défaut : depuis le 01/11/2026, déclaration mensuelle");
   ok(r.vue.alertes.some((a) => a.includes("SIRET")), "Alerte : SIRET pas encore rempli");
   const faux = cookie.replace(/.$/, (c) => (c === "A" ? "B" : "A"));
@@ -342,6 +356,100 @@ if (process.argv[2] !== "--serveur") {
   ok(r.statut === 200 && r.vue.lignes.find((x) => x.id === rose.id).sumup === "TX1", "Rattachement manuel du paiement TX1");
   const c = r.vue.sumup.controle[0];
   ok(c.mois === "2027-01" && c.sumup === 75 && c.factures === 65, `Contrôle de janvier : SumUp 75 € / factures carte ${c.factures} €`);
+
+  console.log("— Rappels aux clientes");
+  const html = readFileSync(RACINE + "public/index.html", "utf8");
+  ok(html.includes('name="ok_veille" value="oui" checked') && html.includes('name="ok_prochain" value="oui">') && !html.includes("mobile-home"),
+    "Site : 2 cases (rappel veille cochée, prochain soin décochée), phrase « espace beauté »");
+  ok(readFileSync(RACINE + "netlify.toml", "utf8").includes('from = "/rdv"'), "Adresse courte /rdv vers la réservation");
+  aller("2027-01-03T18:00:00+01:00");
+  const resa = (b) => reservationConfirmee({ email: "x@example.com", telephone: "06 00 00 00 00", options: [], message: "", ...b });
+  const idAlice = await resa({ nom: "Alice Rappel", email: "alice@example.com", telephone: "06 21 22 33 44", soin: "Pose semi-permanent", date: "2027-01-05", debut: 600, ok_veille: true, ok_prochain: true });
+  ok(G.evs.get(idAlice).extendedProperties.private.ok_prochain === "oui", "Les choix de la cliente sont gardés avec la réservation");
+  await resa({ nom: "Bob Sansrappel", email: "bob@example.com", telephone: "06 99 88 77 66", soin: "Dépose", date: "2027-01-05", debut: 840, ok_veille: false, ok_prochain: false });
+  aller("2027-01-04T10:00:00+01:00");
+  let n = G.mails.length;
+  let rr = await executerRappels(O);
+  const mAlice = G.mails.slice(n).find((m) => to(m) === "alice@example.com");
+  ok(rr.veille === 1 && mAlice && sujet(mAlice).startsWith("Rappel : votre rendez-vous demain à 10 h"), "Sans clés OVH : rappel de la veille par e-mail à Alice → " + (mAlice && sujet(mAlice)));
+  ok(!G.mails.slice(n).some((m) => to(m) === "bob@example.com"), "Bob a décoché : aucun rappel");
+  ok(corpsHtml(mAlice).includes("/api/desinscription?id="), "Lien « Gérer mes messages » dans l'e-mail");
+  r = await api();
+  const fAlice = r.vue.clientes.find((c) => c.nom === "Alice Rappel");
+  ok(fAlice && fAlice.ok_veille === "oui" && fAlice.ok_prochain === "oui" && fAlice.accord_par.includes("sur le site") && /^2027-01-03 18:00$/.test(fAlice.accord_le),
+    "Fiche Alice : accords + preuve « " + (fAlice && fAlice.accord_par) + " » le " + (fAlice && fAlice.accord_le));
+  n = G.mails.length; rr = await executerRappels(O); ok(rr.veille === 0 && G.mails.length === n, "Relancé le même jour : pas de doublon");
+
+  process.env.OVH_APPLICATION_KEY = "appli-ovh"; process.env.OVH_APPLICATION_SECRET = "secret-ovh"; process.env.OVH_CONSUMER_KEY = "conso-ovh";
+  process.env.OVH_SMS_SERVICE = "sms-test-1"; process.env.OVH_SMS_EXPEDITEUR = "CocoNails";
+  aller("2027-01-04T18:00:00+01:00");
+  await resa({ nom: "Chloé Sms", email: "chloe@example.com", telephone: "+33 7 12 34 56 78", soin: "Remplissage 3 semaines", date: "2027-01-06", debut: 540, ok_veille: true, ok_prochain: true });
+  aller("2027-01-05T10:00:00+01:00");
+  rr = await executerRappels(O);
+  const s1 = G.sms.at(-1);
+  ok(rr.veille === 1 && s1 && s1.receivers[0] === "+33712345678" && s1.noStopClause === true && s1.sender === "CocoNails", "Avec OVH : SMS de rappel à Chloé, sans mention STOP (service), expéditeur CocoNails");
+  ok(s1.message.length <= 160 && enGsm(s1.message) === s1.message, `SMS de 1 crédit (${s1.message.length} caractères) : « ${s1.message} »`);
+  const longue = smsVeille({ debut: "870", soin: "Remplissage 5 semaines ou plus + Nail art + French ou baby boomer" }, { adresse: "23 rue du Bonvouloir", ville: "Saint-Jean-du-Bois", telephone: "07 68 22 70 15" });
+  ok(longue.length <= 160, `SMS raccourci si le soin est long (${longue.length} caractères)`);
+
+  console.log("— Message « prochain soin »");
+  r = await api();
+  const la = r.vue.lignes.find((x) => x.cliente === "Alice Rappel");
+  aller("2027-01-05T12:00:00+01:00");
+  r = await api("valider", { id: la.id, montant: "30", paiement: "Espèces" });
+  ok(r.statut === 200, "Le soin d'Alice est payé (pose semi-permanent, rappel conseillé à 21 jours)");
+  aller("2027-01-25T10:00:00+01:00"); let avantSms = G.sms.length; rr = await executerRappels(O);
+  ok(rr.prochain === 0, "Avant l'échéance (25/01) : rien");
+  aller("2027-01-26T10:00:00+01:00"); rr = await executerRappels(O);
+  const s2 = G.sms.slice(avantSms).find((x) => x.receivers[0] === "+33621223344");
+  ok(rr.prochain === 1 && s2 && s2.noStopClause === false, "Le 26/01 : SMS « prochain soin » à Alice, avec STOP ajouté par OVH");
+  ok(s2.message.includes("coconails72.com/rdv") && s2.message.length <= 140 && enGsm(s2.message) === s2.message, `Texte : « ${s2.message} » (${s2.message.length} car.)`);
+  avantSms = G.sms.length; await executerRappels(O); ok(G.sms.length === avantSms, "Pas de second envoi le lendemain");
+  aller("2027-02-14T10:00:00+01:00"); avantSms = G.sms.length; await executerRappels(O);
+  ok(G.sms.length === avantSms, "14/02 est un dimanche : aucun message publicitaire");
+  aller("2027-02-16T10:00:00+01:00"); avantSms = G.sms.length; rr = await executerRappels(O);
+  ok(rr.prochain === 1 && G.sms.at(-1).message.startsWith("Coco Nail's : envie de jolis ongles"), "3 semaines après : une seule relance");
+  aller("2027-03-02T10:00:00+01:00"); avantSms = G.sms.length; await executerRappels(O); ok(G.sms.length === avantSms, "Après la relance : plus rien");
+
+  r = await api(); ok(r.statut === 401, "Après 90 jours, la compta redemande le mot de passe");
+  await api("connexion", { motdepasse: "Vernis-Rouge-2026" });
+  r = await api(); const lc = r.vue.lignes.find((x) => x.cliente === "Chloé Sms");
+  aller("2027-01-06T12:00:00+01:00"); await api("valider", { id: lc.id, montant: "35", paiement: "Espèces" });
+  await api("ajouter", { origine: "Téléphone", cliente: "Chloé Sms", telephone: "+33 7 12 34 56 78", date: "2027-01-27", heure: "11:00", soin: "Remplissage 3 semaines", agenda: true });
+  aller("2027-01-25T10:00:00+01:00"); avantSms = G.sms.length; await executerRappels(O);
+  ok(!G.sms.slice(avantSms).some((x) => x.receivers[0] === "+33712345678" && !x.noStopClause), "Chloé a déjà repris rendez-vous : pas de message « prochain soin »");
+
+  console.log("— STOP, désinscription et choix notés par Coralie");
+  G.stop = ["+33621223344"];
+  aller("2027-03-03T10:00:00+01:00"); await executerRappels(O);
+  r = await api(); const fa2 = r.vue.clientes.find((c) => c.nom === "Alice Rappel");
+  ok(fa2.stop_le && fa2.ok_prochain === "non", "Alice a répondu STOP : noté, plus de message « prochain soin »");
+  const lien = corpsHtml(mAlice).match(/href="([^"]*\/api\/desinscription[^"]*)"/)[1].replace(/&amp;/g, "&");
+  let pg = await desinscription(new Request(lien)); let txt = await pg.text();
+  ok(pg.status === 200 && txt.includes('name="ok_veille"') && txt.includes("STOP"), "Page « Mes messages » : choix affichés, STOP signalé");
+  const q = new URL(lien).searchParams;
+  pg = await desinscription(new Request(O + "/api/desinscription", { method: "POST", body: new URLSearchParams({ id: q.get("id"), s: q.get("s") }) }));
+  r = await api(); const fa3 = r.vue.clientes.find((c) => c.nom === "Alice Rappel");
+  ok(pg.status === 200 && fa3.ok_veille === "non" && fa3.accord_par.includes("Gérer mes messages"), "Tout décoché par la cliente : enregistré avec la preuve");
+  pg = await desinscription(new Request(lien.replace(/s=./, "s=Z"))); ok(pg.status === 403, "Lien falsifié : refusé");
+  r = await api("ajouter", { origine: "Message", cliente: "Diane Oral", telephone: "06 55 44 33 22", date: "2027-03-03", soin: "Dépose", ok_veille: false, ok_prochain: true });
+  const fd = r.vue.clientes.find((c) => c.nom === "Diane Oral");
+  ok(fd && fd.ok_veille === "non" && fd.ok_prochain === "oui" && fd.accord_par.includes("noté par Coralie"), "RDV par message : choix de Diane notés par Coralie");
+  r = await api("cliente", { nom: "Diane Oral", telephone: "06 55 44 33 22", ok_veille: true, ok_prochain: false });
+  ok(r.vue.clientes.find((c) => c.nom === "Diane Oral").ok_veille === "oui", "Fiche cliente modifiée par Coralie");
+  r = await api("cliente", { nom: "Alice Rappel", telephone: "06 21 22 33 44", ok_veille: true, ok_prochain: true });
+  ok(r.statut === 409, "Impossible de réactiver le « prochain soin » après un STOP → " + r.erreur);
+  r = await api("reglage", { rappels_auto: false });
+  ok(r.vue.rappels.auto === false, "Rappels automatiques mis en pause");
+  aller("2027-03-03T18:00:00+01:00");
+  await resa({ nom: "Eva Pause", email: "eva@example.com", telephone: "06 12 12 12 12", soin: "Dépose", date: "2027-03-05", debut: 600, ok_veille: true });
+  aller("2027-03-04T10:00:00+01:00"); avantSms = G.sms.length; rr = await executerRappels(O);
+  ok(rr.veille === 0 && G.sms.length === avantSms, "En pause : aucun envoi");
+  await api("reglage", { rappels_auto: true }); rr = await executerRappels(O); ok(rr.veille === 1, "Réactivés : le rappel d'Eva part");
+  r = await api();
+  ok(r.vue.rappels.envoyes.length >= 5 && r.vue.rappels.envoyes[0].canal === "SMS" && r.vue.clientes.find((c) => c.nom === "Eva Pause").rappels.length === 1,
+    `Journal des rappels visible dans la compta (${r.vue.rappels.envoyes.length} envois)`);
+  ok(smsProchain("Rallongement gel", "coconails72.com", false).length <= 140, "Texte « prochain soin » assez court pour la mention STOP");
 
   console.log("— Tableau non partagé");
   G.tableauPartage = false;

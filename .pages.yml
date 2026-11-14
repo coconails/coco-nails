@@ -113,6 +113,10 @@ content:
             label: Durée à bloquer (en minutes)
             description: "60 = 1 h, 90 = 1 h 30, 105 = 1 h 45. Vide = soin non réservable en ligne."
             type: number
+          - name: rappel_jours
+            label: Message « prochain soin » après … jours
+            description: "Pour les clientes qui l'ont accepté. Par exemple 18 pour un remplissage 3 semaines. Vide = calcul automatique, 0 = pas de message."
+            type: number
           - name: options_possibles
             label: Les options (nail art, French) sont possibles avec ce soin
             type: boolean
