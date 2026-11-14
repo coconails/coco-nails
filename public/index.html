@@ -704,7 +704,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     var photos=(r[0]&&r[0].photos||[]).filter(function(p){return p&&p.image});
     var teintes=r[1]&&r[1].teintes||[], ev=r[2]||{}, soinsData=r[3]||{}, faq=r[4]&&r[4].questions||[], co=r[5]||{}, lg=r[6]||{}, rs=r[7]||{}, pa=r[8]||{};
     var soins=(soinsData.soins||[]).filter(function(s){return s&&s.nom}), options=(soinsData.options||[]).filter(function(o){return o&&o.nom});
-    var semaine=co.semaine||{}, fermetures=(co.fermetures||[]).filter(function(f){return f&&f.du});
+    var semaine=co.semaine||{}, fermeturesCms=(co.fermetures||[]).filter(function(f){return f&&f.du}), fermetures=fermeturesCms.slice();
 
     // ---- Main et défilé ----
     var main=document.querySelector('[data-main]');
@@ -773,6 +773,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     function fermeture(t){var k=cle(t);for(var i=0;i<fermetures.length;i++){var f=fermetures[i],du=String(f.du).slice(0,10),au=String(f.au||f.du).slice(0,10);if(k>=du&&k<=au)return f}return null}
     var now=maintenantParis();
     function prochaineOuverture(depuis){for(var i=0;i<21;i++){var t=now.jour+i*JMS;var h=horaireDu(t);if(!h||fermeture(t))continue;if(i===0&&depuis>=h[0])continue;return {t:t,i:i,debut:h[0]}}return null}
+    function majStatut(){
     var statutTxt,statutCls,hAuj=horaireDu(now.jour),fAuj=fermeture(now.jour);
     if(fAuj){statutCls='ferme';statutTxt='Fermeture exceptionnelle'+(fAuj.au?' jusqu\'au '+fmtDate(Date.parse(String(fAuj.au).slice(0,10))):'')}
     else if(hAuj&&now.minutes>=hAuj[0]&&now.minutes<hAuj[1]){statutCls='ouvert';statutTxt='Ouvert, ferme à '+fmtHeure(hAuj[1])}
@@ -784,6 +785,8 @@ dialog[open]{animation:ouvre .3s ease-out}
     var proF=fermetures.map(function(f){return f}).filter(function(f){return String(f.au||f.du).slice(0,10)>=cle(now.jour)})[0];
     if(proF&&!fAuj){avis=(avis?avis+' ':'')+'Fermeture exceptionnelle du '+fmtDate(Date.parse(String(proF.du).slice(0,10)))+' au '+fmtDate(Date.parse(String(proF.au||proF.du).slice(0,10)))+(proF.motif?' ('+proF.motif+')':'')+'.'}
     if(avis)document.querySelectorAll('[data-avis-ferie]').forEach(function(a){a.textContent=avis;a.hidden=false});
+    }
+    majStatut();
     var tb=document.querySelector('[data-table-horaires]'),jourAuj=nomJour(now.jour);
     ORDRE.forEach(function(j){var h=semaine[j];if(!h)return;var tr=el('tr');if(j===jourAuj)tr.className='aujourdhui';tr.appendChild(el('td',null,j.charAt(0).toUpperCase()+j.slice(1)));var a=enMinutes(h.debut),b=enMinutes(h.fin);tr.appendChild(el('td',null,(h.ouvert&&a!=null&&b!=null)?fmtHeure(a)+' – '+fmtHeure(b):'Fermé'));tb.appendChild(tr)});
 
@@ -809,7 +812,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     function creneaux(t){var h=horaireDu(t);if(!h||fermeture(t)||ferie(t))return [];var d=duree();if(!d)return [];var out=[];for(var m=h[0];m+d<=h[1];m+=pas){if(libre(t,m,d))out.push(m)}return out}
     function chargerOccupes(){
       if(window.__CONTENU__)return Promise.resolve();
-      return fetch('/api/disponibilites?du='+cle(now.jour+dmin*JMS)+'&au='+cle(now.jour+dmax*JMS),{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){occupes=(d&&d.occupe||[]).map(function(x){return [localParis(Date.parse(x.start)),localParis(Date.parse(x.end))]})}).catch(function(){occupes=[]});
+      return fetch('/api/disponibilites?du='+cle(now.jour+dmin*JMS)+'&au='+cle(now.jour+dmax*JMS),{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){occupes=(d&&d.occupe||[]).map(function(x){return [localParis(Date.parse(x.start)),localParis(Date.parse(x.end))]});fermetures=fermeturesCms.concat((d&&d.fermetures)||[]).sort(function(a,b){return String(a.du)<String(b.du)?-1:1});majStatut()}).catch(function(){occupes=[]});
     }
     function raison(t){if(fermeture(t))return 'fermé';if(ferie(t))return 'férié';if(!horaireDu(t))return 'fermé';return 'complet'}
     function majJours(){

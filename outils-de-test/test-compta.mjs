@@ -55,7 +55,8 @@ globalThis.fetch = async (url, opt = {}) => {
   }
   if (url.includes("/freeBusy")) {
     const b = JSON.parse(corps); const a = Date.parse(b.timeMin), z = Date.parse(b.timeMax);
-    const busy = [...G.evs.values()].filter((e) => Date.parse(e.start.dateTime) < z && Date.parse(e.end.dateTime) > a).map((e) => ({ start: e.start.dateTime, end: e.end.dateTime }));
+    const t0 = (x) => Date.parse(x.dateTime || x.date + "T00:00:00+01:00");
+    const busy = [...G.evs.values()].filter((e) => e.transparency !== "transparent" && t0(e.start) < z && t0(e.end) > a).map((e) => ({ start: e.start.dateTime || e.start.date, end: e.end.dateTime || e.end.date }));
     return R({ calendars: { [b.items[0].id]: { busy } } });
   }
   if (url.includes("gmail.googleapis.com")) {
@@ -101,7 +102,8 @@ globalThis.fetch = async (url, opt = {}) => {
     if (!id && opt.method === "POST") { const ev = JSON.parse(corps); ev.start.dateTime = versParis(ev.start.dateTime); ev.end.dateTime = versParis(ev.end.dateTime); G.evs.set(ev.id, ev); return R(ev); }
     if (!id) {
       const q = new URL(url).searchParams; const a = Date.parse(q.get("timeMin")), z = Date.parse(q.get("timeMax"));
-      return R({ items: [...G.evs.values()].filter((e) => Date.parse(e.start.dateTime) < z && Date.parse(e.end.dateTime) > a).map((e) => ({ ...e, id: e.id })) });
+      const t0 = (x) => Date.parse(x.dateTime || x.date + "T00:00:00+01:00");
+      return R({ items: [...G.evs.values()].filter((e) => t0(e.start) < z && t0(e.end) > a).map((e) => ({ ...e, id: e.id })) });
     }
     if (!G.evs.has(id)) return R({}, 404);
     if (opt.method === "PATCH") { const ch = JSON.parse(corps); if (ch.start) ch.start.dateTime = versParis(ch.start.dateTime); if (ch.end) ch.end.dateTime = versParis(ch.end.dateTime); Object.assign(G.evs.get(id), ch); return R(G.evs.get(id)); }
@@ -450,6 +452,23 @@ if (process.argv[2] !== "--serveur") {
   ok(r.vue.rappels.envoyes.length >= 5 && r.vue.rappels.envoyes[0].canal === "SMS" && r.vue.clientes.find((c) => c.nom === "Eva Pause").rappels.length === 1,
     `Journal des rappels visible dans la compta (${r.vue.rappels.envoyes.length} envois)`);
   ok(smsProchain("Rallongement gel", "coconails72.com", false).length <= 140, "Texte « prochain soin » assez court pour la mention STOP");
+
+  console.log("— Fermetures notées dans Google Agenda");
+  const dispo = (await imp("netlify/functions/disponibilites.mjs")).default;
+  aller("2027-03-10T10:00:00+01:00");
+  G.evs.set("vac1", { id: "vac1", summary: "VACANCES à la mer", transparency: "transparent", start: { date: "2027-03-22" }, end: { date: "2027-03-27" } });
+  G.evs.set("perso1", { id: "perso1", summary: "Repas de famille", transparency: "transparent", start: { date: "2027-03-29" }, end: { date: "2027-03-30" } });
+  G.evs.set("form1", { id: "form1", summary: "Fermeture – formation", start: { date: "2027-03-15" }, end: { date: "2027-03-16" } });
+  let rd = await dispo(new Request(O + "/api/disponibilites?du=2027-03-11&au=2027-04-30")); let jd = await rd.json();
+  ok(jd.fermetures.length === 2 && jd.fermetures.some((f) => f.du === "2027-03-22" && f.au === "2027-03-26" && f.motif === "Vacances"),
+    "« VACANCES à la mer » (même en « Disponible ») : fermé du 22 au 26 mars inclus");
+  ok(jd.fermetures.some((f) => f.du === "2027-03-15" && f.au === "2027-03-15"), "« Fermeture – formation » sur une journée : fermé le 15 mars");
+  ok(!JSON.stringify(jd).includes("Repas") && !JSON.stringify(jd).includes("mer"), "Les titres de l'agenda ne sont jamais envoyés aux visiteurs");
+  ok(!jd.fermetures.some((f) => f.du === "2027-03-29"), "Un autre événement « toute la journée » ne ferme rien");
+  let rs = await reserver(new Request(O + "/api/reserver", { method: "POST", body: JSON.stringify({ nom: "Zoé Vac", email: "z@example.com", telephone: "06 01 02 03 04", soin: "Dépose", options: [], date: "2027-03-23", debut: 600 }) }));
+  ok(rs.status === 422 && (await rs.json()).erreur.includes("fermé"), "Réserver pendant les vacances : refusé par le site");
+  rs = await reserver(new Request(O + "/api/reserver", { method: "POST", body: JSON.stringify({ nom: "Zoé Ok", email: "z@example.com", telephone: "06 01 02 03 04", soin: "Dépose", options: [], date: "2027-03-30", debut: 600 }) }));
+  ok(rs.status === 200, "Réserver le lendemain d'un « Repas de famille » toute la journée : accepté");
 
   console.log("— Tableau non partagé");
   G.tableauPartage = false;

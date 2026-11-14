@@ -1,7 +1,7 @@
 // Bloque un créneau : revérifie tout côté serveur, crée un rendez-vous « À confirmer » dans l'agenda de Coralie,
 // puis envoie un e-mail à Coralie (boutons Confirmer / Refuser) et un accusé de réception à la cliente.
 // POST /api/reserver  {soin, options[], date, debut, nom, email, telephone, message}
-import { configuree, occupe, creerRendezVous, contenu, verifier, instant, hhmm, json, nouvelId, lienAction, envoyerMail, destinataireAlertes } from "../lib/agenda.mjs";
+import { configuree, occupe, creerRendezVous, contenu, verifier, instant, hhmm, json, nouvelId, lienAction, envoyerMail, destinataireAlertes, fermeturesAgenda } from "../lib/agenda.mjs";
 import { alerteCoralie, accuseCliente } from "../lib/messages.mjs";
 
 const texte = (v, max) => String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, max);
@@ -26,6 +26,8 @@ export default async (req) => {
     const v = verifier({ soins, coordonnees, reservation }, d);
     if (!v.ok) return json({ erreur: v.erreur }, 422);
 
+    if ((await fermeturesAgenda(d.date, d.date)).some((f) => d.date >= f.du && d.date <= f.au))
+      return json({ erreur: "Coco Nail's est fermé ce jour-là." }, 422);
     const debut = Number(d.debut), fin = debut + v.duree;
     const plages = await occupe(new Date(instant(d.date, debut)).toISOString(), new Date(instant(d.date, fin)).toISOString());
     if (plages.length) return json({ erreur: "Ce créneau vient d'être réservé. Choisissez-en un autre." }, 409);

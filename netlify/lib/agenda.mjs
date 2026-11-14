@@ -280,3 +280,21 @@ export function json(donnees, statut = 200) {
     headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
+
+// ---- Fermetures notées dans Google Agenda ----
+// Un événement « Toute la journée » dont le titre contient Fermé, Vacances, Congés ou Formation
+// (ou Fermeture ; majuscules et accents indifférents) ferme le site ces jours-là, qu'il soit « Occupé » ou « Disponible ».
+const MOTS_FERMETURE = { ferme: "", fermee: "", fermeture: "", vacances: "Vacances", conges: "Congés", formation: "Formation" };
+export function fermetureAgenda(ev) {
+  if (!ev || ev.status === "cancelled" || !ev.start || !ev.start.date) return null;
+  const titre = String(ev.summary || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const mot = Object.keys(MOTS_FERMETURE).find((m) => new RegExp(`(^|[^a-z])${m}([^a-z]|$)`).test(titre));
+  if (!mot) return null;
+  const fin = ev.end && ev.end.date ? ev.end.date : ev.start.date; // la date de fin Google est exclue
+  const au = new Date(Date.parse(fin + "T00:00:00Z") - (fin > ev.start.date ? JOUR_MS : 0)).toISOString().slice(0, 10);
+  return { du: ev.start.date, au, motif: MOTS_FERMETURE[mot] };
+}
+export async function fermeturesAgenda(duDate, auDate) {
+  const evs = await listerRendezVous(new Date(instant(duDate, 0)).toISOString(), new Date(instant(auDate, 24 * 60)).toISOString());
+  return evs.map(fermetureAgenda).filter(Boolean);
+}

@@ -44,6 +44,10 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   champ Pages CMS `rappel_jours` (sinon N semaines → 7N−3 jours, dépose → aucun, autre → 21). Adresse courte `/rdv`.
   Vocabulaire : côté clientes « pause beauté » (SMS, e-mails, case du formulaire), titre du site « La carte beauté »
   (sous-titre « Soins des ongles & tarifs » pour Google) ; côté compta et Pages CMS on garde « soin ».
+- Fermetures depuis Google Agenda : événement « Toute la journée » dont le titre contient Fermé / Fermeture / Vacances / Congés /
+  Formation (accents et majuscules indifférents, même réglé « Disponible ») → jours fermés sur le site (`fermetureAgenda` dans
+  agenda.mjs, renvoyés par `/api/disponibilites` sans les titres, refusés par `/api/reserver`). Sans publication.
+  Les « Fermetures exceptionnelles » de Pages CMS restent possibles (elles coûtent une publication).
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
