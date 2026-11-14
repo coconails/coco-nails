@@ -26,7 +26,9 @@ export default async (req) => {
     const v = verifier({ soins, coordonnees, reservation }, d);
     if (!v.ok) return json({ erreur: v.erreur }, 422);
 
-    if ((await fermeturesAgenda(d.date, d.date)).some((f) => d.date >= f.du && d.date <= f.au))
+    // Jour fermé noté dans l'agenda (Vacances, Congés…). Si la lecture échoue, on ne bloque pas la réservation.
+    const fermes = await fermeturesAgenda(d.date, d.date).catch((e) => { console.error(e); return []; });
+    if (fermes.some((f) => d.date >= f.du && d.date <= f.au))
       return json({ erreur: "Coco Nail's est fermé ce jour-là." }, 422);
     const debut = Number(d.debut), fin = debut + v.duree;
     const plages = await occupe(new Date(instant(d.date, debut)).toISOString(), new Date(instant(d.date, fin)).toISOString());
