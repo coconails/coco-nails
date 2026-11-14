@@ -183,6 +183,7 @@ section{padding:84px 0}
 
 /* Carte des soins */
 .soins .entete-section{max-width:640px;margin-bottom:34px}
+.sous-titre-carte{margin:-.3em 0 .8em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.85rem;color:var(--caramel)}
 .carte{list-style:none;margin:0;padding:0;columns:2;column-gap:60px}
 .carte li{break-inside:avoid;padding:20px 0;border-bottom:1px solid var(--rose)}
 .carte .ligne{display:flex;align-items:baseline;gap:10px}
@@ -479,7 +480,8 @@ dialog[open]{animation:ouvre .3s ease-out}
 <section class="soins" id="soins" aria-labelledby="t-soins">
   <div class="wrap">
     <div class="entete-section">
-      <h2 id="t-soins">La carte des soins</h2>
+      <h2 id="t-soins">La carte beauté</h2>
+      <p class="sous-titre-carte">Soins des ongles &amp; tarifs</p>
       <p>Les durées sont indicatives. Passez sur un soin pour le réserver directement.</p>
     </div>
     <div data-soins></div>
@@ -542,7 +544,7 @@ dialog[open]{animation:ouvre .3s ease-out}
         <fieldset class="accords">
           <legend>Rappels par SMS</legend>
           <label class="accord"><input type="checkbox" name="ok_veille" value="oui" checked> Recevoir un rappel la veille de mon rendez-vous</label>
-          <label class="accord"><input type="checkbox" name="ok_prochain" value="oui"> Recevoir un petit message quand il sera temps de reprendre rendez-vous (désinscription à tout moment)</label>
+          <label class="accord"><input type="checkbox" name="ok_prochain" value="oui"> Recevoir un petit message quand il sera temps de m'offrir ma prochaine pause beauté (désinscription à tout moment)</label>
         </fieldset>
         <p class="message-resa" data-message-resa role="alert" hidden></p>
         <button class="btn btn-plein" type="submit" data-envoyer disabled>Choisissez un soin, un jour et une heure</button>

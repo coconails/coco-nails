@@ -42,6 +42,8 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   « Mes clientes ». Onglets Sheets « Clientes » (choix + preuve : par qui, quand ; STOP) et « Rappels envoyés ».
   Lien signé « Gérer mes messages » : `netlify/functions/desinscription.mjs` (`/api/desinscription`). Délai par soin :
   champ Pages CMS `rappel_jours` (sinon N semaines → 7N−3 jours, dépose → aucun, autre → 21). Adresse courte `/rdv`.
+  Vocabulaire : côté clientes « pause beauté » (SMS, e-mails, case du formulaire), titre du site « La carte beauté »
+  (sous-titre « Soins des ongles & tarifs » pour Google) ; côté compta et Pages CMS on garde « soin ».
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.

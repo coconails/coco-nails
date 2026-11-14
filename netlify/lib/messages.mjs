@@ -267,19 +267,19 @@ Coco Nail's${lienDesinscription ? "\n\nNe plus recevoir de rappels : " + lienDes
 // 8. Pour la cliente : « votre prochain soin approche » (uniquement si elle l'a accepté).
 export function prochainSoinMail({ nom, soin, relance }, origine, lienDesinscription) {
   const prenom = String(nom || "").trim().split(/\s+/)[0];
-  const sujet = relance ? "Coco Nail's : on garde une place pour vous ?" : "Coco Nail's : c'est bientôt le moment de reprendre rendez-vous";
+  const sujet = relance ? "Coco Nail's : une pause beauté vous ferait du bien ?" : "Coco Nail's : c'est bientôt l'heure de votre pause beauté";
   const html = gabarit(relance ? "Envie de vous faire plaisir ?" : "C'est bientôt le moment !", [
     para(`Bonjour ${esc(prenom)},`),
     para(relance
       ? "Cela fait un moment que nous ne nous sommes pas vues ! Coralie serait ravie de s'occuper à nouveau de vos ongles."
-      : `Votre dernier soin (${esc(soin)}) date déjà de quelques semaines : c'est le bon moment pour réserver le prochain et garder de jolis ongles.`),
+      : `Votre dernière pause beauté (${esc(soin)}) date déjà de quelques semaines : c'est le bon moment pour réserver la prochaine et garder de jolis ongles.`),
     `<p style="margin:18px 0">${bouton(origine + "/rdv", "Réserver mon créneau")}</p>`,
     para("À très bientôt,<br>Coralie"),
-    para(`<span style="color:#7a5a60;font-size:12px">Vous recevez ce message car vous avez accepté d'être prévenue de votre prochain soin. <a href="${esc(lienDesinscription)}" style="color:#7a5a60">Ne plus recevoir ces messages</a></span>`),
+    para(`<span style="color:#7a5a60;font-size:12px">Vous recevez ce message car vous avez accepté d'être prévenue de votre prochaine pause beauté. <a href="${esc(lienDesinscription)}" style="color:#7a5a60">Ne plus recevoir ces messages</a></span>`),
   ].join(""));
   const texte = `Bonjour ${prenom},
 
-${relance ? "Cela fait un moment que nous ne nous sommes pas vues ! Coralie serait ravie de s'occuper à nouveau de vos ongles." : `Votre dernier soin (${soin}) date déjà de quelques semaines : c'est le bon moment pour réserver le prochain.`}
+${relance ? "Cela fait un moment que nous ne nous sommes pas vues ! Coralie serait ravie de s'occuper à nouveau de vos ongles." : `Votre dernière pause beauté (${soin}) date déjà de quelques semaines : c'est le bon moment pour réserver la prochaine.`}
 Réservez en 1 minute : ${origine}/rdv
 
 À très bientôt,

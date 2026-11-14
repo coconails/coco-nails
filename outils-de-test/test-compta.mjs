@@ -408,7 +408,7 @@ if (process.argv[2] !== "--serveur") {
   aller("2027-02-14T10:00:00+01:00"); avantSms = G.sms.length; await executerRappels(O);
   ok(G.sms.length === avantSms, "14/02 est un dimanche : aucun message publicitaire");
   aller("2027-02-16T10:00:00+01:00"); avantSms = G.sms.length; rr = await executerRappels(O);
-  ok(rr.prochain === 1 && G.sms.at(-1).message.startsWith("Coco Nail's : envie de jolis ongles"), "3 semaines après : une seule relance");
+  ok(rr.prochain === 1 && G.sms.at(-1).message.startsWith("Coco Nail's : envie d'une pause beauté"), "3 semaines après : une seule relance");
   aller("2027-03-02T10:00:00+01:00"); avantSms = G.sms.length; await executerRappels(O); ok(G.sms.length === avantSms, "Après la relance : plus rien");
 
   r = await api(); ok(r.statut === 401, "Après 90 jours, la compta redemande le mot de passe");

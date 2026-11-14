@@ -14,7 +14,6 @@ const plusJours = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * JOUR_MS)
 const { lienGestion } = C;
 
 const heureCourte = (min) => { const [h, m] = hhmm(min).split(":"); return `${Number(h)}h${m === "00" ? "" : m}`; };
-const minuscule = (t) => String(t || "").charAt(0).toLowerCase() + String(t || "").slice(1);
 
 // Textes des SMS (160 caractères au plus pour ne consommer qu'un crédit).
 export function smsVeille(i, c) {
@@ -27,9 +26,8 @@ export function smsVeille(i, c) {
   return t;
 }
 export function smsProchain(soin, site, relance) {
-  if (relance) return `Coco Nail's : envie de jolis ongles ? Coralie serait ravie de vous revoir. Réservez en 1 min sur ${site}/rdv`;
-  const t = `Coco Nail's : il est temps de penser à votre prochain rendez-vous (${minuscule(soin)}) ! Réservez en 1 min sur ${site}/rdv - Coralie`;
-  return t.length <= 140 ? t : `Coco Nail's : il est temps de penser à votre prochain rendez-vous ! Réservez en 1 min sur ${site}/rdv - Coralie`;
+  if (relance) return `Coco Nail's : envie d'une pause beauté ? Coralie serait ravie de vous revoir. Réservez en 1 min sur ${site}/rdv`;
+  return `Coco Nail's : il est temps de penser à votre prochaine pause beauté ! Réservez en 1 min sur ${site}/rdv - Coralie`;
 }
 
 export async function executerRappels(origine) {
