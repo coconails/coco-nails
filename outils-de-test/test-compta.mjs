@@ -11,7 +11,8 @@ process.env.GOOGLE_CALENDAR_ID = "contact@coconails72.com";
 const contenus = Object.fromEntries(["soins", "coordonnees", "reservation", "paiement", "legal"].map((n) => [n, JSON.parse(readFileSync(`${RACINE}public/contenu/${n}.json`))]));
 
 // ---------- Google simulé ----------
-export const G = { evs: new Map(), mails: [], feuilles: new Map(), appelsTableau: 0, tableauPartage: true };
+export const G = { evs: new Map(), mails: [], feuilles: new Map(), appelsTableau: 0, tableauPartage: true,
+  sumup: [], versements: [], drive: [], driveDelegation: false };
 const R = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
 const versParis = (iso) => (/[+-]\d\d:\d\d$/.test(iso) ? iso : /Z$/.test(iso) ? new Date(Date.parse(iso) + 3600e3).toISOString().slice(0, 19) + "+01:00" : iso + "+01:00");
 const col = (l) => l.split("").reduce((a, c) => a * 26 + c.charCodeAt(0) - 64, 0);
@@ -35,6 +36,7 @@ globalThis.fetch = async (url, opt = {}) => {
   const corps = opt.body && typeof opt.body === "string" ? opt.body : null;
   if (url.includes("oauth2.googleapis.com/token")) {
     const charge = JSON.parse(Buffer.from(new URLSearchParams(opt.body).get("assertion").split(".")[1], "base64url"));
+    if (charge.scope.includes("drive") && !G.driveDelegation) return R({ error: "unauthorized_client" }, 401);
     return R({ access_token: "tok-" + (charge.sub || "sa") + "-" + charge.scope.split("/").pop(), expires_in: 3600 });
   }
   if (url.includes("sheets.googleapis.com")) {
@@ -59,6 +61,29 @@ globalThis.fetch = async (url, opt = {}) => {
   if (url.includes("gmail.googleapis.com")) {
     const raw = Buffer.from(JSON.parse(corps).raw, "base64url").toString();
     G.mails.push(raw); return R({ id: "m" + G.mails.length });
+  }
+  if (url.startsWith("https://api.sumup.com")) {
+    if (opt.headers.Authorization !== "Bearer sup_sk_test") return R({ error_code: "NOT_AUTHORIZED" }, 401);
+    const u = new URL(url), q = u.searchParams;
+    if (u.pathname === "/v0.1/memberships") return R({ items: [{ id: "mem1", resource_id: "MTEST01", type: "merchant", resource: { id: "MTEST01", type: "merchant", name: "Coco Nail's" } }], total_count: 1 });
+    if (u.pathname === "/v2.1/merchants/MTEST01/transactions/history") {
+      const a = Date.parse(q.get("oldest_time") || 0), z = Date.parse(q.get("newest_time") || "2100-01-01");
+      const tous = G.sumup.filter((t) => Date.parse(t.timestamp) >= a && Date.parse(t.timestamp) < z);
+      const depart = Number(q.get("oldest_ref") || 0), page = tous.slice(depart, depart + 2); // 2 par page pour tester la pagination
+      const links = depart + 2 < tous.length ? [{ rel: "next", href: `${q.toString().replace(/&?oldest_ref=\d+/, "")}&oldest_ref=${depart + 2}` }] : [];
+      return R({ items: page, links });
+    }
+    if (u.pathname === "/v1.0/merchants/MTEST01/payouts") return R(G.versements.filter((v) => v.date >= q.get("start_date") && v.date <= q.get("end_date")));
+    return R({}, 404);
+  }
+  if (url.includes("googleapis.com/drive/v3/files") || url.includes("googleapis.com/upload/drive/v3/files")) {
+    if (!url.includes("upload")) { const meta = JSON.parse(corps); const id = "dossier" + (G.drive.length + 1); G.drive.push({ id, ...meta }); return R({ id }); }
+    const brut = Buffer.from(opt.body), texte = brut.toString("latin1");
+    const meta = JSON.parse(brut.toString("utf8").match(/\r\n\r\n(\{.*?\})\r\n--/)[1]);
+    const debut = texte.indexOf("\r\n\r\n", texte.indexOf("Content-Type: image") >= 0 ? texte.indexOf("Content-Type: image") : texte.indexOf("Content-Type: application/pdf")) + 4;
+    const fin = texte.lastIndexOf("\r\n--");
+    const id = "fichier" + (G.drive.length + 1); G.drive.push({ id, ...meta, octets: brut.subarray(debut, fin) });
+    return R({ id, webViewLink: `https://drive.google.com/file/d/${id}/view` });
   }
   const m = url.match(/\/events(?:\/([^?]+))?(\?.*)?$/);
   if (m) {
@@ -123,7 +148,7 @@ if (process.argv[2] !== "--serveur") {
   ok(r.statut === 401 && performance.now() - debut > 1400 && !cookie, "Mauvais mot de passe : refusé après une pause anti-devinette");
   r = await api("connexion", { motdepasse: "Vernis-Rouge-2026" });
   ok(r.statut === 200 && cookie.startsWith("coco_compta="), "Bon mot de passe : connectée");
-  ok([...G.feuilles.keys()].join(",") === "Rendez-vous,Factures,Déclarations URSSAF,Réglages", "Onglets créés dans le tableau : " + [...G.feuilles.keys()].join(", "));
+  ok([...G.feuilles.keys()].join(",") === "Rendez-vous,Factures,Déclarations URSSAF,Réglages,Dépenses,Abonnements", "Onglets créés dans le tableau : " + [...G.feuilles.keys()].join(", "));
   ok(r.vue.reglages.depuis === "2026-11-01" && r.vue.reglages.periodicite === "mensuelle", "Réglages par défaut : depuis le 01/11/2026, déclaration mensuelle");
   ok(r.vue.alertes.some((a) => a.includes("SIRET")), "Alerte : SIRET pas encore rempli");
   const faux = cookie.replace(/.$/, (c) => (c === "A" ? "B" : "A"));
@@ -238,6 +263,85 @@ if (process.argv[2] !== "--serveur") {
   const lignes = G.feuilles.get("Rendez-vous");
   const rangChloe = lignes.findIndex((x) => x[5] === "Chloé"); lignes[rangChloe][1] = "À valider"; lignes[rangChloe][15] = "";
   r = await api(); ok(r.vue.lignes.find((x) => x.cliente === "Chloé").etat === "Validée", "Ligne non mise à jour après une coupure : réparée automatiquement");
+
+  console.log("— Dépenses et abonnements");
+  r = await api();
+  const abo = (n) => r.vue.depenses.filter((x) => x.source === "Abonnement" && x.libelle.startsWith(n));
+  ok(abo("Google Workspace").length === 3 && abo("Forfait Free").length === 3 && !abo("Nom de domaine").length,
+    "Abonnements : Google et Free créés pour nov., déc., janv. ; domaine en pause → rien");
+  ok(abo("Google Workspace")[0].montant === 9.72 && abo("Google Workspace")[0].etat === "À valider" && abo("Google Workspace")[0].date === "2026-11-01", "Ligne Google « À valider » de 9,72 € au 01/11");
+  r = await api(); ok(r.vue.depenses.length === 6, "Recharger : pas de doublon d'abonnement");
+  const gnov = abo("Google Workspace")[0];
+  r = await api("modifier_depense", { id: gnov.id, date: gnov.date, montant: "9,72", fournisseur: "Google", libelle: gnov.libelle, categorie: gnov.categorie, paiement: "Prélèvement", valider: true });
+  ok(r.vue.depenses.find((x) => x.id === gnov.id).etat === "Validée", "Dépense d'abonnement validée");
+  const fdec = r.vue.depenses.find((x) => x.libelle === "Forfait Free 2 € — décembre 2026");
+  r = await api("ecarter_depense", { id: fdec.id }); ok(r.vue.depenses.find((x) => x.id === fdec.id).etat === "Écartée", "Échéance écartée");
+  r = await api(); ok(r.vue.depenses.filter((x) => x.ref === fdec.ref).length === 1, "Une échéance écartée n'est pas recréée");
+  r = await api("ecarter_depense", { id: fdec.id, retablir: true }); ok(r.vue.depenses.find((x) => x.id === fdec.id).etat === "À valider", "…et peut être remise à valider");
+  r = await api("ajouter_depense", { date: "2027-01-02", montant: "45,90", fournisseur: "Nailstore", libelle: "Gels de construction", categorie: "Fournitures (vernis, gels, limes…)", paiement: "Carte bancaire" });
+  const achat = r.vue.depenses.find((x) => x.id === r.depense);
+  ok(achat && achat.etat === "Validée" && achat.montant === 45.9, "Achat saisi à la main : 45,90 €, validé directement");
+  r = await api("ajouter_depense", { date: "2027-02-01", montant: "5", fournisseur: "X" }); ok(r.statut === 400, "Dépense dans le futur : refusée");
+  r = await api("ajouter_depense", { date: "2027-01-02", montant: "0", fournisseur: "X" }); ok(r.statut === 400, "Dépense à 0 € : refusée");
+
+  const photo = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from("faux jpeg pour le test")]);
+  r = await api("justificatif", { id: achat.id, type: "image/jpeg", contenu: photo.toString("base64") });
+  ok(r.statut === 503 && r.erreur.includes("pas encore autorisé"), "Ticket sans autorisation Drive : message clair → " + r.erreur);
+  G.driveDelegation = true;
+  r = await api("justificatif", { id: achat.id, type: "image/jpeg", contenu: photo.toString("base64") });
+  const fichier = G.drive.find((x) => x.id && x.id.startsWith("fichier"));
+  ok(r.statut === 200 && fichier && fichier.octets.equals(photo), "Ticket archivé dans Google Drive, fichier intact");
+  ok(fichier.name === "2027-01-02 Nailstore 45,90 €.jpg", "Nom du fichier : " + fichier.name);
+  ok(G.drive.filter((x) => x.mimeType).map((x) => x.name).join(" / ") === "Comptabilité Coco Nail's — Justificatifs / 2027", "Dossiers créés : " + G.drive.filter((x) => x.mimeType).map((x) => x.name).join(" / "));
+  const dep = r.vue.depenses.find((x) => x.id === achat.id);
+  const { createHash } = await import("node:crypto");
+  ok(dep.justificatif.includes("drive.google.com") && dep.empreinte === createHash("sha256").update(photo).digest("hex"), "Lien et empreinte SHA-256 notés dans le tableau");
+  r = await api("justificatif", { id: gnov.id, type: "application/pdf", contenu: Buffer.from("%PDF-1.4 facture").toString("base64") });
+  ok(r.statut === 200 && G.drive.filter((x) => x.mimeType).length === 3, "Facture PDF de 2026 : rangée dans un dossier 2026 (dossier principal réutilisé)");
+  r = await api("justificatif", { id: achat.id, type: "text/html", contenu: "PGI+" }); ok(r.statut === 400, "Format non accepté : refusé");
+  r = await api("justificatif", { id: achat.id, type: "image/jpeg", contenu: Buffer.alloc(4.2 * 1024 * 1024).toString("base64") }); ok(r.statut === 400, "Fichier trop lourd : refusé");
+
+  r = await api();
+  const dom = r.vue.abonnements.find((a) => a.nom.startsWith("Nom de domaine"));
+  r = await api("abonnement", { id: dom.id, nom: dom.nom, fournisseur: "Squarespace", montant: "21,60", rythme: "annuel", jour: "2", mois: "1", actif: true });
+  ok(r.statut === 200 && r.vue.depenses.some((x) => x.libelle === "Nom de domaine coconails72.com — 2027" && x.montant === 21.6 && x.date === "2027-01-02"),
+    "Domaine activé (2 janvier, 21,60 €) : échéance de janvier 2027 créée");
+  r = await api("abonnement", { nom: "Assurance pro", fournisseur: "MAAF", montant: "120", rythme: "annuel", mois: "3", categorie: "Assurance" });
+  ok(r.statut === 200 && r.vue.abonnements.length === 4 && !r.vue.depenses.some((x) => x.libelle.startsWith("Assurance")), "Nouvel abonnement annuel (mars) : rien avant mars");
+  r = await api("abonnement", { nom: "Sans mois", montant: "10", rythme: "annuel" }); ok(r.statut === 400, "Abonnement annuel sans mois : refusé");
+  r = await api();
+  const janv = r.vue.bilan.find((m) => m.mois === "2027-01");
+  ok(janv.recettes === 5 && janv.depenses === 45.9 && janv.benefice === -40.9, `Bilan de janvier : recettes 5 €, dépenses 45,90 €, bénéfice ${janv.benefice} €`);
+
+  console.log("— SumUp");
+  ok(!r.vue.sumup.actif, "Sans clé SumUp : rien n'est affiché");
+  process.env.SUMUP_API_KEY = "mauvaise";
+  r = await api(); ok(r.statut === 200 && r.vue.alertes.some((a) => a.includes("clé SumUp")), "Clé refusée : la page marche, avec un message");
+  process.env.SUMUP_API_KEY = "sup_sk_test";
+  const tx = (code, iso, montant, extra = {}) => ({ id: "id-" + code, transaction_code: code, amount: montant, currency: "EUR", timestamp: iso, status: "SUCCESSFUL", type: "PAYMENT", card_type: "VISA", ...extra });
+  G.sumup.push(tx("TX1", "2026-12-28T13:05:00Z", 20), tx("TX0", "2026-12-29T09:00:00Z", 15, { status: "FAILED" }),
+    tx("TX2", "2027-01-03T09:15:00Z", 45), tx("TX3", "2027-01-03T10:40:00Z", 30), tx("TXR", "2027-01-02T10:00:00Z", 10, { type: "REFUND" }));
+  G.versements.push({ id: 1, type: "PAYOUT", amount: 19.65, date: "2026-12-30", currency: "EUR", fee: 0.35, status: "SUCCESSFUL", reference: "x", transaction_code: "TX1" });
+  r = await api();
+  ok(r.vue.sumup.actif && r.vue.sumup.libres.map((p) => p.code).join(",") === "TX1,TX2,TX3", "Paiements lus (3 pages), échecs et remboursements ignorés : " + r.vue.sumup.libres.map((p) => p.code).join(","));
+  ok(r.vue.sumup.libres.find((p) => p.code === "TX2").heure === "10:15", "Heure de Paris : 10 h 15");
+  const com = r.vue.depenses.find((x) => x.ref === "sumup:2026-12");
+  ok(com && com.montant === 0.35 && com.etat === "À valider" && com.date === "2026-12-31" && com.paiement === "Retenu par SumUp", "Commission SumUp de décembre : 0,35 € (réelle), au 31/12");
+  ok(!r.vue.depenses.some((x) => x.ref === "sumup:2027-01"), "Pas de commission pour le mois en cours");
+  r = await api(); ok(r.vue.depenses.filter((x) => x.ref === "sumup:2026-12").length === 1, "Commission non recréée en double");
+  r = await api("ajouter", { origine: "Téléphone", cliente: "Nina Faure", date: "2027-01-03", soin: "Rallongement gel", montant: "45" });
+  const nina = r.vue.lignes.find((x) => x.cliente === "Nina Faure");
+  r = await api("valider", { id: nina.id, montant: "45", paiement: "Carte bancaire" });
+  ok(r.vue.lignes.find((x) => x.id === nina.id).sumup === "TX2" && !r.vue.sumup.libres.some((p) => p.code === "TX2"), "Validation carte 45 € : paiement SumUp TX2 retrouvé tout seul");
+  ok(r.vue.factures.find((f) => f.numero === r.facture).sumup === "TX2", "La facture affiche le lien SumUp");
+  r = await api("ajouter", { origine: "Message", cliente: "Rose Lemaire", date: "2026-12-28", soin: "Dépose", montant: "20" });
+  const rose = r.vue.lignes.find((x) => x.cliente === "Rose Lemaire");
+  r = await api("valider", { id: rose.id, montant: "20", paiement: "Carte bancaire", paye_le: "2027-01-03", sumup: "TX2" });
+  ok(r.statut === 409, "Paiement SumUp déjà rattaché : refusé");
+  r = await api("valider", { id: rose.id, montant: "20", paiement: "Carte bancaire", paye_le: "2027-01-03", sumup: "TX1" });
+  ok(r.statut === 200 && r.vue.lignes.find((x) => x.id === rose.id).sumup === "TX1", "Rattachement manuel du paiement TX1");
+  const c = r.vue.sumup.controle[0];
+  ok(c.mois === "2027-01" && c.sumup === 75 && c.factures === 65, `Contrôle de janvier : SumUp 75 € / factures carte ${c.factures} €`);
 
   console.log("— Tableau non partagé");
   G.tableauPartage = false;

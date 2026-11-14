@@ -15,21 +15,33 @@ export class Refus extends Error {
 }
 
 // ---- Les onglets du tableau ----
-export const ONGLET = { lignes: "Rendez-vous", factures: "Factures", declarations: "Déclarations URSSAF", reglages: "Réglages" };
+export const ONGLET = { lignes: "Rendez-vous", factures: "Factures", declarations: "Déclarations URSSAF", reglages: "Réglages",
+  depenses: "Dépenses", abonnements: "Abonnements" };
 const ENTETES = {
   lignes: ["N°", "État", "Origine", "Date du RDV", "Heure", "Cliente", "Téléphone", "E-mail", "Adresse", "Soin", "Options",
-    "Prix du tarif", "Montant encaissé", "Paiement", "Payé le", "Facture", "Réf. agenda", "Note", "Créée le", "Modifiée le"],
+    "Prix du tarif", "Montant encaissé", "Paiement", "Payé le", "Facture", "Réf. agenda", "Note", "Créée le", "Modifiée le", "Réf. SumUp"],
   factures: ["N° de facture", "Date", "N° de ligne", "Cliente", "Montant", "Paiement", "Envois", "Contenu de la facture (ne pas modifier)"],
   declarations: ["Période", "Montant déclaré", "Déclaré le", "Nombre de factures"],
   reglages: ["Réglage", "Valeur"],
+  depenses: ["N°", "État", "Date", "Fournisseur", "Catégorie", "Libellé", "Montant TTC", "Paiement", "Origine", "Référence",
+    "Justificatif (lien)", "Réf. justificatif", "Empreinte du justificatif (SHA-256)", "Note", "Créée le", "Modifiée le"],
+  abonnements: ["N°", "Nom", "Fournisseur", "Catégorie", "Montant TTC", "Rythme (mensuel / annuel)", "Jour du prélèvement",
+    "Mois (si annuel, 1 à 12)", "Actif (oui / non)", "Depuis le", "Note"],
 };
 const CHAMPS_LIGNE = ["id", "etat", "origine", "date", "heure", "cliente", "telephone", "email", "adresse", "soin", "options",
-  "tarif", "montant", "paiement", "paye_le", "facture", "rdv", "note", "cree", "modifie"];
+  "tarif", "montant", "paiement", "paye_le", "facture", "rdv", "note", "cree", "modifie", "sumup"];
+const CHAMPS_DEPENSE = ["id", "etat", "date", "fournisseur", "categorie", "libelle", "montant", "paiement", "source", "ref",
+  "justificatif", "justificatif_id", "empreinte", "note", "cree", "modifie"];
+const CHAMPS_ABONNEMENT = ["id", "nom", "fournisseur", "categorie", "montant", "rythme", "jour", "mois", "actif", "depuis", "note"];
 const CHAMPS_FACTURE = ["numero", "date", "ligne", "cliente", "montant", "paiement", "envois", "contenu"];
 const CHAMPS_DECLARATION = ["periode", "montant", "declare_le", "nb"];
 
 export const ETATS = { attente: "À valider", validee: "Validée", annulee: "Annulée" };
 export const ORIGINES = ["Site", "Téléphone", "Message"];
+export const ETATS_DEPENSE = { attente: "À valider", validee: "Validée", ecartee: "Écartée" };
+export const CATEGORIES = ["Fournitures (vernis, gels, limes…)", "Matériel", "Abonnements et logiciels", "Téléphone et internet",
+  "Frais bancaires et SumUp", "Assurance", "Formation", "Déplacements", "Publicité", "Autre"];
+export const PAIEMENTS_DEPENSE = ["Carte bancaire", "Prélèvement", "Virement", "Espèces", "Chèque", "Retenu par SumUp"];
 
 const colonne = (n) => String.fromCharCode(64 + n); // 1 -> A
 const plage = (onglet, r) => encodeURIComponent(`'${onglet}'!${r}`);
@@ -59,7 +71,18 @@ async function preparer() {
     for (const k of manquants) {
       const lignes = [ENTETES[k]];
       if (k === "reglages") lignes.push(["depuis", aujourdhui().slice(0, 8) + "01"], ["periodicite", "mensuelle"]);
+      if (k === "abonnements") lignes.push(...ABONNEMENTS_DE_DEPART().map((a) => versRangee(CHAMPS_ABONNEMENT, a)));
       await tableau(`/values/${plage(ONGLET[k], "A1")}?valueInputOption=RAW`, { methode: "PUT", corps: { values: lignes } });
+    }
+  }
+  // Titres de colonnes à jour (une colonne a pu s'ajouter avec une nouvelle version du site).
+  const cles = Object.keys(ONGLET).filter((k) => !manquants.includes(k));
+  if (cles.length) {
+    const t = await tableau(`/values:batchGet?${cles.map((k) => "ranges=" + plage(ONGLET[k], "A1:" + colonne(ENTETES[k].length) + "1")).join("&")}`);
+    for (const [i, k] of cles.entries()) {
+      const actuels = (((t.valueRanges || [])[i] || {}).values || [[]])[0] || [];
+      if (ENTETES[k].some((e, j) => actuels[j] !== e))
+        await tableau(`/values/${plage(ONGLET[k], "A1")}?valueInputOption=RAW`, { methode: "PUT", corps: { values: [ENTETES[k]] } });
     }
   }
   pret = true;
@@ -73,18 +96,30 @@ function versObjet(champs, rangee, rang) {
 }
 const versRangee = (champs, o) => champs.map((c) => (c === "montant" && o[c] !== "" && o[c] != null ? Number(o[c]) : texte(o[c])));
 
+// Abonnements notés au départ (Coralie corrige les montants avec ses vraies factures).
+const ABONNEMENTS_DE_DEPART = () => [
+  { id: "A1", nom: "Google Workspace", fournisseur: "Google", categorie: "Abonnements et logiciels", montant: 9.72, rythme: "mensuel", jour: "1", mois: "",
+    actif: "oui", depuis: aujourdhui().slice(0, 8) + "01", note: "Business Starter, 8,10 € HT par mois : corriger avec le montant TTC de la facture Google" },
+  { id: "A2", nom: "Forfait Free 2 €", fournisseur: "Free", categorie: "Téléphone et internet", montant: 2, rythme: "mensuel", jour: "1", mois: "",
+    actif: "oui", depuis: aujourdhui().slice(0, 8) + "01", note: "" },
+  { id: "A3", nom: "Nom de domaine coconails72.com", fournisseur: "Squarespace", categorie: "Abonnements et logiciels", montant: 20, rythme: "annuel", jour: "1", mois: "",
+    actif: "non", depuis: aujourdhui().slice(0, 8) + "01", note: "Indiquer le mois de renouvellement et le montant exact, puis activer" },
+];
+
 // Lit tout le tableau en une seule fois.
 export async function lireTout() {
   await preparer();
   const q = Object.values(ONGLET).map((o) => "ranges=" + plage(o, "A2:" + colonne(ENTETES.lignes.length))).join("&");
   const d = await tableau(`/values:batchGet?${q}&valueRenderOption=UNFORMATTED_VALUE`);
-  const [l, f, dc, r] = (d.valueRanges || []).map((v) => v.values || []);
+  const [l, f, dc, r, dp, ab] = (d.valueRanges || []).map((v) => v.values || []);
   const garder = (rangee) => rangee && rangee.some((x) => texte(x).trim() !== "");
   const donnees = {
     lignes: (l || []).map((x, i) => garder(x) && versObjet(CHAMPS_LIGNE, x, i + 2)).filter(Boolean),
     factures: (f || []).map((x, i) => garder(x) && versObjet(CHAMPS_FACTURE, x, i + 2)).filter(Boolean),
     declarations: (dc || []).map((x, i) => garder(x) && versObjet(CHAMPS_DECLARATION, x, i + 2)).filter(Boolean),
     reglages: Object.fromEntries((r || []).filter(garder).map((x) => [texte(x[0]).trim(), texte(x[1]).trim()])),
+    depenses: (dp || []).map((x, i) => garder(x) && versObjet(CHAMPS_DEPENSE, x, i + 2)).filter(Boolean),
+    abonnements: (ab || []).map((x, i) => garder(x) && versObjet(CHAMPS_ABONNEMENT, x, i + 2)).filter(Boolean),
   };
   donnees.reglages.periodicite = donnees.reglages.periodicite === "trimestrielle" ? "trimestrielle" : "mensuelle";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(donnees.reglages.depuis || "")) donnees.reglages.depuis = aujourdhui().slice(0, 8) + "01";
@@ -101,6 +136,17 @@ async function majRangee(onglet, champs, o) {
 }
 export const majLigne = (l) => (l.modifie = horodatage(), majRangee(ONGLET.lignes, CHAMPS_LIGNE, l));
 export const majFacture = (f) => majRangee(ONGLET.factures, CHAMPS_FACTURE, f);
+export const majDepense = (x) => (x.modifie = horodatage(), majRangee(ONGLET.depenses, CHAMPS_DEPENSE, x));
+export const majAbonnement = (x) => majRangee(ONGLET.abonnements, CHAMPS_ABONNEMENT, x);
+async function nouvellesRangees(cle, onglet, champs, objets, donnees) {
+  if (!objets.length) return;
+  const prochain = donnees[cle].reduce((m, o) => Math.max(m, o._rang), 1) + 1;
+  objets.forEach((o, i) => { o._rang = prochain + i; if ("cree" in o || champs.includes("cree")) { o.cree = o.cree || horodatage(); o.modifie = o.cree; } });
+  await ajouterRangees(onglet, objets.map((o) => versRangee(champs, o)));
+  donnees[cle].push(...objets);
+}
+export const nouvellesDepenses = (xs, d) => nouvellesRangees("depenses", ONGLET.depenses, CHAMPS_DEPENSE, xs, d);
+export const nouvelAbonnement = (x, d) => nouvellesRangees("abonnements", ONGLET.abonnements, CHAMPS_ABONNEMENT, [x], d);
 export async function nouvellesLignes(lignes, donnees) {
   const prochain = donnees.lignes.reduce((m, l) => Math.max(m, l._rang), 1) + 1;
   lignes.forEach((l, i) => { l._rang = prochain + i; l.cree = l.cree || horodatage(); l.modifie = l.cree; });
@@ -282,4 +328,52 @@ export function sessionValide(v) {
 export function motDePasseOk(m) {
   const h = (x) => createHash("sha256").update(String(x || "")).digest();
   return Boolean(process.env.COMPTA_MOT_DE_PASSE) && timingSafeEqual(h(m), h(process.env.COMPTA_MOT_DE_PASSE));
+}
+
+// ---- Dépenses ----
+export const nouvelIdDepense = () => "D" + Date.now().toString(36).toUpperCase() + randomUUID().slice(0, 4).toUpperCase();
+const MOIS_COURTS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+// Crée les lignes « À valider » des abonnements arrivés à échéance (une seule fois chacune, grâce à la référence).
+export async function genererAbonnements(donnees) {
+  const auj = aujourdhui(), refs = new Set(donnees.depenses.map((x) => x.ref).filter(Boolean));
+  const nouvelles = [];
+  for (const a of donnees.abonnements) {
+    const montant = Number(a.montant);
+    if (!/^oui$/i.test(a.actif.trim()) || !(montant > 0) || !a.nom.trim()) continue;
+    const annuel = /^annuel/i.test(a.rythme.trim());
+    const moisAnnuel = Number(a.mois);
+    if (annuel && !(moisAnnuel >= 1 && moisAnnuel <= 12)) continue;
+    const debut = [a.depuis, donnees.reglages.depuis].filter(dateValide).sort().pop() || donnees.reglages.depuis;
+    let [an, mo] = debut.split("-").map(Number);
+    while (`${an}-${String(mo).padStart(2, "0")}` <= auj.slice(0, 7)) {
+      if (!annuel || mo === moisAnnuel) {
+        const dernier = new Date(Date.UTC(an, mo, 0)).getUTCDate();
+        const jour = Math.min(Math.max(Number(a.jour) || 1, 1), dernier);
+        const date = `${an}-${String(mo).padStart(2, "0")}-${String(jour).padStart(2, "0")}`;
+        const ref = `abo:${a.id}:${date.slice(0, 7)}`;
+        if (date >= debut && date <= auj && !refs.has(ref)) {
+          refs.add(ref);
+          nouvelles.push({ id: nouvelIdDepense(), etat: ETATS_DEPENSE.attente, date, fournisseur: a.fournisseur, categorie: a.categorie || "Abonnements et logiciels",
+            libelle: `${a.nom} — ${annuel ? an : MOIS_COURTS[mo - 1] + " " + an}`, montant, paiement: "Prélèvement", source: "Abonnement", ref,
+            justificatif: "", justificatif_id: "", empreinte: "", note: "" });
+        }
+      }
+      mo++; if (mo > 12) { mo = 1; an++; }
+    }
+  }
+  await nouvellesDepenses(nouvelles, donnees);
+  return nouvelles.length;
+}
+
+// Recettes (paiements reçus) et dépenses validées, mois par mois.
+export function bilan(donnees) {
+  const parMois = new Map();
+  const mois = (k) => { if (!parMois.has(k)) parMois.set(k, { mois: k, recettes: 0, depenses: 0 }); return parMois.get(k); };
+  for (const l of donnees.lignes) if (l.etat === ETATS.validee && dateValide(l.paye_le)) mois(l.paye_le.slice(0, 7)).recettes += Number(l.montant) || 0;
+  for (const x of donnees.depenses) if (x.etat === ETATS_DEPENSE.validee && dateValide(x.date)) mois(x.date.slice(0, 7)).depenses += Number(x.montant) || 0;
+  mois(aujourdhui().slice(0, 7));
+  return [...parMois.values()].sort((a, b) => (a.mois < b.mois ? 1 : -1)).map((m) => ({
+    ...m, recettes: Math.round(m.recettes * 100) / 100, depenses: Math.round(m.depenses * 100) / 100,
+    benefice: Math.round((m.recettes - m.depenses) * 100) / 100, libelle: `${MOIS_COURTS[Number(m.mois.slice(5)) - 1]} ${m.mois.slice(0, 4)}` }));
 }

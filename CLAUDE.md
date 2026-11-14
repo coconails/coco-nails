@@ -26,11 +26,19 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   privé, onglets Rendez-vous / Factures / Déclarations URSSAF / Réglages, créés automatiquement), PDF dans `netlify/lib/facture.mjs`
   (dépendance `pdf-lib` 1.17.1). Les RDV confirmés de l'agenda (extendedProperties.private.id, sans « À confirmer ») sont importés
   à l'ouverture de la page. Facture créée seulement à la validation, numéros F2026-001… sans trou, contenu figé en JSON.
-  Test : `node outils-de-test/test-compta.mjs` (Google simulé).
+- Compta étape 2 (14/11/2026) : onglet Dépenses (onglets Sheets « Dépenses » et « Abonnements » ; échéances d'abonnement
+  créées « À valider » via une référence `abo:<id>:<AAAA-MM>` ; bilan recettes − dépenses), tickets archivés dans le Drive de
+  Coralie (`netlify/lib/drive.mjs`, délégation `drive.file` au nom de contact@, dossier « Comptabilité Coco Nail's — Justificatifs »
+  puis un dossier par année, empreinte SHA-256 notée), SumUp en lecture seule (`netlify/lib/sumup.mjs`, API
+  `/v2.1/merchants/{code}/transactions/history` + `/v1.0/merchants/{code}/payouts` ; rapprochement automatique à la validation
+  carte, colonne « Réf. SumUp » ; commission du mois écoulé ajoutée aux dépenses, réf. `sumup:<AAAA-MM>`).
+  Test : `node outils-de-test/test-compta.mjs` (Google, Drive et SumUp simulés).
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
+  SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
 - Google : projet Cloud `coco-nails-514415`, compte de service `coconails@coco-nails-514415.iam.gserviceaccount.com`
-  (ID client 116446334886747443278), API Calendar + Gmail activées, délégation domaine scope `gmail.send` uniquement.
+  (ID client 116446334886747443278), API Calendar + Gmail activées (+ Sheets et Drive à activer pour la compta), délégation domaine scopes `gmail.send`
+  (+ `drive.file` à ajouter pour les tickets).
 - Domaine chez Squarespace (via Google Workspace) : A @ 75.2.60.5, CNAME www → silly-kataifi-f31ee1.netlify.app,
   MX/SPF/DKIM/DMARC Google à ne jamais toucher. Search Console validé, sitemap envoyé, site indexé.
 
@@ -48,8 +56,9 @@ Toujours tester localement avant (Google simulé) et montrer un aperçu avant de
   dans Pages CMS > Horaires et coordonnées. Vérifier qu'il n'existe pas de fiche en double.
 - Assurance (avenant habitation), bio Instagram, double authentification sur tous les comptes.
 
-- Compta étape 2 (proposée) : argent à mettre de côté, alerte des seuils, sauvegarde, rappel la veille aux clientes, demande d'avis Google.
-  Étape 3 : dépenses, tableau de bord, export annuel, avoirs, bons cadeaux, fidélité.
+- Compta, idées restantes : argent à mettre de côté, alerte des seuils, sauvegarde, rappel la veille aux clientes, demande d'avis
+  Google, tableau de bord, export annuel, avoirs, bons cadeaux, fidélité.
+- SumUp : compte pas encore créé ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %). Workspace payé au mois, pas de Freebox.
 
 ## Horaires actuels
 Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h · dim fermé. Tél. 07 68 22 70 15 (WhatsApp actif).

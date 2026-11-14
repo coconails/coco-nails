@@ -6,6 +6,8 @@ import { configuree, json, contenu, creerRendezVous, modifierRendezVous, lireRen
 import * as C from "../lib/compta.mjs";
 import { pdfFacture } from "../lib/facture.mjs";
 import { factureCliente } from "../lib/messages.mjs";
+import * as S from "../lib/sumup.mjs";
+import { deposer, TYPES_ACCEPTES, TAILLE_MAX } from "../lib/drive.mjs";
 
 const COOKIE = "coco_compta";
 const DUREE_SESSION_JOURS = 90;
@@ -35,7 +37,51 @@ async function charger(origine, synchro) {
       alertes.push("L'agenda n'a pas pu être lu : les derniers rendez-vous confirmés sur le site apparaîtront un peu plus tard.");
     }
   }
-  return { d, soins, paiement, legal, coordonnees, alertes, origine };
+  if (synchro) {
+    try { await C.genererAbonnements(d); } catch (e) { console.error(e); }
+  }
+  const ctx = { d, soins, paiement, legal, coordonnees, alertes, origine, sumup: null };
+  if (S.sumupConfigure()) {
+    try { await chargerSumup(ctx, synchro); } catch (e) {
+      if (!e.publique) console.error(e);
+      alertes.push(e.publique ? e.message : "SumUp ne répond pas pour le moment : le contrôle des paiements carte reviendra plus tard.");
+    }
+  }
+  return ctx;
+}
+
+// Paiements SumUp des derniers mois + commission du mois écoulé ajoutée aux dépenses (une fois).
+const JOUR_MS = 86400000;
+async function chargerSumup(ctx, synchro) {
+  const { d } = ctx, auj = C.aujourdhui();
+  const il_y_a = new Date(Date.parse(auj + "T00:00:00Z") - 100 * JOUR_MS).toISOString().slice(0, 8) + "01";
+  const du = [d.reglages.depuis, il_y_a].sort().pop();
+  const paiements = await S.paiements(du, auj);
+  ctx.sumup = { paiements };
+  if (!synchro) return;
+  const refs = new Set(d.depenses.map((x) => x.ref));
+  const moisFinis = [...new Set(paiements.map((p) => p.date.slice(0, 7)))].filter((m) => m < auj.slice(0, 7) && `${m}-01` >= du && !refs.has(`sumup:${m}`));
+  if (!moisFinis.length) return;
+  const frais = await S.commissions(`${moisFinis[0]}-01`, auj);
+  const nouvelles = moisFinis.map((m) => {
+    const ps = paiements.filter((p) => p.date.startsWith(m));
+    let reel = 0, estime = 0;
+    for (const p of ps) { if (frais.has(p.code)) reel += frais.get(p.code); else estime += p.montant * S.TAUX_SUMUP; }
+    const montant = Math.round((reel + estime) * 100) / 100;
+    const [a, mo] = m.split("-").map(Number);
+    return { id: C.nouvelIdDepense(), etat: C.ETATS_DEPENSE.attente, date: new Date(Date.UTC(a, mo, 0)).toISOString().slice(0, 10), fournisseur: "SumUp",
+      categorie: "Frais bancaires et SumUp", libelle: `Commission SumUp — ${C.infosPeriode(m).libelle}`,
+      montant, paiement: "Retenu par SumUp", source: "SumUp", ref: `sumup:${m}`, justificatif: "", justificatif_id: "", empreinte: "",
+      note: `${ps.length} paiement${ps.length > 1 ? "s" : ""} carte${estime ? ` · dont ${(Math.round(estime * 100) / 100).toString().replace(".", ",")} € estimés à 1,75 % (pas encore versés)` : ""}` };
+  }).filter((x) => x.montant > 0);
+  await C.nouvellesDepenses(nouvelles, d);
+}
+
+// Paiements SumUp pas encore rattachés à une facture.
+function sumupLibres(ctx) {
+  if (!ctx.sumup) return [];
+  const pris = new Set(ctx.d.lignes.map((l) => l.sumup).filter(Boolean));
+  return ctx.sumup.paiements.filter((p) => p.statut === "SUCCESSFUL" && !pris.has(p.code));
 }
 
 function moyens(ctx) {
@@ -68,10 +114,16 @@ function vue(ctx) {
       let c = {}; try { c = JSON.parse(f.contenu); } catch {}
       return { numero: f.numero, date: f.date, ligne: f.ligne, cliente: f.cliente, montant: Number(f.montant) || 0, paiement: f.paiement, envois: f.envois,
         email: (c.cliente && c.cliente.email) || "", telephone: (c.cliente && c.cliente.telephone) || "", prestation: c.prestation || {}, paye_le: c.paye_le || "",
-        lien: C.lienFacture(origine, f.numero) };
+        lien: C.lienFacture(origine, f.numero), sumup: (d.lignes.find((l) => l.id === f.ligne) || {}).sumup || "" };
     }),
     periodes: C.resumePeriodes(d),
     reglages: d.reglages,
+    depenses: d.depenses.map(({ _rang, ...x }) => ({ ...x, montant: x.montant === "" ? "" : Number(x.montant) })),
+    abonnements: d.abonnements.map(({ _rang, ...x }) => ({ ...x, montant: x.montant === "" ? "" : Number(x.montant) })),
+    bilan: C.bilan(d),
+    categories: C.CATEGORIES,
+    paiementsDepense: C.PAIEMENTS_DEPENSE,
+    sumup: vueSumup(ctx),
     soins: { soins: (soins.soins || []).map(({ nom, categorie, prix, duree, options_possibles }) => ({ nom, categorie, prix, duree, options_possibles })),
       options: (soins.options || []).map(({ nom, prix, duree }) => ({ nom, prix, duree })) },
     moyens: moyens(ctx),
@@ -79,6 +131,39 @@ function vue(ctx) {
     agenda: configuree(),
     alertes,
   };
+}
+
+function vueSumup(ctx) {
+  if (!S.sumupConfigure()) return { actif: false };
+  if (!ctx.sumup) return { actif: true, erreur: true, libres: [], controle: [] };
+  const auj = C.aujourdhui();
+  const moisListe = [auj.slice(0, 7), new Date(Date.parse(auj.slice(0, 8) + "01T00:00:00Z") - JOUR_MS).toISOString().slice(0, 7)];
+  const controle = moisListe.map((m) => {
+    const sumup = ctx.sumup.paiements.filter((p) => p.statut === "SUCCESSFUL" && p.date.startsWith(m));
+    const factures = ctx.d.lignes.filter((l) => l.etat === C.ETATS.validee && l.paiement === "Carte bancaire" && l.paye_le.startsWith(m));
+    const somme = (xs, f) => Math.round(xs.reduce((a, x) => a + (Number(f(x)) || 0), 0) * 100) / 100;
+    return { mois: m, sumup: somme(sumup, (p) => p.montant), nbSumup: sumup.length, factures: somme(factures, (l) => l.montant), nbFactures: factures.length };
+  });
+  return { actif: true, libres: sumupLibres(ctx), controle };
+}
+
+// Champs d'une dépense.
+function lireDepense(x) {
+  const date = t(x.date, 10);
+  if (!C.dateValide(date)) throw new C.Refus("La date de la dépense n'est pas valide.");
+  if (date > C.aujourdhui()) throw new C.Refus("La date de la dépense ne peut pas être dans le futur.");
+  const fournisseur = t(x.fournisseur, 80), libelle = t(x.libelle, 120);
+  if (!fournisseur && !libelle) throw new C.Refus("Indiquez le magasin ou ce qui a été acheté.");
+  const montant = arrondi(Number(String(x.montant == null ? "" : x.montant).replace(",", ".")));
+  if (!(montant > 0 && montant < 100000)) throw new C.Refus("Indiquez le montant payé (TTC).");
+  const categorie = C.CATEGORIES.includes(x.categorie) ? x.categorie : "Autre";
+  const paiement = C.PAIEMENTS_DEPENSE.includes(x.paiement) ? x.paiement : "Carte bancaire";
+  return { date, fournisseur, libelle: libelle || fournisseur, montant, categorie, paiement, note: t(x.note, 300) };
+}
+function trouverDepense(d, id) {
+  const x = d.depenses.find((y) => y.id === id);
+  if (!x) throw new C.Refus("Cette dépense est introuvable. Rechargez la page.", 404);
+  return x;
 }
 
 // Champs communs à « ajouter » et « modifier ».
@@ -190,6 +275,18 @@ const ACTIONS = {
     if (email && !EMAIL.test(email)) throw new C.Refus("L'adresse e-mail n'est pas valide.");
     if (!legal.nom_entreprise || (!legal.siret && !legal.siren)) throw new C.Refus("Il manque le nom de l'entreprise ou le SIRET (Pages CMS > Informations légales) pour faire une facture.", 409);
 
+    // Rapprochement SumUp : le paiement choisi, sinon le seul paiement carte du même jour et du même montant.
+    let sumup = "";
+    if (paiement === "Carte bancaire" && ctx.sumup) {
+      const libres = sumupLibres(ctx);
+      if (x.sumup) {
+        if (!libres.some((p) => p.code === x.sumup)) throw new C.Refus("Ce paiement SumUp est déjà rattaché à une autre facture.", 409);
+        sumup = x.sumup;
+      } else {
+        const memes = libres.filter((p) => p.date === paye_le && Math.abs(p.montant - montant) < 0.005);
+        if (memes.length === 1) sumup = memes[0].code;
+      }
+    }
     const numero = C.prochainNumero(d, auj.slice(0, 4));
     const contenuFacture = {
       numero, date: auj, paye_le, paiement, montant,
@@ -202,7 +299,7 @@ const ACTIONS = {
     };
     // La facture d'abord (elle fait foi), puis la ligne.
     await C.enregistrerFacture({ numero, date: auj, ligne: l.id, cliente, montant, paiement, envois: "", contenu: JSON.stringify(contenuFacture) }, d);
-    Object.assign(l, { etat: C.ETATS.validee, montant, paiement, paye_le, facture: numero, cliente, email, telephone, adresse });
+    Object.assign(l, { etat: C.ETATS.validee, montant, paiement, paye_le, facture: numero, cliente, email, telephone, adresse, sumup });
     await C.majLigne(l);
     return { facture: numero };
   },
@@ -235,6 +332,66 @@ const ACTIONS = {
     if (!p.terminee) throw new C.Refus("Cette période n'est pas encore terminée : la déclaration se fait après.", 409);
     if (p.declaration) throw new C.Refus("Cette période est déjà marquée comme déclarée.", 409);
     await C.enregistrerDeclaration({ periode: p.periode, montant: p.total, declare_le: C.horodatage(), nb: String(p.nb) }, ctx.d);
+    return {};
+  },
+
+  async ajouter_depense(ctx, x) {
+    const dep = { id: C.nouvelIdDepense(), etat: C.ETATS_DEPENSE.validee, ...lireDepense(x), source: "Saisie", ref: "", justificatif: "", justificatif_id: "", empreinte: "" };
+    await C.nouvellesDepenses([dep], ctx.d);
+    return { depense: dep.id };
+  },
+
+  async modifier_depense(ctx, x) {
+    const dep = trouverDepense(ctx.d, x.id);
+    Object.assign(dep, lireDepense(x));
+    if (x.valider) dep.etat = C.ETATS_DEPENSE.validee;
+    await C.majDepense(dep);
+    return { depense: dep.id };
+  },
+
+  async ecarter_depense(ctx, x) {
+    const dep = trouverDepense(ctx.d, x.id);
+    if (dep.source === "Saisie") throw new C.Refus("Une dépense saisie à la main se corrige avec le crayon.", 409);
+    dep.etat = x.retablir ? C.ETATS_DEPENSE.attente : C.ETATS_DEPENSE.ecartee;
+    await C.majDepense(dep);
+    return {};
+  },
+
+  async justificatif(ctx, x) {
+    const dep = trouverDepense(ctx.d, x.id);
+    const type = t(x.type, 40);
+    if (!TYPES_ACCEPTES[type]) throw new C.Refus("Format non accepté : envoyez une photo ou un PDF.");
+    const octets = Buffer.from(String(x.contenu || ""), "base64");
+    if (octets.length > TAILLE_MAX) throw new C.Refus("Le fichier est trop lourd (4 Mo au maximum).");
+    const r = await deposer(dep, { type, donnees: octets }, ctx.d);
+    Object.assign(dep, { justificatif: r.lien, justificatif_id: r.id, empreinte: r.empreinte });
+    await C.majDepense(dep);
+    return { lien: r.lien };
+  },
+
+  async abonnement(ctx, x) {
+    const nom = t(x.nom, 80);
+    if (nom.length < 2) throw new C.Refus("Donnez un nom à l'abonnement.");
+    const montant = arrondi(Number(String(x.montant == null ? "" : x.montant).replace(",", ".")));
+    if (!(montant > 0 && montant < 10000)) throw new C.Refus("Indiquez le montant TTC de l'abonnement.");
+    const rythme = x.rythme === "annuel" ? "annuel" : "mensuel";
+    const jour = Math.min(Math.max(Math.round(Number(x.jour) || 1), 1), 31);
+    const mois = rythme === "annuel" ? Math.round(Number(x.mois)) : "";
+    if (rythme === "annuel" && !(mois >= 1 && mois <= 12)) throw new C.Refus("Choisissez le mois du renouvellement.");
+    const champs = { nom, fournisseur: t(x.fournisseur, 80), categorie: C.CATEGORIES.includes(x.categorie) ? x.categorie : "Abonnements et logiciels",
+      montant, rythme, jour: String(jour), mois: String(mois), actif: x.actif === false ? "non" : "oui", note: t(x.note, 200) };
+    if (x.id) {
+      const a = ctx.d.abonnements.find((y) => y.id === x.id);
+      if (!a) throw new C.Refus("Abonnement introuvable.", 404);
+      // Réactivé : on repart d'aujourd'hui pour ne pas créer d'échéances passées oubliées.
+      if (champs.actif === "oui" && a.actif !== "oui") champs.depuis = C.aujourdhui().slice(0, 8) + "01";
+      Object.assign(a, champs);
+      await C.majAbonnement(a);
+    } else {
+      const id = "A" + (ctx.d.abonnements.reduce((m, a) => Math.max(m, Number(String(a.id).slice(1)) || 0), 0) + 1);
+      await C.nouvelAbonnement({ id, ...champs, depuis: C.aujourdhui().slice(0, 8) + "01" }, ctx.d);
+    }
+    await C.genererAbonnements(ctx.d);
     return {};
   },
 

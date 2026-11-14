@@ -89,6 +89,10 @@ main{padding:8px 0 calc(60px + env(safe-area-inset-bottom))}
 .onglets{display:flex;background:#fff;border-radius:999px;padding:5px;gap:4px;margin-bottom:16px;box-shadow:var(--ombre);position:sticky;top:calc(66px + env(safe-area-inset-top));z-index:10}
 .onglets button{flex:1;border:0;background:none;border-radius:999px;min-height:44px;font-weight:700;font-size:.95rem;color:var(--gris);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
 .onglets button[aria-selected="true"]{background:var(--bordeaux);color:#fff}
+.onglets button{font-size:.8rem;gap:3px;padding:0 2px;white-space:nowrap;letter-spacing:-.01em}
+.onglets .compteur{min-width:18px;height:18px;padding:0 5px;font-size:.7rem}
+.onglets button{min-width:0;flex:1 1 auto}
+@media (max-width:370px){.onglets{padding:4px;gap:2px}.onglets button{font-size:.72rem}.onglets .compteur{min-width:16px;height:16px;padding:0 4px;font-size:.66rem}}
 .compteur{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--vernis);color:#fff;font-size:.75rem}
 .onglets button[aria-selected="true"] .compteur{background:#fff;color:var(--bordeaux)}
 
@@ -140,6 +144,40 @@ details.annulees summary::-webkit-details-marker{display:none}
 .statut.retard{background:var(--alerte-clair);color:var(--alerte)}
 .statut.cours{background:#f1ecec;color:var(--gris)}
 .periode-titre{font-weight:700;text-transform:capitalize;flex:1}
+
+/* Dépenses */
+.bilan{background:#fff;border-radius:22px;padding:16px;box-shadow:var(--ombre);margin-bottom:12px}
+.bilan .t{font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.bilan .t small{color:var(--gris);font-weight:600}
+.bilan .chiffres{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.bilan .chiffres div{background:var(--poudre);border-radius:14px;padding:10px 4px}
+.bilan .chiffres small{display:block;color:var(--gris);font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.bilan .chiffres strong{font-family:var(--display);font-style:italic;font-size:1.3rem;color:var(--bordeaux)}
+.bilan .chiffres .dep strong{color:var(--caramel)}
+.bilan .chiffres .ben{background:var(--vert-clair)}
+.bilan .chiffres .ben strong{color:var(--vert)}
+.bilan .annee{margin-top:10px;font-size:.86rem;color:var(--gris);text-align:center}
+.justif{display:inline-flex;align-items:center;gap:6px;font-size:.86rem;font-weight:700;color:var(--vert);text-decoration:none;margin-top:8px;background:none;border:0;padding:0;cursor:pointer}
+.justif .ic{width:18px;height:18px}
+.justif.manque{color:var(--caramel)}
+.fichier{position:relative;display:flex;align-items:center;gap:10px;border:2px dashed var(--rose);border-radius:14px;padding:14px;cursor:pointer;background:#fff;font-weight:700;color:var(--bordeaux)}
+.fichier input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.apercu-fichier{max-width:100%;max-height:160px;border-radius:12px;margin-top:8px;display:block}
+.chip-sumup{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;font-weight:700;color:var(--vert);background:var(--vert-clair);border-radius:999px;padding:2px 10px;margin-left:6px}
+.chip-sumup .ic{width:14px;height:14px}
+.sumup-bloc{background:#fff;border-radius:20px;padding:16px;box-shadow:var(--ombre);margin:10px 0 4px}
+.sumup-bloc .t{display:flex;align-items:center;gap:8px;font-weight:800;margin-bottom:6px}
+.paiement-libre{display:flex;align-items:center;gap:10px;border-top:1px solid #f1e1e2;padding:10px 0}
+.paiement-libre strong{font-family:var(--display);font-style:italic;font-size:1.25rem;color:var(--bordeaux);min-width:72px}
+.paiement-libre span{flex:1;font-size:.9rem}
+.paiement-libre .btn{min-height:40px;padding:6px 14px;font-size:.88rem}
+.info-sumup{display:flex;gap:8px;align-items:center;border-radius:12px;padding:8px 12px;font-size:.9rem;font-weight:600;margin:-4px 0 14px}
+.info-sumup.ok{background:var(--vert-clair);color:var(--vert)}
+.info-sumup.non{background:#fbf1e6;color:#8a5a14}
+.info-sumup .ic{width:18px;height:18px}
+.choix-ligne{display:block;width:100%;text-align:left;background:#fff;border:2px solid var(--rose);border-radius:16px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
+.choix-ligne strong{display:block}
+.inactif{opacity:.6}
 
 /* Fenêtres */
 dialog{border:0;padding:0;width:min(560px,100%);max-height:94vh;border-radius:26px 26px 0 0;margin:auto auto 0;background:var(--blanc);color:var(--encre);box-shadow:0 -10px 40px rgba(36,22,26,.25)}
@@ -229,6 +267,11 @@ input[type=date],input[type=time]{min-width:0;max-width:100%}
   <symbol id="i-alerte" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
   <symbol id="i-urssaf" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></symbol>
   <symbol id="i-horloge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-photo" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trombone" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+  <symbol id="i-repete" viewBox="0 0 24 24"><path d="m17 1 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 23-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="i-panier" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></symbol>
   <symbol id="i-cadenas" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
 </svg>
 
@@ -265,13 +308,16 @@ input[type=date],input[type=time]{min-width:0;max-width:100%}
     <nav class="onglets" role="tablist" aria-label="Rubriques">
       <button role="tab" id="t-valider" aria-controls="v-valider" data-onglet="valider">À valider <span class="compteur" id="c-valider" hidden></span></button>
       <button role="tab" id="t-factures" aria-controls="v-factures" data-onglet="factures">Factures</button>
+      <button role="tab" id="t-depenses" aria-controls="v-depenses" data-onglet="depenses">Dépenses <span class="compteur" id="c-depenses" hidden></span></button>
       <button role="tab" id="t-urssaf" aria-controls="v-urssaf" data-onglet="urssaf">URSSAF <span class="compteur" id="c-urssaf" hidden></span></button>
     </nav>
     <section id="v-valider" role="tabpanel" aria-labelledby="t-valider"></section>
     <section id="v-factures" role="tabpanel" aria-labelledby="t-factures" hidden>
+      <div id="bloc-sumup"></div>
       <label class="recherche"><svg class="ic"><use href="#i-chercher"/></svg><input type="search" id="recherche" placeholder="Chercher une cliente ou un n° de facture" aria-label="Chercher une facture"></label>
       <div id="liste-factures"></div>
     </section>
+    <section id="v-depenses" role="tabpanel" aria-labelledby="t-depenses" hidden></section>
     <section id="v-urssaf" role="tabpanel" aria-labelledby="t-urssaf" hidden></section>
   </main>
 </div>
@@ -311,6 +357,7 @@ input[type=date],input[type=time]{min-width:0;max-width:100%}
       <div class="recap" id="valider-recap"></div>
       <label class="champ"><span>Montant encaissé</span><span class="montant-champ"><input type="text" name="montant" inputmode="decimal" autocomplete="off" required></span></label>
       <div class="champ"><span>Moyen de paiement</span><div class="puces" id="puces-paiement"></div></div>
+      <div class="info-sumup" id="valider-sumup" hidden></div>
       <label class="champ"><span>Payé le</span><input type="date" name="paye_le" required></label>
       <details class="plus"><summary>Coordonnées de la cliente sur la facture</summary>
         <label class="champ"><span>Nom</span><input type="text" name="cliente" autocomplete="off"></label>
@@ -360,6 +407,67 @@ input[type=date],input[type=time]{min-width:0;max-width:100%}
     <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Plus tard</button><button class="btn btn-vert" type="submit"><svg class="ic"><use href="#i-ok"/></svg> C'est déclaré</button></div>
   </form>
 </dialog>
+
+<!-- Dépense -->
+<dialog id="d-depense" aria-labelledby="d-depense-titre">
+  <form method="dialog" id="f-depense" novalidate>
+    <div class="d-tete"><h2 id="d-depense-titre">Dépense</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps">
+      <div class="champ"><span>Ticket ou facture <small>(photo ou PDF)</small></span>
+        <label class="fichier"><svg class="ic"><use href="#i-photo"/></svg><span id="fichier-nom">Prendre en photo ou choisir un fichier</span>
+          <input type="file" name="fichier" accept="image/*,application/pdf"></label>
+        <img class="apercu-fichier" id="fichier-apercu" alt="" hidden>
+        <a class="justif" id="fichier-existant" target="_blank" rel="noopener" hidden><svg class="ic"><use href="#i-trombone"/></svg> Justificatif déjà archivé</a>
+      </div>
+      <div class="deux">
+        <label class="champ"><span>Date</span><input type="date" name="date" required></label>
+        <label class="champ"><span>Montant TTC</span><span class="montant-champ"><input type="text" name="montant" inputmode="decimal" autocomplete="off" required></span></label>
+      </div>
+      <label class="champ"><span>Magasin ou fournisseur</span><input type="text" name="fournisseur" list="l-fournisseurs" autocomplete="off" placeholder="Par exemple : Action, Amazon, Nailstore…"></label>
+      <datalist id="l-fournisseurs"></datalist>
+      <label class="champ"><span>Ce qui a été acheté</span><input type="text" name="libelle" autocomplete="off" placeholder="Par exemple : 3 vernis semi-permanents"></label>
+      <label class="champ"><span>Catégorie</span><select name="categorie"></select></label>
+      <div class="champ"><span>Payé par</span><div class="puces" id="puces-depense"></div></div>
+      <label class="champ"><span>Note <small>(facultatif)</small></span><textarea name="note" rows="2"></textarea></label>
+      <p class="erreur" role="alert"></p>
+    </div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Annuler</button><button class="btn" type="submit">Enregistrer</button></div>
+  </form>
+</dialog>
+
+<!-- Abonnement -->
+<dialog id="d-abonnement" aria-labelledby="d-abonnement-titre">
+  <form method="dialog" id="f-abonnement" novalidate>
+    <div class="d-tete"><h2 id="d-abonnement-titre">Abonnement</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps">
+      <label class="champ"><span>Nom</span><input type="text" name="nom" autocomplete="off" placeholder="Par exemple : Google Workspace"></label>
+      <div class="deux">
+        <label class="champ"><span>Fournisseur</span><input type="text" name="fournisseur" autocomplete="off"></label>
+        <label class="champ"><span>Montant TTC</span><span class="montant-champ"><input type="text" name="montant" inputmode="decimal" autocomplete="off"></span></label>
+      </div>
+      <label class="champ"><span>Catégorie</span><select name="categorie"></select></label>
+      <div class="deux">
+        <label class="champ"><span>Rythme</span><select name="rythme"><option value="mensuel">Mensuel</option><option value="annuel">Annuel</option></select></label>
+        <label class="champ"><span>Jour du prélèvement</span><input type="text" name="jour" inputmode="numeric" autocomplete="off"></label>
+      </div>
+      <label class="champ" id="c-mois"><span>Mois du renouvellement</span><select name="mois"></select></label>
+      <label class="case"><input type="checkbox" name="actif" checked><span><strong>Actif</strong><span class="petit">Une dépense « À valider » est créée à chaque échéance.</span></span></label>
+      <label class="champ" style="margin-top:14px"><span>Note <small>(facultatif)</small></span><input type="text" name="note" autocomplete="off"></label>
+      <p class="erreur" role="alert"></p>
+    </div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Annuler</button><button class="btn" type="submit">Enregistrer</button></div>
+  </form>
+</dialog>
+
+<!-- Rattacher un paiement SumUp -->
+<dialog id="d-rattacher" aria-labelledby="d-rattacher-titre">
+  <form method="dialog" novalidate>
+    <div class="d-tete"><h2 id="d-rattacher-titre">Quel rendez-vous ?</h2><button class="fermer" type="button" data-fermer aria-label="Fermer"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="d-corps" id="rattacher-corps"></div>
+    <div class="d-pied"><button class="btn btn-gris" type="button" data-fermer>Annuler</button></div>
+  </form>
+</dialog>
+<input type="file" id="ticket-rapide" accept="image/*,application/pdf" hidden>
 
 <div class="toast" id="toast" role="status" aria-live="polite" popover="manual"></div>
 
@@ -428,7 +536,7 @@ function montrer(ecran) {
 function rendre() {
   if (!V) return;
   $("#alertes").innerHTML = V.alertes.map((a) => `<div class="alerte">${ic("alerte")}<span>${esc(a)}</span></div>`).join("");
-  rendreResume(); rendreValider(); rendreFactures(); rendreUrssaf();
+  rendreResume(); rendreValider(); rendreFactures(); rendreDepenses(); rendreSumup(); rendreUrssaf();
   $("#l-clientes").innerHTML = V.clientes.map((c) => `<option value="${esc(c.nom)}">`).join("");
 }
 
@@ -494,7 +602,7 @@ function rendreFactures() {
       <div class="haut"><span class="quand"><span class="numero">${esc(f.numero)}</span><small>Le ${esc(jourNum(f.date))}</small></span><span class="somme">${eur(f.montant)}</span></div>
       <p class="cliente">${esc(f.cliente)}</p>
       <div class="soin">${esc([f.prestation.soin, f.prestation.options].filter(Boolean).join(" + "))}</div>
-      <span class="paiement">${ic(ICONE_PAIEMENT[f.paiement] || "carte")} ${esc(f.paiement)}</span>
+      <span class="paiement">${ic(ICONE_PAIEMENT[f.paiement] || "carte")} ${esc(f.paiement)}</span>${f.sumup ? `<span class="chip-sumup">${ic("ok")} SumUp</span>` : ""}
       <div class="envoi ${f.envois ? "" : "non"}">${f.envois ? ic("ok") + " Envoyée : " + esc(envoisFr(f.envois)) : ic("horloge") + " Pas encore envoyée"}</div>
       <div class="actions">
         <a class="btn btn-trait" href="${esc(f.lien)}" target="_blank" rel="noopener">${ic("facture")} Voir</a>
@@ -524,12 +632,196 @@ function rendreUrssaf() {
   $("#periodicite").value = V.reglages.periodicite;
 }
 
+// ---------- SumUp (onglet Factures) ----------
+function rendreSumup() {
+  const z = $("#bloc-sumup");
+  if (!V.sumup || !V.sumup.actif) { z.innerHTML = ""; return; }
+  if (V.sumup.erreur) { z.innerHTML = ""; return; }
+  const c = V.sumup.controle[0];
+  const ecart = Math.round((c.sumup - c.factures) * 100) / 100;
+  const libres = [...V.sumup.libres].sort((a, b) => (a.date + a.heure < b.date + b.heure ? 1 : -1));
+  z.innerHTML = `<div class="sumup-bloc"><div class="t">${ic("carte")} Paiements carte SumUp</div>
+    <div class="petit"><span style="text-transform:capitalize">${esc(moisAnnee(c.mois + "-01"))}</span> : SumUp ${eur(c.sumup)} (${c.nbSumup}) · factures carte ${eur(c.factures)} (${c.nbFactures})</div>
+    ${ecart === 0 ? `<div class="info-sumup ok" style="margin:10px 0 0">${ic("ok")} Tout correspond</div>`
+      : `<div class="info-sumup non" style="margin:10px 0 0">${ic("alerte")} Écart de ${eur(Math.abs(ecart))} : ${ecart > 0 ? "des paiements carte n'ont pas encore de facture" : "des factures « carte » n'ont pas de paiement SumUp"}</div>`}
+    ${libres.length ? `<p class="petit" style="margin:12px 0 0;font-weight:700">Paiements sans facture (${libres.length})</p>` + libres.map((p) => `<div class="paiement-libre">
+      <strong>${eur(p.montant)}</strong><span>${esc(jourCourt(p.date))} · ${esc(heureFr(p.heure))}</span>
+      <button class="btn" type="button" data-act="rattacher" data-id="${esc(p.code)}">Rattacher</button></div>`).join("") : ""}</div>`;
+}
+function ouvrirRattacher(code) {
+  const p = V.sumup.libres.find((x) => x.code === code); if (!p) return;
+  const dist = (l) => Math.abs(Date.parse(l.date) - Date.parse(p.date)) + (Math.abs((Number(l.montant) || 0) - p.montant) < 0.005 ? 0 : 1);
+  const lignes = V.lignes.filter((l) => l.etat === "À valider" && l.date <= V.aujourdhui).sort((a, b) => dist(a) - dist(b));
+  $("#rattacher-corps").innerHTML = `<div class="recap"><strong>Paiement de ${eur(p.montant)}</strong>${esc(jourCourt(p.date))} à ${esc(heureFr(p.heure))}</div>`
+    + (lignes.length ? lignes.map((l) => `<button class="choix-ligne" type="button" data-act="choisir-ligne" data-id="${esc(l.id)}" data-code="${esc(p.code)}">
+      <strong>${esc(l.cliente)} · ${l.montant !== "" ? eur(l.montant) : ""}</strong><span class="petit">${esc(jourCourt(l.date))}${l.heure ? " · " + esc(heureFr(l.heure)) : ""} — ${esc([l.soin, l.options].filter(Boolean).join(" + "))}</span></button>`).join("")
+      : `<div class="vide">Aucun rendez-vous à valider. Ajoutez d'abord le rendez-vous (téléphone ou message), puis rattachez le paiement.</div>`);
+  $("#d-rattacher").showModal();
+}
+
+// ---------- Dépenses ----------
+const ICONE_SOURCE = { Abonnement: ["repete", "Abonnement"], SumUp: ["carte", "Commission SumUp"], Saisie: ["panier", "Achat"] };
+const ICONE_PAIEMENT_DEP = { "Carte bancaire": "carte", "Prélèvement": "repete", "Virement": "virement", "Espèces": "especes", "Chèque": "cheque", "Retenu par SumUp": "carte" };
+function carteDepense(x) {
+  const [i, t] = ICONE_SOURCE[x.source] || ICONE_SOURCE.Saisie;
+  const att = x.etat === "À valider", ecartee = x.etat === "Écartée";
+  return `<article class="carte ${ecartee ? "annulee" : ""}">
+    <div class="haut"><span class="origine" title="${esc(t)}">${ic(i)}</span>
+      <span class="quand">${esc(x.fournisseur || x.libelle)}<small>${esc(jourCourt(x.date))} · ${esc(x.categorie)}</small></span>
+      <span class="somme" style="color:var(--caramel)">${eur(x.montant)}</span></div>
+    <div class="soin" style="margin-top:8px">${esc(x.libelle)}</div>
+    <span class="paiement">${ic(ICONE_PAIEMENT_DEP[x.paiement] || "carte")} ${esc(x.paiement)}</span>
+    ${x.note ? `<div class="petit">${esc(x.note)}</div>` : ""}
+    <div>${x.justificatif ? `<a class="justif" href="${esc(x.justificatif)}" target="_blank" rel="noopener">${ic("trombone")} Justificatif archivé</a>`
+      : ecartee ? "" : `<button class="justif manque" type="button" data-act="ticket" data-id="${esc(x.id)}">${ic("photo")} Ajouter le ticket</button>`}</div>
+    <div class="actions">${att
+      ? `<button class="btn btn-vert" type="button" data-act="valider-depense" data-id="${esc(x.id)}">${ic("ok")} Valider</button>
+         <button class="btn btn-gris btn-rond" type="button" data-act="ecarter-depense" data-id="${esc(x.id)}" aria-label="Écarter" title="Pas de dépense ce mois-ci">${ic("x")}</button>`
+      : ecartee ? `<button class="btn btn-gris" type="button" data-act="retablir-depense" data-id="${esc(x.id)}">${ic("retour")} Remettre à valider</button>`
+      : `<button class="btn btn-trait" type="button" data-act="modifier-depense" data-id="${esc(x.id)}">${ic("modif")} Modifier</button>`}</div>
+  </article>`;
+}
+function rendreDepenses() {
+  const moisCourant = V.aujourdhui.slice(0, 7), an = V.aujourdhui.slice(0, 4);
+  const b = V.bilan.find((m) => m.mois === moisCourant) || { recettes: 0, depenses: 0, benefice: 0, libelle: "" };
+  const anneeB = V.bilan.filter((m) => m.mois.startsWith(an)).reduce((a, m) => ({ r: a.r + m.recettes, d: a.d + m.depenses }), { r: 0, d: 0 });
+  const att = V.depenses.filter((x) => x.etat === "À valider").sort((a, c) => (a.date < c.date ? -1 : 1));
+  const val = V.depenses.filter((x) => x.etat === "Validée").sort((a, c) => (a.date < c.date ? 1 : -1));
+  const ecartees = V.depenses.filter((x) => x.etat === "Écartée");
+  let h = `<div class="bilan"><div class="t"><span style="text-transform:capitalize">${esc(b.libelle)}</span><small>Vrai bénéfice</small></div>
+    <div class="chiffres"><div><small>Recettes</small><strong>${eur(b.recettes)}</strong></div><div class="dep"><small>Dépenses</small><strong>${eur(b.depenses)}</strong></div>
+    <div class="ben"><small>Bénéfice</small><strong>${eur(b.benefice)}</strong></div></div>
+    <div class="annee">Depuis janvier ${an} : ${eur(anneeB.r)} de recettes − ${eur(anneeB.d)} de dépenses = <strong>${eur(anneeB.r - anneeB.d)}</strong></div></div>
+    <button class="btn btn-large" type="button" data-act="ajouter-depense">${ic("photo")} Ajouter une dépense</button>
+    <p class="petit" style="margin:8px 4px 0">En micro-entreprise, les dépenses ne réduisent pas l'URSSAF : elles servent à connaître votre vrai bénéfice. Gardez les justificatifs 10 ans.</p>`;
+  if (att.length) h += `<h2 class="titre-groupe">À valider <small>${att.length}</small></h2>` + att.map(carteDepense).join("");
+  const groupes = new Map();
+  for (const x of val) { const k = x.date.slice(0, 7); if (!groupes.has(k)) groupes.set(k, []); groupes.get(k).push(x); }
+  h += [...groupes].map(([k, liste]) => `<h2 class="titre-groupe"><span style="text-transform:capitalize">${esc(moisAnnee(k + "-01"))}</span><small>${eur(liste.reduce((a, x) => a + x.montant, 0))}</small></h2>` + liste.map(carteDepense).join("")).join("");
+  if (!att.length && !val.length) h += `<div class="vide" style="margin-top:14px"><strong>Aucune dépense pour l'instant</strong>Ajoutez vos achats avec la photo du ticket : elle est rangée dans votre Google Drive.</div>`;
+  if (ecartees.length) h += `<details class="annulees"><summary>Voir les dépenses écartées (${ecartees.length})</summary>${ecartees.map(carteDepense).join("")}</details>`;
+  h += `<h2 class="titre-groupe">Mes abonnements</h2>` + V.abonnements.map((a) => `<article class="carte ${a.actif === "oui" ? "" : "inactif"}">
+      <div class="haut"><span class="origine">${ic("repete")}</span><span class="quand">${esc(a.nom)}<small>${a.rythme === "annuel" ? "Chaque année" + (a.mois ? " en " + esc(moisAnnee(`2000-${String(a.mois).padStart(2, "0")}-01`).split(" ")[0]) : "") : "Chaque mois"}, le ${esc(a.jour || 1)}</small></span>
+      <span class="somme" style="color:var(--caramel)">${eur(a.montant)}</span></div>
+      ${a.note ? `<div class="petit" style="margin-top:8px">${esc(a.note)}</div>` : ""}
+      <div class="actions"><span class="statut ${a.actif === "oui" ? "ok" : "cours"}">${a.actif === "oui" ? ic("ok") + " Actif" : "En pause"}</span>
+      <button class="btn btn-trait" type="button" data-act="modifier-abonnement" data-id="${esc(a.id)}" style="flex:0 0 auto;margin-left:auto">${ic("modif")} Modifier</button></div></article>`).join("")
+    + `<button class="btn btn-trait btn-large" type="button" data-act="ajouter-abonnement">${ic("plus")} Ajouter un abonnement</button>`;
+  $("#v-depenses").innerHTML = h;
+  const cd = $("#c-depenses"); cd.hidden = !att.length; cd.textContent = att.length;
+  $("#l-fournisseurs").innerHTML = [...new Set(V.depenses.map((x) => x.fournisseur).filter(Boolean))].map((f) => `<option value="${esc(f)}">`).join("");
+}
+
+// Photo réduite (1800 px, JPEG) pour un envoi rapide ; PDF envoyé tel quel.
+async function preparerFichier(f) {
+  const enBase64 = (blob) => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = ko; r.readAsDataURL(blob); });
+  if (f.type === "application/pdf") {
+    if (f.size > 4 * 1024 * 1024) throw new Error("Ce PDF est trop lourd (4 Mo au maximum).");
+    return { type: f.type, contenu: await enBase64(f) };
+  }
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ko(new Error("Cette image ne peut pas être lue : prenez plutôt une photo.")); i.src = url; });
+    const k = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.82));
+    return { type: "image/jpeg", contenu: await enBase64(blob) };
+  } finally { URL.revokeObjectURL(url); }
+}
+async function envoyerTicket(id, fichier) {
+  toast("Envoi du ticket…");
+  const p = await preparerFichier(fichier);
+  await api("justificatif", { id, ...p });
+  toast("Ticket archivé dans votre Google Drive");
+}
+
+const fd = $("#f-depense");
+let depenseCourante = null, modeDepense = "ajouter";
+function ouvrirDepense(mode, x) {
+  modeDepense = mode; depenseCourante = x || null;
+  $("#d-depense-titre").textContent = mode === "ajouter" ? "Nouvelle dépense" : mode === "valider" ? "Valider la dépense" : "Modifier la dépense";
+  fd.reset(); $(".erreur", fd).textContent = "";
+  $("#fichier-nom").textContent = "Prendre en photo ou choisir un fichier"; $("#fichier-apercu").hidden = true;
+  const ex = $("#fichier-existant"); ex.hidden = !(x && x.justificatif); if (x && x.justificatif) ex.href = x.justificatif;
+  fd.categorie.innerHTML = V.categories.map((c) => `<option>${esc(c)}</option>`).join("");
+  fd.date.value = x ? x.date : V.aujourdhui; fd.date.max = V.aujourdhui;
+  fd.montant.value = x ? String(x.montant).replace(".", ",") : "";
+  fd.fournisseur.value = x ? x.fournisseur : ""; fd.libelle.value = x ? x.libelle : "";
+  fd.categorie.value = x ? x.categorie : V.categories[0]; fd.note.value = x ? x.note : "";
+  const choisi = x ? x.paiement : "Carte bancaire";
+  $("#puces-depense").innerHTML = V.paiementsDepense.map((m) => `<label class="puce"><input type="radio" name="paiement" value="${esc(m)}" ${m === choisi ? "checked" : ""}><span>${ic(ICONE_PAIEMENT_DEP[m] || "carte")} ${esc(m)}</span></label>`).join("");
+  $("#d-depense button[type=submit]").innerHTML = mode === "valider" ? `${ic("ok")} Valider` : "Enregistrer";
+  $("#d-depense button[type=submit]").classList.toggle("btn-vert", mode === "valider");
+  $("#d-depense").showModal();
+}
+fd.fichier.addEventListener("change", () => {
+  const f = fd.fichier.files[0]; const ap = $("#fichier-apercu");
+  $("#fichier-nom").textContent = f ? f.name : "Prendre en photo ou choisir un fichier";
+  if (f && f.type.startsWith("image/")) { ap.src = URL.createObjectURL(f); ap.hidden = false; } else ap.hidden = true;
+});
+fd.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $(".erreur", fd); err.textContent = "";
+  const montant = nombre(fd.montant.value);
+  if (!(montant > 0)) return (err.textContent = "Indiquez le montant payé.");
+  if (!fd.fournisseur.value.trim() && !fd.libelle.value.trim()) return (err.textContent = "Indiquez le magasin ou ce qui a été acheté.");
+  const d = { date: fd.date.value, montant, fournisseur: fd.fournisseur.value, libelle: fd.libelle.value, categorie: fd.categorie.value,
+    paiement: (fd.querySelector("input[name=paiement]:checked") || {}).value, note: fd.note.value };
+  const fichier = fd.fichier.files[0];
+  await occupe($("button[type=submit]", fd), async () => {
+    let id;
+    try {
+      const r = modeDepense === "ajouter" ? await api("ajouter_depense", d) : await api("modifier_depense", { ...d, id: depenseCourante.id, valider: modeDepense === "valider" });
+      id = r.depense;
+    } catch (x) { err.textContent = x.message; return; }
+    $("#d-depense").close();
+    if (fichier) { try { await envoyerTicket(id, fichier); } catch (x) { toast("Dépense enregistrée, mais le ticket n'a pas pu être archivé : " + x.message, true); return; } }
+    else toast(modeDepense === "valider" ? "Dépense validée" : "Dépense enregistrée");
+  });
+});
+let ticketPour = null;
+$("#ticket-rapide").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f || !ticketPour) return;
+  try { await envoyerTicket(ticketPour, f); } catch (x) { toast(x.message, true); }
+});
+
+const fa = $("#f-abonnement");
+let abonnementCourant = null;
+function ouvrirAbonnement(a) {
+  abonnementCourant = a || null;
+  $("#d-abonnement-titre").textContent = a ? "Modifier l'abonnement" : "Nouvel abonnement";
+  fa.reset(); $(".erreur", fa).textContent = "";
+  fa.categorie.innerHTML = V.categories.map((c) => `<option>${esc(c)}</option>`).join("");
+  fa.mois.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${esc(moisAnnee(`2000-${String(i + 1).padStart(2, "0")}-01`).split(" ")[0])}</option>`).join("");
+  fa.nom.value = a ? a.nom : ""; fa.fournisseur.value = a ? a.fournisseur : "";
+  fa.montant.value = a ? String(a.montant).replace(".", ",") : ""; fa.categorie.value = a ? a.categorie : "Abonnements et logiciels";
+  fa.rythme.value = a && a.rythme === "annuel" ? "annuel" : "mensuel"; fa.jour.value = a ? a.jour || "1" : "1";
+  fa.mois.value = a && a.mois ? a.mois : String(Number(V.aujourdhui.slice(5, 7)));
+  fa.actif.checked = a ? a.actif === "oui" : true; fa.note.value = a ? a.note : "";
+  $("#c-mois").hidden = fa.rythme.value !== "annuel";
+  $("#d-abonnement").showModal();
+}
+fa.rythme.addEventListener("change", () => ($("#c-mois").hidden = fa.rythme.value !== "annuel"));
+fa.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $(".erreur", fa); err.textContent = "";
+  await occupe($("button[type=submit]", fa), async () => {
+    try {
+      await api("abonnement", { id: abonnementCourant && abonnementCourant.id, nom: fa.nom.value, fournisseur: fa.fournisseur.value, montant: nombre(fa.montant.value),
+        categorie: fa.categorie.value, rythme: fa.rythme.value, jour: fa.jour.value, mois: fa.mois.value, actif: fa.actif.checked, note: fa.note.value });
+      $("#d-abonnement").close(); toast("Abonnement enregistré");
+    } catch (x) { err.textContent = x.message; }
+  });
+});
+
 // ---------- Onglets ----------
 function choisirOnglet(nom, maj = true) {
-  if (!["valider", "factures", "urssaf"].includes(nom)) nom = "valider";
+  if (!["valider", "factures", "depenses", "urssaf"].includes(nom)) nom = "valider";
   onglet = nom;
   for (const b of $$(".onglets button")) b.setAttribute("aria-selected", String(b.dataset.onglet === nom));
-  for (const n of ["valider", "factures", "urssaf"]) $("#v-" + n).hidden = n !== nom;
+  for (const n of ["valider", "factures", "depenses", "urssaf"]) $("#v-" + n).hidden = n !== nom;
   if (maj && location.hash !== "#" + nom) history.replaceState(null, "", "#" + nom);
 }
 window.addEventListener("hashchange", () => choisirOnglet(location.hash.slice(1), false));
@@ -625,18 +917,36 @@ fs.addEventListener("submit", async (e) => {
 
 // ---------- Valider ----------
 const fv = $("#f-valider");
-let ligneAValider = null;
-function ouvrirValider(l) {
-  ligneAValider = l;
+let ligneAValider = null, sumupChoisi = "";
+function majSumupValider() {
+  const z = $("#valider-sumup");
+  const paiement = (fv.querySelector("input[name=paiement]:checked") || {}).value;
+  if (!V.sumup || !V.sumup.actif || V.sumup.erreur || paiement !== "Carte bancaire") { z.hidden = true; return; }
+  z.hidden = false;
+  const p = sumupChoisi ? V.sumup.libres.find((x) => x.code === sumupChoisi) : null;
+  const memes = V.sumup.libres.filter((x) => x.date === fv.paye_le.value && Math.abs(x.montant - nombre(fv.montant.value)) < 0.005);
+  const trouve = p || (memes.length === 1 ? memes[0] : null);
+  z.className = "info-sumup " + (trouve ? "ok" : "non");
+  z.innerHTML = trouve ? `${ic("ok")} Paiement SumUp ${p ? "choisi" : "trouvé"} : ${esc(heureFr(trouve.heure))} · ${eur(trouve.montant)}`
+    : memes.length > 1 ? `${ic("alerte")} Plusieurs paiements SumUp identiques ce jour-là : rattachez-le depuis l'onglet Factures.`
+    : `${ic("alerte")} Aucun paiement SumUp de ce montant ce jour-là.`;
+}
+function ouvrirValider(l, pre = {}) {
+  ligneAValider = l; sumupChoisi = pre.sumup || "";
   fv.reset(); $(".erreur", fv).textContent = "";
   $("#valider-recap").innerHTML = `<strong>${esc(l.cliente)}</strong>${esc([l.soin, l.options].filter(Boolean).join(" + "))}<div class="petit">${esc(jourCourt(l.date))}${l.heure ? " · " + esc(heureFr(l.heure)) : ""}</div>`;
   fv.montant.value = l.montant !== "" ? String(l.montant).replace(".", ",") : "";
   fv.paye_le.value = V.aujourdhui > l.date && l.date >= V.aujourdhui.slice(0, 8) + "01" ? l.date : V.aujourdhui;
   fv.paye_le.max = V.aujourdhui;
-  $("#puces-paiement").innerHTML = V.moyens.map((m, i) => `<label class="puce"><input type="radio" name="paiement" value="${esc(m)}" ${i === 0 ? "checked" : ""}><span>${ic(ICONE_PAIEMENT[m] || "carte")} ${esc(m)}</span></label>`).join("");
+  $("#puces-paiement").innerHTML = V.moyens.map((m, i) => `<label class="puce"><input type="radio" name="paiement" value="${esc(m)}" ${(pre.paiement ? m === pre.paiement : i === 0) ? "checked" : ""}><span>${ic(ICONE_PAIEMENT[m] || "carte")} ${esc(m)}</span></label>`).join("");
   fv.cliente.value = l.cliente; fv.telephone.value = l.telephone; fv.email.value = l.email; fv.adresse.value = l.adresse;
+  if (pre.montant) fv.montant.value = String(pre.montant).replace(".", ",");
+  if (pre.paye_le) fv.paye_le.value = pre.paye_le;
+  majSumupValider();
   $("#d-valider").showModal();
 }
+fv.addEventListener("input", majSumupValider);
+fv.addEventListener("change", (e) => { if (e.target.name === "paiement") sumupChoisi = ""; majSumupValider(); });
 fv.addEventListener("submit", async (e) => {
   e.preventDefault();
   const err = $(".erreur", fv); err.textContent = "";
@@ -646,7 +956,7 @@ fv.addEventListener("submit", async (e) => {
   if (!paiement) return (err.textContent = "Choisissez le moyen de paiement.");
   await occupe($("button[type=submit]", fv), async () => {
     try {
-      const r = await api("valider", { id: ligneAValider.id, montant, paiement, paye_le: fv.paye_le.value, cliente: fv.cliente.value, telephone: fv.telephone.value, email: fv.email.value, adresse: fv.adresse.value });
+      const r = await api("valider", { id: ligneAValider.id, montant, paiement, paye_le: fv.paye_le.value, sumup: paiement === "Carte bancaire" ? sumupChoisi : "", cliente: fv.cliente.value, telephone: fv.telephone.value, email: fv.email.value, adresse: fv.adresse.value });
       $("#d-valider").close();
       ouvrirEnvoi(r.facture, true);
     } catch (x) { err.textContent = x.message; }
@@ -736,6 +1046,20 @@ document.addEventListener("click", async (e) => {
     case "modifier": return l && ouvrirSaisie(l.origine, l);
     case "valider": return l && ouvrirValider(l);
     case "envoyer": return ouvrirEnvoi(id);
+    case "rattacher": return ouvrirRattacher(id);
+    case "choisir-ligne": {
+      const ligne = V.lignes.find((x) => x.id === id), p = V.sumup.libres.find((x) => x.code === b.dataset.code);
+      $("#d-rattacher").close();
+      return ouvrirValider(ligne, { montant: p.montant, paiement: "Carte bancaire", paye_le: p.date, sumup: p.code });
+    }
+    case "ajouter-depense": return ouvrirDepense("ajouter");
+    case "valider-depense": return ouvrirDepense("valider", V.depenses.find((x) => x.id === id));
+    case "modifier-depense": return ouvrirDepense("modifier", V.depenses.find((x) => x.id === id));
+    case "ecarter-depense": return occupe(b, () => api("ecarter_depense", { id }).then(() => toast("Dépense écartée")).catch((x) => toast(x.message, true)));
+    case "retablir-depense": return occupe(b, () => api("ecarter_depense", { id, retablir: true }).then(() => toast("Remise à valider")).catch((x) => toast(x.message, true)));
+    case "ticket": ticketPour = id; return $("#ticket-rapide").click();
+    case "ajouter-abonnement": return ouvrirAbonnement();
+    case "modifier-abonnement": return ouvrirAbonnement(V.abonnements.find((x) => x.id === id));
     case "declarer": return ouvrirDeclarer(V.periodes.find((p) => p.periode === id));
     case "annuler":
       if (!confirm(`${l.cliente} : marquer ce rendez-vous comme annulé (pas de facture) ?`)) return;
