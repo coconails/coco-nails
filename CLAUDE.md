@@ -33,6 +33,7 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   `/v2.1/merchants/{code}/transactions/history` + `/v1.0/merchants/{code}/payouts` ; rapprochement automatique à la validation
   carte, colonne « Réf. SumUp » ; commission du mois écoulé ajoutée aux dépenses, réf. `sumup:<AAAA-MM>`).
   Test : `node outils-de-test/test-compta.mjs` (Google, Drive et SumUp simulés).
+  Installable comme application (manifest `public/compta/manifest.webmanifest`, icônes 180/192/512 + masquable).
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
