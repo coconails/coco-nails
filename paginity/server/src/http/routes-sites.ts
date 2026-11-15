@@ -224,12 +224,14 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { site } = ctx.sites.require(user, siteParam(req), 'code');
     const b = body<{ chemin?: string; contenu?: string; version?: string | null; forcerJson?: boolean }>(req);
     if (typeof b.contenu !== 'string') throw new UserError(400, 'Contenu manquant.');
+    // La version lue est obligatoire : sans elle, on pourrait écraser sans le savoir une modification faite entre-temps.
+    if (b.version !== null && typeof b.version !== 'string') throw new UserError(400, 'Version du fichier manquante : rechargez le fichier avant de l’enregistrer.');
     const rel = resolveIn(ctx.sites.repoDir(site), b.chemin).rel;
     if (!isText(rel)) throw new UserError(400, 'Seuls les fichiers texte peuvent être modifiés ici.');
     const errors = validateText(rel, b.contenu);
     if (errors.length && !b.forcerJson) throw new UserError(422, errors.join(' '), { erreurs: errors });
     return ctx.sites.lock(site.id, async () => {
-      const w = writeChecked(ctx.sites.repoDir(site), rel, b.contenu!, b.version === undefined ? undefined : b.version);
+      const w = writeChecked(ctx.sites.repoDir(site), rel, b.contenu!, b.version);
       const commit = await ctx.sites.repo(site).commitPaths([w.rel], `Code : ${w.rel}`, authorOf(user));
       return { chemin: w.rel, version: w.version, enregistre: commit !== null };
     });

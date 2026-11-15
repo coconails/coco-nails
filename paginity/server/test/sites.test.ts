@@ -92,6 +92,10 @@ describe('Sites : contenus, code, publication, versions', () => {
     const stale = await c.call('PUT', `/api/sites/${siteId}/fichier`, { chemin: 'public/style.css', contenu: 'écrasement', version: css.json.version });
     expect(stale.status).toBe(409);
     expect(stale.json.details.conflit).toBe(true);
+    // Sans indiquer la version lue : refusé (on n'écrase jamais à l'aveugle le travail de quelqu'un d'autre).
+    const aveugle = await c.call('PUT', `/api/sites/${siteId}/fichier`, { chemin: 'public/style.css', contenu: 'écrasement' });
+    expect(aveugle.status).toBe(400);
+    expect((await c.call('GET', `/api/sites/${siteId}/fichier?chemin=public/style.css`)).json.contenu).toContain('/* ajout */');
     const created = await c.call('POST', `/api/sites/${siteId}/fichiers/nouveau`, { chemin: 'public/mentions.html' });
     expect(created.status).toBe(200);
   });
