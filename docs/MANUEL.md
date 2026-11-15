@@ -58,8 +58,8 @@ Les noms, messages et valeurs qu'on y voit sont fictifs.
 |---|---|
 | Contributeur | Modifier les contenus et les photos (brouillon). Ne peut pas publier. |
 | Éditeur | Tout ce que fait le contributeur, plus publier, revenir en arrière et lire les messages des formulaires. |
-| Administrateur du site | Tout, y compris le code, les secrets, les réglages et les personnes du site. |
-| Propriétaire | Vous : tous les sites, les utilisateurs, la santé du serveur, le journal, les réglages. |
+| Administrateur du site | Tout, y compris le code des pages (HTML, styles, scripts du navigateur), les secrets, les réglages et les personnes du site. |
+| Propriétaire | Vous : tous les sites, les utilisateurs, la santé du serveur, le journal, les réglages. Vous seul pouvez modifier le **code exécuté sur le serveur** (fonctions, étape de préparation, réglages de fabrication, dépendances). |
 
 ---
 

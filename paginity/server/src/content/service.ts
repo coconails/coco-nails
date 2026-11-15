@@ -1,3 +1,4 @@
+import { assertMayWrite } from '../sites/server-code.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
@@ -90,6 +91,8 @@ export async function saveEntry(ctx: Ctx, site: SiteRow, user: UserRow, name: st
     if (errors.length) throw new UserError(422, 'Certains champs sont à corriger.', { champs: errors });
     const repoDir = ctx.sites.repoDir(site);
     const r = resolveIn(repoDir, entry.path);
+    // Un contenu ne doit jamais servir à écrire dans le code exécuté sur le serveur.
+    assertMayWrite(ctx, site, user, [r.rel]);
     const original = fs.existsSync(r.abs) ? fs.readFileSync(r.abs, 'utf8') : null;
     const base = typeof baseVersion === 'string' ? baseVersion : original === null ? null : undefined;
     if (base === undefined) throw new UserError(400, 'Version du contenu manquante : rechargez la page.');

@@ -14,6 +14,7 @@ import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import type { Entry, Field } from '../content/schema.js';
 import { buildPreview } from '../publish/pipeline.js';
 import { createPreviewLink } from '../servers/sites.js';
+import { assertMayRestore, assertMayWrite } from '../sites/server-code.js';
 import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,19 @@ function flatten(v: unknown, prefix: string[] = [], out = new Map<string, unknow
     if (entries.length === 0) out.set(prefix.join('\u0000'), Array.isArray(v) ? '(liste vide)' : '(vide)');
     for (const [k, x] of entries) flatten(x, [...prefix, k], out);
   } else out.set(prefix.join('\u0000'), v);
+  return out;
+}
+
+function listRelUnder(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string, r: string) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const rr = r ? `${r}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(path.join(d, e.name), rr);
+      else out.push(rr);
+    }
+  };
+  walk(dir, '');
   return out;
 }
 
@@ -227,6 +241,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     // La version lue est obligatoire : sans elle, on pourrait écraser sans le savoir une modification faite entre-temps.
     if (b.version !== null && typeof b.version !== 'string') throw new UserError(400, 'Version du fichier manquante : rechargez le fichier avant de l’enregistrer.');
     const rel = resolveIn(ctx.sites.repoDir(site), b.chemin).rel;
+    assertMayWrite(ctx, site, user, [rel]);
     if (!isText(rel)) throw new UserError(400, 'Seuls les fichiers texte peuvent être modifiés ici.');
     const errors = validateText(rel, b.contenu);
     if (errors.length && !b.forcerJson) throw new UserError(422, errors.join(' '), { erreurs: errors });
@@ -243,6 +258,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const b = body<{ chemin?: string; dossier?: boolean }>(req);
     return ctx.sites.lock(site.id, async () => {
       const r = resolveIn(ctx.sites.repoDir(site), b.chemin);
+      assertMayWrite(ctx, site, user, [b.dossier ? `${r.rel}/.gitkeep` : r.rel]);
       if (fs.existsSync(r.abs)) throw new UserError(409, 'Un fichier ou dossier porte déjà ce nom.');
       if (b.dossier) {
         fs.mkdirSync(r.abs, { recursive: true });
@@ -266,6 +282,11 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
       const from = resolveIn(root, b.de);
       const to = resolveIn(root, b.vers);
       if (!fs.existsSync(from.abs)) throw new UserError(404, 'Fichier introuvable.');
+      assertMayWrite(ctx, site, user, [from.rel, to.rel]);
+      if (fs.lstatSync(from.abs).isDirectory()) {
+        // Un dossier renommé : chaque fichier change d'adresse.
+        assertMayWrite(ctx, site, user, listRelUnder(from.abs).map((f) => `${to.rel}/${f}`));
+      }
       if (fs.existsSync(to.abs)) throw new UserError(409, 'Un fichier porte déjà ce nom.');
       fs.mkdirSync(path.dirname(to.abs), { recursive: true });
       fs.renameSync(from.abs, to.abs);
@@ -281,6 +302,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     return ctx.sites.lock(site.id, async () => {
       const r = resolveIn(ctx.sites.repoDir(site), q.chemin);
       if (!fs.existsSync(r.abs)) throw new UserError(404, 'Fichier introuvable.');
+      assertMayWrite(ctx, site, user, [r.rel]);
       if (r.rel === 'paginity.yml') throw new UserError(400, 'La fiche du site ne peut pas être supprimée.');
       fs.rmSync(r.abs, { recursive: true });
       await ctx.sites.repo(site).commitPaths([r.rel], `Code : suppression de ${r.rel}`, authorOf(user));
@@ -439,9 +461,11 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
       const repo = ctx.sites.repo(site);
       if (b.chemin) {
         const rel = resolveIn(ctx.sites.repoDir(site), b.chemin).rel;
+        assertMayWrite(ctx, site, user, [rel]);
         await repo.restorePath(liveTag, rel);
         await repo.commitAll(`Modifications annulées : ${rel}`, authorOf(user));
       } else {
+        await assertMayRestore(ctx, site, user, liveTag);
         await repo.resetTreeTo(liveTag);
         await repo.commitAll('Toutes les modifications non publiées ont été annulées', authorOf(user));
       }
@@ -501,6 +525,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     return ctx.sites.lock(site.id, async () => {
       const repo = ctx.sites.repo(site);
       if (!(await repo.resolve(`pub-${numero}`))) throw new UserError(404, 'Publication introuvable.');
+      await assertMayRestore(ctx, site, user, `pub-${numero}`);
       await repo.resetTreeTo(`pub-${numero}`);
       await repo.commitAll(`Brouillon repris depuis la publication n°${numero}`, authorOf(user));
       audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'brouillon_repris', siteId: site.id, details: { numero } });
