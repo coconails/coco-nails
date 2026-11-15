@@ -68,6 +68,7 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 ```bash
 npm test                      # 76 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
 npm run build && npm run e2e  # parcours complet dans Chromium (nécessite Playwright)
+npm run verifier              # contrôle des types (serveur, tests, interface) et de la syntaxe des scripts
 ```
 
 Les tests de Coco Nail's s'exécutent seulement si le dépôt du site est présent (variable `COCO_NAILS_DIR`).

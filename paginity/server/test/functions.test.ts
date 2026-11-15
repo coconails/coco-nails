@@ -288,7 +288,7 @@ describe('Fonctions serveur, secrets, formulaires, tâches planifiées', () => {
     s3.timeSynced = async () => true;
     await s3.tick(Date.UTC(2030, 0, 1, 12, 23, 0));
     await waitDone();
-    runs = p.ctx.db.prepare('SELECT slot, status FROM schedule_runs ORDER BY slot').all() as { slot: number; status: string }[];
+    runs = p.ctx.db.prepare('SELECT slot, status, kind FROM schedule_runs ORDER BY slot').all() as { slot: number; status: string; kind: string }[];
     expect(runs.map((r) => r.status)).toEqual(['reussie', 'manquee', 'manquee', 'manquee', 'manquee']);
     // Avec le rattrapage autorisé : seul le dernier créneau manqué est exécuté.
     await c.call('PUT', `/api/sites/${siteId}/taches/tache`, { rattrapage: true });
