@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# paginity-admin : outil de secours (voir « paginity-admin aide »). À lancer avec le même utilisateur que PAGINITY.
+set -euo pipefail
+BASE="${PAGINITY_MAJ_BASE:-/opt/paginity}"
+APP="$(readlink -f "$BASE/actuelle")"
+[ -f "$APP/paginity/server/dist/cli/admin.js" ] && APP="$APP/paginity"
+export PAGINITY_DATA_DIR="${PAGINITY_DATA_DIR:-/var/lib/paginity}"
+exec node --disable-warning=ExperimentalWarning "$APP/server/dist/cli/admin.js" "$@"

@@ -79,6 +79,25 @@ extérieure est refusée, aucune action réelle n'est possible. Ce simulateur n'
 COCO_NAILS_DIR=/chemin/vers/coco-nails1 npm run e2e:phase3   # import réel, fonctions, secrets, formulaires
 ```
 
+## 5 bis. Outils de secours et de mise à jour (préparés pour la phase 4)
+
+**`paginity-admin`** (`paginity/scripts/paginity-admin`, ou `npm run admin -- <commande>`) s'utilise sur la machine
+elle-même quand l'interface web n'est plus accessible. Il lit les mêmes données (`PAGINITY_DATA_DIR`) et note chaque
+action dans le journal. Commandes : `etat`, `verifier` (base, clé du coffre, dossiers des sites), `debloquer [e-mail]`,
+`fermer-sessions <e-mail>`, `mot-de-passe <e-mail>` (demandé au clavier, jamais sur la ligne de commande),
+`reinitialiser-2fa <e-mail> --confirmer`, `activer <e-mail>`, `copie-base <fichier>` (copie cohérente, jamais écrasée).
+
+**`paginity-maj`** (`paginity/scripts/paginity-maj`) met PAGINITY à jour depuis son dépôt Git, dans l'organisation prévue :
+`/opt/paginity/versions/<date>-<commit>/`, lien `/opt/paginity/actuelle`, données dans `/var/lib/paginity`.
+1. La nouvelle version est récupérée, installée (`npm ci --ignore-scripts`), fabriquée et testée **à côté** :
+   en cas d'échec, rien ne change et PAGINITY n'est même pas arrêté.
+2. PAGINITY est arrêté, la base est copiée (`sauvegardes/avant-maj-….db`), le lien bascule, PAGINITY redémarre.
+3. Si PAGINITY ne répond pas dans les 60 secondes : la base copiée et l'ancienne version sont remises, et PAGINITY redémarre.
+Une seule mise à jour à la fois ; les 3 dernières versions sont gardées. Réglages : `PAGINITY_MAJ_BASE`, `PAGINITY_MAJ_SOURCE`,
+`PAGINITY_MAJ_REF`, `PAGINITY_MAJ_ARRET` / `PAGINITY_MAJ_DEMARRAGE` (par défaut `systemctl stop|start paginity`),
+`PAGINITY_MAJ_SANTE`, `PAGINITY_MAJ_ATTENTE`, `PAGINITY_MAJ_GARDER`. Essayé dans `test/maj.test.ts` avec un faux PAGINITY ;
+pas encore sur le mini-PC (phase 4).
+
 ## 6. Fonctions serveur, secrets et e-mails
 
 - **Secrets** (clés Google, OVH…) : écran « Secrets » de chaque site. Saisissez-les vous-même ; ils sont chiffrés et ne

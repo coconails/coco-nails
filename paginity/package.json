@@ -18,6 +18,7 @@
     "test": "npm test -w server",
     "e2e": "node e2e/parcours.mjs",
     "e2e:phase3": "node e2e/phase3.mjs",
-    "manuel": "node e2e/captures-manuel.mjs && node e2e/manuel-pdf.mjs"
+    "manuel": "node e2e/captures-manuel.mjs && node e2e/manuel-pdf.mjs",
+    "admin": "node --disable-warning=ExperimentalWarning server/dist/cli/admin.js"
   }
 }

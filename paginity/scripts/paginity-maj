@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# paginity-maj : met PAGINITY à jour depuis son dépôt Git, avec retour arrière automatique.
+#
+# Organisation prévue sur le mini-PC (phase 4) :
+#   /opt/paginity/versions/<date>-<commit>/   une copie complète par version (code + dépendances + build)
+#   /opt/paginity/actuelle  ->  lien vers la version en service
+#   /var/lib/paginity/                          les données (jamais dans le dossier du code)
+#
+# Étapes : 1. récupère la nouvelle version à côté de l'actuelle (rien ne change encore)
+#          2. installe ses dépendances (sans exécuter de scripts d'installation), la fabrique, lance ses tests
+#          3. arrête PAGINITY, copie la base de données, bascule le lien, redémarre
+#          4. vérifie que PAGINITY répond ; sinon : remet la base copiée et l'ancienne version, redémarre.
+# Les sites en ligne restent servis par l'ancienne version jusqu'à l'étape 3 (coupure de quelques secondes).
+#
+# Utilisation : paginity-maj [--ref <branche ou étiquette>] [--source <adresse du dépôt>] [--sans-tests]
+set -euo pipefail
+
+BASE="${PAGINITY_MAJ_BASE:-/opt/paginity}"
+DONNEES="${PAGINITY_DATA_DIR:-/var/lib/paginity}"
+SOURCE="${PAGINITY_MAJ_SOURCE:-}"
+REF="${PAGINITY_MAJ_REF:-main}"
+ARRET="${PAGINITY_MAJ_ARRET:-systemctl stop paginity}"
+DEMARRAGE="${PAGINITY_MAJ_DEMARRAGE:-systemctl start paginity}"
+SANTE="${PAGINITY_MAJ_SANTE:-http://127.0.0.1:8080/api/etat}"
+ATTENTE="${PAGINITY_MAJ_ATTENTE:-60}"
+GARDER="${PAGINITY_MAJ_GARDER:-3}"
+TESTS=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ref) REF="$2"; shift 2 ;;
+    --source) SOURCE="$2"; shift 2 ;;
+    --sans-tests) TESTS=0; shift ;;
+    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Option inconnue : $1" >&2; exit 1 ;;
+  esac
+done
+
+dire() { printf '[paginity-maj] %s\n' "$*"; }
+echec() { dire "ÉCHEC : $*" >&2; exit 1; }
+
+ACTUELLE_LIEN="$BASE/actuelle"
+[ -L "$ACTUELLE_LIEN" ] || echec "$ACTUELLE_LIEN n'existe pas (installation initiale à faire d'abord)."
+ACTUELLE="$(readlink -f "$ACTUELLE_LIEN")"
+[ -n "$SOURCE" ] || SOURCE="$(git -C "$ACTUELLE" remote get-url origin 2>/dev/null || true)"
+[ -n "$SOURCE" ] || echec "adresse du dépôt inconnue : utilisez --source."
+BASE_DE_DONNEES="$DONNEES/plateforme/paginity.db"
+
+# Une seule mise à jour à la fois.
+mkdir -p "$BASE/versions" "$DONNEES/sauvegardes"
+exec 9>"$BASE/.maj.verrou"
+flock -n 9 || echec "une autre mise à jour est déjà en cours."
+
+# 1. Nouvelle version, à côté de l'actuelle.
+TEMP="$BASE/versions/.en-preparation-$$"
+rm -rf "$TEMP"
+nettoyer() { rm -rf "$TEMP"; }
+trap nettoyer EXIT
+dire "Récupération de « $REF » depuis $SOURCE…"
+git clone -q --depth 1 --branch "$REF" "$SOURCE" "$TEMP" || echec "impossible de récupérer la nouvelle version."
+COMMIT="$(git -C "$TEMP" rev-parse --short HEAD)"
+NOM="$(date -u +%Y%m%d-%H%M%S)-$COMMIT"
+if [ "$(git -C "$ACTUELLE" rev-parse --short HEAD 2>/dev/null || true)" = "$COMMIT" ]; then
+  dire "Déjà à jour (version $COMMIT). Rien à faire."
+  exit 0
+fi
+APP="$TEMP"
+[ -f "$TEMP/paginity/package.json" ] && APP="$TEMP/paginity"
+
+# 2. Dépendances, fabrication, tests (PAGINITY tourne toujours sur l'ancienne version).
+dire "Installation des dépendances…"
+(cd "$APP" && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error) || echec "installation des dépendances impossible. Rien n'a changé."
+dire "Fabrication…"
+(cd "$APP" && npm run build --silent) || echec "la fabrication a échoué. Rien n'a changé."
+if [ "$TESTS" = 1 ]; then
+  dire "Tests automatiques…"
+  (cd "$APP" && npm test --silent) || echec "des tests ont échoué. Rien n'a changé."
+fi
+mv "$TEMP" "$BASE/versions/$NOM"
+trap - EXIT
+NOUVELLE="$BASE/versions/$NOM"
+
+basculer() { ln -sfn "$1" "$BASE/.actuelle-tmp" && mv -T "$BASE/.actuelle-tmp" "$ACTUELLE_LIEN"; }
+repond() {
+  local i=0
+  while [ "$i" -lt "$ATTENTE" ]; do
+    if curl -fsS -m 3 -o /dev/null "$SANTE" 2>/dev/null; then return 0; fi
+    sleep 1; i=$((i + 1))
+  done
+  return 1
+}
+
+# 3. Arrêt, copie de la base, bascule, redémarrage.
+COPIE="$DONNEES/sauvegardes/avant-maj-$NOM.db"
+dire "Arrêt de PAGINITY…"
+sh -c "$ARRET" 9>&- || echec "arrêt impossible. Rien n'a changé (la nouvelle version reste prête dans $NOUVELLE)."
+if [ -f "$BASE_DE_DONNEES" ]; then
+  node -e 'const { DatabaseSync } = require("node:sqlite"); const d = new DatabaseSync(process.argv[1]); d.prepare("VACUUM INTO ?").run(process.argv[2]); d.close();' "$BASE_DE_DONNEES" "$COPIE" \
+    || { sh -c "$DEMARRAGE" 9>&- || true; echec "copie de la base impossible : l'ancienne version a été redémarrée."; }
+  chmod 600 "$COPIE"
+  dire "Base copiée dans $COPIE."
+fi
+basculer "$NOUVELLE"
+dire "Démarrage de la nouvelle version ($COMMIT)…"
+sh -c "$DEMARRAGE" 9>&- || true
+
+# 4. Vérification, sinon retour arrière.
+if repond; then
+  dire "Mise à jour réussie : PAGINITY répond (version $COMMIT)."
+  # Ménage : on garde les $GARDER dernières versions (et toujours celle en service).
+  ls -1d "$BASE/versions/"*/ 2>/dev/null | sed 's:/$::' | sort | head -n -"$GARDER" | while read -r v; do
+    [ "$(readlink -f "$v")" = "$(readlink -f "$ACTUELLE_LIEN")" ] || rm -rf "$v"
+  done
+  exit 0
+fi
+
+dire "La nouvelle version ne répond pas : retour à la version précédente…" >&2
+sh -c "$ARRET" 9>&- || true
+if [ -f "$COPIE" ]; then
+  cp "$COPIE" "$BASE_DE_DONNEES.retour" && mv -f "$BASE_DE_DONNEES.retour" "$BASE_DE_DONNEES"
+  rm -f "$BASE_DE_DONNEES-wal" "$BASE_DE_DONNEES-shm"
+fi
+basculer "$ACTUELLE"
+sh -c "$DEMARRAGE" 9>&- || true
+if repond; then
+  echec "nouvelle version refusée ; l'ancienne a été remise en service avec la base d'avant la mise à jour."
+fi
+echec "nouvelle version refusée ET l'ancienne ne répond pas : intervention nécessaire (paginity-admin verifier)."

@@ -540,8 +540,8 @@ PAGINITY fonctionne dans le navigateur du téléphone ou de la tablette (Safari,
 | Situation | Que faire |
 |---|---|
 | J'ai perdu mon téléphone | Connectez-vous avec un **code de secours**. Puis, dans votre profil : **Se déconnecter partout**, supprimez l’ancienne passkey et cliquez sur **Changer de téléphone** pour installer les codes à 6 chiffres sur le nouveau téléphone. |
-| Je n'ai plus de code de secours | Depuis votre profil (connecté) : **Générer de nouveaux codes**. Si vous ne pouvez plus vous connecter du tout, une procédure de secours sur le serveur lui-même sera documentée en phase 4. |
-| « Trop de tentatives » | Attendez le nombre de minutes indiqué, puis réessayez calmement. |
+| Je n'ai plus de code de secours | Depuis votre profil (connecté) : **Générer de nouveaux codes**. Si vous ne pouvez plus vous connecter du tout : sur la machine elle-même (clavier et écran, ou connexion SSH), la commande **`paginity-admin reinitialiser-2fa votre@adresse --confirmer`** supprime l’ancienne double authentification ; vous la reconfigurez à la connexion suivante (le mot de passe reste exigé). `paginity-admin aide` liste les autres commandes de secours (débloquer, nouveau mot de passe…). |
+| « Trop de tentatives » | Attendez le nombre de minutes indiqué, puis réessayez calmement, de préférence depuis un appareil où vous vous êtes déjà connecté. En cas d’urgence, sur la machine : `paginity-admin debloquer`. |
 | « Ce fichier a été modifié ailleurs » | Quelqu'un (ou vous, dans un autre onglet) a enregistré entre-temps. Rien n'est perdu. Rechargez la dernière version, puis refaites votre modification. |
 | « Certains champs sont à corriger » | Les champs en rouge indiquent le problème (champ obligatoire vide, format d'heure…). |
 | La publication a échoué | **L'ancienne version reste en ligne.** Ouvrez **Activités** : l'étape en rouge explique la cause (JSON invalide, fonction en erreur…). Corrigez, puis publiez à nouveau. |
