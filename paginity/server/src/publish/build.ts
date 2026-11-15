@@ -4,6 +4,7 @@ import { readManifest, TECHNICAL_FILES, type SiteManifest } from '../sites/manif
 import { parsePagesYml, validateEntryValue } from '../content/schema.js';
 import { UserError } from '../lib/util.js';
 import { RULES_FILE } from '../servers/static.js';
+import { scanForms } from '../functions/forms.js';
 
 /**
  * Fabrication d'une version : contrôles, copie du dossier publié, vérification des liens.
@@ -80,7 +81,7 @@ export function checkSource(srcDir: string): CheckResult {
 }
 
 /** Copie le dossier publié vers la destination, sans fichiers techniques ni fichiers cachés. */
-export function buildOutput(srcDir: string, manifest: SiteManifest, outDir: string, version: string): number {
+export function buildOutput(srcDir: string, manifest: SiteManifest, outDir: string, version: string, extra: { functionsDir?: string | null } = {}): number {
   const pubDir = path.join(srcDir, manifest.publishDir === '.' ? '' : manifest.publishDir);
   const atRoot = manifest.publishDir === '.';
   let count = 0;
@@ -98,7 +99,10 @@ export function buildOutput(srcDir: string, manifest: SiteManifest, outDir: stri
     },
   });
   // Règles (redirections, en-têtes) et numéro de version, lus par le serveur des sites. Fichier caché : jamais servi.
-  fs.writeFileSync(path.join(outDir, RULES_FILE), JSON.stringify({ version, redirects: manifest.redirects, headers: manifest.headers }));
+  fs.writeFileSync(
+    path.join(outDir, RULES_FILE),
+    JSON.stringify({ version, redirects: manifest.redirects, headers: manifest.headers, forms: scanForms(outDir), functionsDir: extra.functionsDir ?? null }),
+  );
   return count;
 }
 

@@ -156,6 +156,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireSudo(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'supprimer');
     if (ctx.jobs.hasActive(site.id)) throw new UserError(409, 'Une opération est en cours sur ce site. Réessayez dans un instant.');
+    await ctx.functions.stopSite(site.id);
     await ctx.sites.deleteSite(site);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'suppression_site', siteId: site.id, details: { nom: site.name } });
     return { ok: true };

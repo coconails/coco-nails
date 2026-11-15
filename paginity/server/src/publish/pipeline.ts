@@ -8,6 +8,9 @@ import { now, UserError } from '../lib/util.js';
 import { authorOf, type SiteRow } from '../sites/service.js';
 import { buildOutput, checkLinks, checkSource, makeReadOnly, readLink, removeTree, swapSymlink } from './build.js';
 import { readManifest } from '../sites/manifest.js';
+import { fabricate } from './fabrication.js';
+import { setSetting } from '../db.js';
+import { APP_DIR } from '../functions/service.js';
 import type { JobRun } from '../jobs/queue.js';
 
 export const PUBLISH_STEPS = [
@@ -23,7 +26,7 @@ export const PUBLISH_STEPS = [
   'Enregistrer',
 ];
 
-export const RESTORE_STEPS = ['Préparer la version', 'Basculer', 'Vérifier en ligne', 'Enregistrer'];
+export const RESTORE_STEPS = ['Préparer la version', 'Fonctions serveur', 'Basculer', 'Vérifier en ligne', 'Enregistrer'];
 
 /** Vérification « en conditions réelles » : on interroge le serveur des sites comme un visiteur. Remplaçable pour les tests. */
 export const hooks = {
@@ -54,7 +57,30 @@ function tmpDir(ctx: Ctx, name: string): string {
   return d;
 }
 
-async function switchAndVerify(ctx: Ctx, run: JobRun, site: SiteRow, versionDir: string, number: number): Promise<void> {
+type Prepared = Awaited<ReturnType<Ctx['functions']['startFor']>> | null;
+
+/** Démarre l'exécuteur de la nouvelle version À CÔTÉ de l'ancien, et vérifie que toutes les fonctions se chargent. */
+async function prepareFunctions(ctx: Ctx, run: JobRun, site: SiteRow, versionDir: string): Promise<Prepared> {
+  if (!fs.existsSync(path.join(versionDir, APP_DIR))) {
+    run.skip('Fonctions serveur', 'Aucune fonction serveur pour ce site.');
+    return null;
+  }
+  return run.step(
+    'Fonctions serveur',
+    async () => {
+      const entry = await ctx.functions.startFor(site, 'production', versionDir);
+      const broken = entry.functions.filter((f) => f.erreur);
+      if (broken.length) {
+        await entry.worker.stop();
+        throw new UserError(422, `Fonction(s) en erreur : ${broken.map((f) => `${f.nom} (${f.erreur})`).join(' ; ')}. L’ancienne version reste en ligne.`);
+      }
+      return entry;
+    },
+    (e) => `${e.functions.length} fonction(s) prête(s) (${ctx.functions.isolation.mode === 'podman' ? 'conteneur isolé' : 'processus restreint'}) : ${e.functions.map((f) => f.nom).join(', ')}.`,
+  );
+}
+
+async function switchAndVerify(ctx: Ctx, run: JobRun, site: SiteRow, versionDir: string, number: number, prepared: Prepared = null): Promise<void> {
   const link = ctx.sites.liveLink(site);
   const previous = readLink(link);
   const previousLive = site.live_publication;
@@ -77,8 +103,13 @@ async function switchAndVerify(ctx: Ctx, run: JobRun, site: SiteRow, versionDir:
     else fs.rmSync(link, { force: true });
     ctx.db.prepare('UPDATE sites SET live_publication = ? WHERE id = ?').run(previousLive, site.id);
     ctx.sites.invalidate();
+    if (prepared) await ctx.functions.discard(prepared);
     throw new UserError(502, `${(e as Error).message} Retour automatique à la version précédente${previousLive ? ` (n°${previousLive})` : ''}.`);
   }
+  // Nouvelle version validée : son exécuteur remplace l'ancien, et la liste des fonctions est mise à jour.
+  if (prepared) ctx.functions.activate(prepared);
+  else await ctx.functions.stopSite(site.id, 'production');
+  setSetting(ctx.db, `catalogue:${site.id}`, JSON.stringify(prepared?.functions ?? []));
 }
 
 function pruneVersions(ctx: Ctx, site: SiteRow): void {
@@ -128,11 +159,15 @@ export async function runPublication(ctx: Ctx, run: JobRun): Promise<unknown> {
     const check = await run.step('Contrôler', async () => checkSource(srcDir), (c) => `${c.files} fichiers contrôlés${c.warnings.length ? `, ${c.warnings.length} avertissement(s)` : ''}.`);
     warnings.push(...check.warnings);
 
-    if (check.manifest.build) {
-      run.note('Fabriquer', 'Étape de préparation non exécutée (prise en charge isolée en phase 3).');
-    }
-    const count = await run.step('Fabriquer', async () => buildOutput(srcDir, check.manifest, outDir, String(number)), (n) => `${n} fichiers prêts à publier.`);
-    void count;
+    await run.step(
+      'Fabriquer',
+      () => fabricate(ctx, site, srcDir, outDir, String(number), check.manifest, 'production'),
+      (f) =>
+        `${f.fichiers} fichiers prêts à publier` +
+        (f.dependances === 'installees' ? ', dépendances installées' : f.dependances === 'cache' ? ', dépendances (cache)' : '') +
+        (f.preparation ? ', étape de préparation exécutée (isolée)' : '') +
+        '.',
+    );
 
     const linkWarnings = await run.step('Vérifier le résultat', async () => checkLinks(outDir), (w) => (w.length ? `${w.length} lien(s) à vérifier.` : 'Aucun lien cassé détecté.'));
     warnings.push(...linkWarnings);
@@ -145,13 +180,8 @@ export async function runPublication(ctx: Ctx, run: JobRun): Promise<unknown> {
       fs.chmodSync(versionDir, 0o555);
     }, () => `Rangée en lecture seule (${versionDirName(number!)}).`);
 
-    if (check.manifest.functionsDir && fs.existsSync(path.join(srcDir, check.manifest.functionsDir))) {
-      run.skip('Fonctions serveur', 'Fonctions détectées : elles seront exécutées dans des conteneurs isolés à partir de la phase 3.');
-    } else {
-      run.skip('Fonctions serveur', 'Aucune fonction serveur pour ce site.');
-    }
-
-    await switchAndVerify(ctx, run, site, versionDir, number!);
+    const prepared = await prepareFunctions(ctx, run, site, versionDir);
+    await switchAndVerify(ctx, run, site, versionDir, number!, prepared);
 
     await run.step('Enregistrer', async () => {
       await ctx.sites.lock(site.id, () => ctx.sites.repo(site).tag(`pub-${number}`, commit));
@@ -195,7 +225,7 @@ export async function runRestore(ctx: Ctx, run: JobRun): Promise<unknown> {
     try {
       await ctx.sites.lock(site.id, () => ctx.sites.repo(site).extract(pub.commit_hash, '', srcDir));
       const check = checkSource(srcDir);
-      buildOutput(srcDir, check.manifest, outDir, String(number));
+      await fabricate(ctx, site, srcDir, outDir, String(number), check.manifest, 'production');
       removeTree(versionDir);
       fs.renameSync(outDir, versionDir);
       makeReadOnly(versionDir);
@@ -205,7 +235,8 @@ export async function runRestore(ctx: Ctx, run: JobRun): Promise<unknown> {
       removeTree(outDir);
     }
   }, (r) => (r === 'existante' ? 'Version encore disponible : bascule immédiate.' : 'Version refabriquée depuis l’historique.'));
-  await switchAndVerify(ctx, run, site, versionDir, number);
+  const prepared = await prepareFunctions(ctx, run, site, versionDir);
+  await switchAndVerify(ctx, run, site, versionDir, number, prepared);
   await run.step('Enregistrer', async () => {
     ctx.db.prepare("UPDATE sites SET last_publication_status = 'reussie' WHERE id = ?").run(site.id);
     audit(ctx.db, { userId: run.userId, action: 'remise_en_ligne', siteId: site.id, details: { numero: number } });
@@ -229,7 +260,7 @@ export async function buildPreview(ctx: Ctx, site: SiteRow): Promise<{ duree: nu
       const manifest = readManifest(srcDir);
       const pub = path.join(srcDir, manifest.publishDir === '.' ? '' : manifest.publishDir);
       if (!fs.existsSync(pub)) throw new UserError(422, `Le dossier publié « ${manifest.publishDir} » n'existe pas.`);
-      buildOutput(srcDir, manifest, outDir, 'apercu');
+      await fabricate(ctx, site, srcDir, outDir, 'apercu', manifest, 'test');
       const warnings = fs.existsSync(path.join(outDir, 'index.html')) ? checkLinks(outDir) : ["Il manque la page d'accueil index.html."];
       const link = ctx.sites.previewLink(site);
       const old = readLink(link);

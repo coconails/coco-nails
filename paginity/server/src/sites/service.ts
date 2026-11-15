@@ -47,6 +47,8 @@ export interface SiteRow {
   created_by: string;
   live_publication: number | null;
   last_publication_status: string | null;
+  schedules_enabled?: number;
+  notify_email?: string | null;
 }
 
 export class SiteService {

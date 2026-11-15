@@ -17,6 +17,12 @@ import { pruneExpired } from './auth/service.js';
 import { pruneAudit } from './lib/audit.js';
 import { removeTree } from './publish/build.js';
 import path from 'node:path';
+import { FunctionService } from './functions/service.js';
+import { Isolation, detectIsolation } from './functions/isolation.js';
+import { Scheduler } from './functions/scheduler.js';
+import { Mailer } from './lib/mail.js';
+import { pruneAlerts, sendDigest } from './lib/alerts.js';
+import { pruneSubmissions } from './functions/forms.js';
 
 export interface Paginity {
   ctx: Ctx;
@@ -28,25 +34,49 @@ export interface Paginity {
 }
 
 /** Assemble PAGINITY (sans ouvrir de port). */
-export async function createPaginity(overrides: Partial<Config> = {}): Promise<Paginity> {
-  const config = loadConfig(overrides);
+export async function createPaginity(
+  overrides: Partial<Config> & { isolation?: 'podman' | 'processus'; scheduler?: boolean } = {},
+): Promise<Paginity> {
+  const { isolation: _i, scheduler: _s, ...cfg } = overrides;
+  const config = loadConfig(cfg);
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
   // Nettoyage des fichiers temporaires laissés par un arrêt brutal.
   removeTree(path.join(config.dataDir, 'temporaire'));
   const db = openDb(config.dataDir);
   const events = new Events();
   const sites = new SiteService();
-  const ctx: Ctx = { config, db, vault: new Vault(config.dataDir), events, jobs: new JobQueue(db, events, config.maxConcurrentJobs), sites };
+  const ctx = { config, db, vault: new Vault(config.dataDir), events, jobs: new JobQueue(db, events, config.maxConcurrentJobs), sites } as Ctx;
   sites.ctx = ctx;
+  ctx.mailer = new Mailer(ctx);
+  ctx.functions = new FunctionService(ctx);
+  ctx.functions.isolation = new Isolation({
+    mode: overrides.isolation ?? detectIsolation(process.env.PAGINITY_ISOLATION),
+    image: process.env.PAGINITY_CONTAINER_IMAGE ?? 'docker.io/library/node:22-slim',
+    network: process.env.PAGINITY_CONTAINER_NETWORK ?? 'slirp4netns',
+    onLog: (key, line) => ctx.functions.log(key, line),
+  });
+  ctx.scheduler = new Scheduler(ctx);
+  if (overrides.scheduler !== false) ctx.scheduler.start();
   defineSiteJobs(ctx);
   ctx.jobs.define('import', { steps: IMPORT_STEPS, run: (r) => runImport(ctx, r) });
   const admin = await createAdminApp(ctx);
   const sitesServer = createSitesServer(ctx);
   const previewServer = createPreviewServer(ctx);
   const setupCode = ensureSetupCode(ctx);
+  let lastDigest = '';
   const timer = setInterval(() => {
     pruneExpired(ctx);
     pruneAudit(db);
+    pruneAlerts(ctx);
+    pruneSubmissions(ctx);
+    ctx.functions.prune();
+    // Récapitulatif quotidien des alertes, vers 6 h UTC.
+    const d = new Date();
+    const day = d.toISOString().slice(0, 10);
+    if (d.getUTCHours() === 6 && lastDigest !== day) {
+      lastDigest = day;
+      void sendDigest(ctx).catch((e) => console.error('[récapitulatif] ', (e as Error).message));
+    }
   }, 10 * 60_000);
   timer.unref();
   return {
@@ -57,6 +87,8 @@ export async function createPaginity(overrides: Partial<Config> = {}): Promise<P
     setupCode,
     async close() {
       clearInterval(timer);
+      ctx.scheduler.stop();
+      await ctx.functions.stopAll();
       await admin.close();
       await new Promise((r) => sitesServer.close(() => r(null)));
       await new Promise((r) => previewServer.close(() => r(null)));

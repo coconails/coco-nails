@@ -148,6 +148,66 @@ const MIGRATIONS: string[] = [
     expires_at INTEGER NOT NULL
   );
   `,
+  `
+  ALTER TABLE sites ADD COLUMN schedules_enabled INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sites ADD COLUMN notify_email TEXT;
+  CREATE TABLE site_secrets (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    env TEXT NOT NULL,
+    name TEXT NOT NULL,
+    value_enc TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    updated_by TEXT,
+    PRIMARY KEY (site_id, env, name)
+  );
+  CREATE TABLE function_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    site_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    fn TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    duration_ms INTEGER NOT NULL,
+    message TEXT
+  );
+  CREATE INDEX function_log_site ON function_log(site_id, at);
+  CREATE TABLE schedule_settings (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    fn TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    catch_up INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (site_id, fn)
+  );
+  CREATE TABLE schedule_runs (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    fn TEXT NOT NULL,
+    slot INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at INTEGER,
+    finished_at INTEGER,
+    message TEXT,
+    PRIMARY KEY (site_id, fn, slot)
+  );
+  CREATE TABLE form_submissions (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    form TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    data_enc TEXT NOT NULL,
+    read_at INTEGER
+  );
+  CREATE INDEX form_submissions_site ON form_submissions(site_id, at);
+  CREATE TABLE alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at INTEGER NOT NULL,
+    level TEXT NOT NULL,
+    message TEXT NOT NULL,
+    site_id TEXT,
+    emailed_at INTEGER,
+    read_at INTEGER
+  );
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

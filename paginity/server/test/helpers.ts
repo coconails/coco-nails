@@ -12,9 +12,11 @@ export interface Client {
   call(method: string, url: string, payload?: unknown, headers?: Record<string, string>): Promise<{ status: number; json: any; headers: Record<string, any>; body: string }>;
 }
 
-export async function startPaginity(): Promise<Paginity & { dir: string }> {
+export async function startPaginity(opts: { isolation?: 'podman' | 'processus' } = {}): Promise<Paginity & { dir: string }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'paginity-test-'));
   const p = await createPaginity({
+    isolation: opts.isolation ?? 'processus',
+    scheduler: false,
     dataDir: dir,
     publicUrl: 'http://localhost:8080',
     rpId: 'localhost',

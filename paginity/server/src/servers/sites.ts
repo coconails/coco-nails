@@ -5,7 +5,26 @@ import type { Ctx } from '../context.js';
 import { adminOrigin } from '../config.js';
 import { getUser } from '../auth/service.js';
 import { now } from '../lib/util.js';
-import { serveStatic, simplePage } from './static.js';
+import { readRules, serveStatic, simplePage } from './static.js';
+import { handleFormPost, isFormPost } from '../functions/forms.js';
+import { isFunctionPath } from '../functions/routes.js';
+import { hasTestSecrets } from '../functions/secrets.js';
+
+export function clientIp(req: http.IncomingMessage): string {
+  if (process.env.PAGINITY_TRUST_PROXY === 'true') {
+    const h = req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0];
+    if (typeof h === 'string' && h.trim()) return h.trim();
+  }
+  return req.socket.remoteAddress ?? '';
+}
+
+function pathOf(req: http.IncomingMessage): string {
+  try {
+    return decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
+  } catch {
+    return '/';
+  }
+}
 
 function hostOf(req: http.IncomingMessage): string {
   return String(req.headers.host ?? '').toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
@@ -25,8 +44,19 @@ export function createSitesServer(ctx: Ctx): http.Server {
     } catch {
       return simplePage(res, 503, site.name, "Ce site n'est pas encore publié.");
     }
+    const rules = readRules(root);
+    if (isFormPost(req) && rules.forms?.length) {
+      handleFormPost(ctx, site, rules.forms, req, res, clientIp(req)).catch((e) => {
+        if (!res.headersSent) res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end((e as Error).message);
+      });
+      return;
+    }
+    if (rules.functionsDir && isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req))) {
+      void ctx.functions.proxy(site, 'production', req, res, clientIp(req));
+      return;
+    }
     serveStatic(root, req, res, {
-      functionsMessage: 'Les fonctions serveur de ce site ne sont pas encore actives sur PAGINITY (prévu en phase 3).',
+      functionsMessage: 'Ce site n’a pas de fonction serveur à cette adresse.',
     });
   });
 }
@@ -79,8 +109,21 @@ export function createPreviewServer(ctx: Ctx): http.Server {
     } catch {
       return simplePage(res, 404, 'Aperçu non préparé', 'Demandez un aperçu depuis PAGINITY.');
     }
+    const rules = readRules(root);
+    if (isFormPost(req) && rules.forms?.length) {
+      req.resume();
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      res.end('<!doctype html><meta charset="utf-8"><title>Aperçu</title><p>Aperçu : le formulaire fonctionne, mais rien n’a été envoyé ni enregistré.</p>');
+      return;
+    }
+    if (rules.functionsDir && hasTestSecrets(ctx, site.id) && (isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/'))) {
+      void ctx.functions.proxy(site, 'test', req, res, clientIp(req));
+      return;
+    }
     serveStatic(root, req, res, {
-      functionsMessage: 'Aperçu : les fonctions serveur ne sont pas exécutées (aucun SMS, e-mail ou paiement réel).',
+      functionsMessage: rules.functionsDir
+        ? 'Aperçu : les fonctions serveur ne sont pas exécutées tant qu’aucun secret de test n’est enregistré (aucun SMS, e-mail ou paiement réel).'
+        : 'Ce site n’a pas de fonction serveur à cette adresse.',
       extraHeaders: {
         'X-Robots-Tag': 'noindex, nofollow',
         'Cache-Control': 'no-store',

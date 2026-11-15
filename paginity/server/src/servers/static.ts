@@ -21,6 +21,8 @@ export interface VersionRules {
   version: string;
   redirects: Redirect[];
   headers: HeaderRule[];
+  forms?: { nom: string; piege: string | null; champs: string[] }[];
+  functionsDir?: string | null;
 }
 
 export const RULES_FILE = '.paginity.json';

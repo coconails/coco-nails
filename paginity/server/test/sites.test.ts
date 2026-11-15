@@ -116,7 +116,7 @@ describe('Sites : contenus, code, publication, versions', () => {
     expect(page.headers['x-robots-tag']).toContain('noindex');
     const fn = await getSite(p, url.hostname, '/api/reserver', { port });
     expect(fn.status).toBe(503);
-    expect(fn.body).toMatch(/aucun SMS/);
+    expect(fn.body).toMatch(/pas de fonction serveur/);
     // Lien expiré : refusé.
     p.ctx.db.prepare('UPDATE preview_links SET expires_at = 0').run();
     expect((await getSite(p, url.hostname, '/', { port })).status).toBe(404);

@@ -15,9 +15,11 @@
     "@fastify/static": "^10.1.11",
     "@node-rs/argon2": "^2.2.2",
     "@simplewebauthn/server": "^14.1.0",
+    "busboy": "^1.6.0",
     "diff": "^9.0.0",
     "fastify": "^5.12.8",
     "file-type": "^22.3.0",
+    "nodemailer": "^10.5.0",
     "qrcode": "^1.5.4",
     "sharp": "^0.35.5",
     "smol-toml": "^1.9.1",
@@ -27,11 +29,15 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.5",
     "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/qrcode": "^1.5.6",
+    "@types/smtp-server": "^3.5.13",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "otpauth": "^9.6.0",
+    "smtp-server": "^3.21.4",
     "tsx": "^4.23.15",
     "typescript": "5.9",
     "vitest": "^5.1.0"

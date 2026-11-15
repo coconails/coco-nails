@@ -6,6 +6,7 @@ import type { PaginityEvent } from '../lib/events.js';
 import type { PublicJob } from '../jobs/queue.js';
 import { now, UserError } from '../lib/util.js';
 import { requireOwner, requireUser } from './helpers.js';
+import { listAlerts } from '../lib/alerts.js';
 
 export const VERSION = '0.2.0';
 
@@ -22,9 +23,10 @@ function readTemperature(): number | null {
 }
 
 export interface Alert {
+  id?: number;
   niveau: 'information' | 'attention' | 'critique';
   message: string;
-  siteId?: string;
+  siteId?: string | null;
 }
 
 export function serverHealth(ctx: Ctx) {
@@ -51,6 +53,8 @@ export function serverHealth(ctx: Ctx) {
     memoire: { total: memTotal, libre: memFree, utilisePct: Math.round(((memTotal - memFree) / memTotal) * 1000) / 10, paginity: process.memoryUsage().rss },
     temperature: readTemperature(),
     disque,
+    isolation: ctx.functions.isolation.mode,
+    messagerie: ctx.mailer.configured(),
     sauvegardes: { configurees: false, message: 'Les sauvegardes automatiques hors du serveur seront mises en place à l’installation définitive (phase 4).' },
   };
 }
@@ -63,7 +67,10 @@ export function computeAlerts(ctx: Ctx, health: ReturnType<typeof serverHealth> 
     if (health.temperature !== null && health.temperature >= 80) alerts.push({ niveau: 'critique', message: `Température élevée : ${health.temperature} °C.` });
     else if (health.temperature !== null && health.temperature >= 75) alerts.push({ niveau: 'attention', message: `Température à surveiller : ${health.temperature} °C.` });
     if (!health.sauvegardes.configurees) alerts.push({ niveau: 'information', message: 'Sauvegardes automatiques pas encore configurées (prévu en phase 4).' });
+    if (!health.messagerie) alerts.push({ niveau: 'information', message: 'L’envoi d’e-mails (alertes, messages des formulaires) n’est pas configuré : Réglages de la plateforme.' });
+    if (health.isolation === 'processus') alerts.push({ niveau: 'information', message: 'Podman n’est pas installé : les fonctions des sites tournent dans des processus restreints (isolation plus faible).' });
   }
+  for (const a of listAlerts(ctx, siteIds)) alerts.push({ id: a.id, niveau: a.niveau, message: a.message, siteId: a.siteId });
   const sites = ctx.sites.all().filter((s) => siteIds === null || siteIds.includes(s.id));
   for (const s of sites) {
     if (s.last_publication_status === 'echouee') {
