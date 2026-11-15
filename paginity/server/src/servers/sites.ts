@@ -51,7 +51,7 @@ export function createSitesServer(ctx: Ctx): http.Server {
       });
       return;
     }
-    if (rules.functionsDir && isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req))) {
+    if (rules.functionsDir && (isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/'))) {
       void ctx.functions.proxy(site, 'production', req, res, clientIp(req));
       return;
     }
