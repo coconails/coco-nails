@@ -101,23 +101,25 @@ describe('Sites : contenus, code, publication, versions', () => {
     expect(m.json.fichiers.length).toBeGreaterThan(5); // jamais publié : tout est nouveau
   });
 
-  it('prépare un aperçu privé, inaccessible sans lien signé', async () => {
+  it('prépare un aperçu privé, accessible seulement par une adresse temporaire', async () => {
     const a = await c.call('POST', `/api/sites/${siteId}/apercu`, {});
     expect(a.status).toBe(200);
     const url = new URL(a.json.url);
+    expect(url.hostname).toMatch(new RegExp(`^${slug}--[a-z2-7]{16}\\.localhost$`));
     const port = p.ctx.config.previewPort;
-    const noToken = await getSite(p, `${slug}.localhost`, '/', { port });
-    expect(noToken.status).toBe(403);
-    const withToken = await getSite(p, `${slug}.localhost`, url.pathname + url.search, { port });
-    expect(withToken.status).toBe(303);
-    const cookie = String(withToken.headers['set-cookie']).split(';')[0];
-    const page = await getSite(p, `${slug}.localhost`, '/contenu/prestations.json', { port, cookie });
+    expect((await getSite(p, `${slug}.localhost`, '/', { port })).status).toBe(404);
+    expect((await getSite(p, `${slug}--aaaaaaaaaaaaaaaa.localhost`, '/', { port })).status).toBe(404);
+    const page = await getSite(p, url.hostname, '/contenu/prestations.json', { port });
     expect(page.status).toBe(200);
     expect(page.body).toContain('29 €');
     expect(page.headers['content-security-policy']).toContain('frame-ancestors http://localhost:8080');
-    const fn = await getSite(p, `${slug}.localhost`, '/api/reserver', { port, cookie });
+    expect(page.headers['x-robots-tag']).toContain('noindex');
+    const fn = await getSite(p, url.hostname, '/api/reserver', { port });
     expect(fn.status).toBe(503);
     expect(fn.body).toMatch(/aucun SMS/);
+    // Lien expiré : refusé.
+    p.ctx.db.prepare('UPDATE preview_links SET expires_at = 0').run();
+    expect((await getSite(p, url.hostname, '/', { port })).status).toBe(404);
   });
 
   let pub1: number;

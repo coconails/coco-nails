@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import type { Ctx } from '../context.js';
@@ -34,57 +35,44 @@ export function createSitesServer(ctx: Ctx): http.Server {
 // Aperçus privés
 // ---------------------------------------------------------------------------
 
-const COOKIE = 'paginity_apercu';
-const TOKEN_MS = 2 * 3_600_000;
+const LINK_MS = 2 * 3_600_000;
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 
-export function previewToken(ctx: Ctx, siteId: string, userId: string): string {
-  const payload = `${siteId}.${userId}.${now() + TOKEN_MS}`;
-  return `${Buffer.from(payload).toString('base64url')}.${ctx.vault.sign(`apercu:${payload}`)}`;
+/**
+ * Lien d'aperçu : une adresse temporaire et impossible à deviner, du type <site>--<code>.<domaine d'aperçu>.
+ * Pas de cookie (les navigateurs les bloquent de plus en plus dans les cadres) : c'est l'adresse elle-même qui donne l'accès,
+ * pendant 2 heures, et seulement tant que la personne a toujours accès au site.
+ */
+export function createPreviewLink(ctx: Ctx, siteId: string, slug: string, userId: string): string {
+  const bytes = crypto.randomBytes(16);
+  let code = '';
+  for (const b of bytes) code += ALPHABET[b % 32];
+  const label = `${slug}--${code}`.slice(0, 63);
+  ctx.db.prepare('DELETE FROM preview_links WHERE expires_at < ?').run(now());
+  ctx.db.prepare('INSERT INTO preview_links (label, site_id, user_id, expires_at) VALUES (?, ?, ?, ?)').run(label, siteId, userId, now() + LINK_MS);
+  return label;
 }
 
-function checkToken(ctx: Ctx, token: string | undefined, siteId: string): boolean {
-  if (!token) return false;
-  const [b64, sig] = token.split('.');
-  if (!b64 || !sig) return false;
-  const payload = Buffer.from(b64, 'base64url').toString('utf8');
-  if (ctx.vault.sign(`apercu:${payload}`) !== sig) return false;
-  const [sid, uid, exp] = payload.split('.');
-  if (sid !== siteId || Number(exp) < now()) return false;
-  const user = getUser(ctx, uid);
-  return !!user && !user.disabled && !!ctx.sites.role(user, siteId);
-}
-
-function readCookie(req: http.IncomingMessage, name: string): string | undefined {
-  const m = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(req.headers.cookie ?? '');
-  return m ? decodeURIComponent(m[1]) : undefined;
+function resolvePreview(ctx: Ctx, label: string) {
+  const row = ctx.db.prepare('SELECT * FROM preview_links WHERE label = ?').get(label) as { site_id: string; user_id: string; expires_at: number } | undefined;
+  if (!row || row.expires_at < now()) return null;
+  const site = ctx.sites.get(row.site_id);
+  const user = getUser(ctx, row.user_id);
+  if (!site || !user || user.disabled || !ctx.sites.role(user, site.id)) return null;
+  return site;
 }
 
 /**
  * Serveur des aperçus : sur une origine distincte de l'administration (D12), accessible seulement
- * avec un lien signé et temporaire. Les fonctions serveur n'y sont jamais exécutées avec les vrais secrets (D11).
+ * par un lien temporaire. Les fonctions serveur n'y sont jamais exécutées avec les vrais secrets (D11).
  */
 export function createPreviewServer(ctx: Ctx): http.Server {
   return http.createServer((req, res) => {
     const host = hostOf(req);
     const suffix = `.${ctx.config.previewBaseDomain}`;
-    const slug = host.endsWith(suffix) ? host.slice(0, -suffix.length) : '';
-    const site = slug ? ctx.sites.all().find((s) => s.slug === slug) : undefined;
-    if (!site) return simplePage(res, 404, 'Aperçu introuvable', "Cet aperçu n'existe pas.");
-    const url = new URL(req.url ?? '/', 'http://apercu.invalid');
-    const fromQuery = url.searchParams.get('jeton');
-    if (fromQuery) {
-      if (!checkToken(ctx, fromQuery, site.id)) return simplePage(res, 403, 'Lien expiré', "Ce lien d'aperçu a expiré. Ouvrez-en un nouveau depuis PAGINITY.");
-      url.searchParams.delete('jeton');
-      res.writeHead(303, {
-        Location: url.pathname + (url.search || ''),
-        'Set-Cookie': `${COOKIE}=${encodeURIComponent(fromQuery)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${TOKEN_MS / 1000}${ctx.config.previewProtocol === 'https' ? '; Secure' : ''}`,
-        'Cache-Control': 'no-store',
-      });
-      return res.end();
-    }
-    if (!checkToken(ctx, readCookie(req, COOKIE), site.id)) {
-      return simplePage(res, 403, 'Aperçu privé', 'Cet aperçu est réservé aux personnes connectées à PAGINITY. Ouvrez-le depuis l’administration.');
-    }
+    const label = host.endsWith(suffix) ? host.slice(0, -suffix.length) : '';
+    const site = /^[a-z0-9-]{1,63}$/.test(label) ? resolvePreview(ctx, label) : null;
+    if (!site) return simplePage(res, 404, 'Aperçu expiré ou introuvable', 'Ouvrez un nouvel aperçu depuis PAGINITY.');
     let root: string;
     try {
       root = fs.realpathSync(ctx.sites.previewLink(site));

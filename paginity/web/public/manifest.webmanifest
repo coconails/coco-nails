@@ -1,0 +1,14 @@
+{
+  "name": "PAGINITY",
+  "short_name": "PAGINITY",
+  "description": "Créer · Gérer · Publier · Suivre",
+  "lang": "fr",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1626",
+  "theme_color": "#0b1626",
+  "icons": [
+    { "src": "/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

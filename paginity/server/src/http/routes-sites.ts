@@ -13,7 +13,7 @@ import { createFromTemplate, exportSite, listTemplates } from '../sites/import.j
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import type { Entry, Field } from '../content/schema.js';
 import { buildPreview } from '../publish/pipeline.js';
-import { previewToken } from '../servers/sites.js';
+import { createPreviewLink } from '../servers/sites.js';
 import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -451,7 +451,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
     const r = await buildPreview(ctx, site);
-    return { ...r, url: `${previewOrigin(ctx.config, site.slug)}/?jeton=${encodeURIComponent(previewToken(ctx, site.id, user.id))}` };
+    return { ...r, url: `${previewOrigin(ctx.config, createPreviewLink(ctx, site.id, site.slug, user.id))}/` };
   });
 
   app.post('/api/sites/:id/publier', async (req) => {

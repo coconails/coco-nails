@@ -19,7 +19,7 @@ export async function createAdminApp(ctx: Ctx, opts: { logger?: boolean } = {}):
     logger: opts.logger ? { level: 'warn' } : false,
     bodyLimit: 3 * 1024 * 1024,
     trustProxy: process.env.PAGINITY_TRUST_PROXY === 'true',
-    disableRequestLogging: true,
+    
   });
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024, files: 1, fields: 10 } });
