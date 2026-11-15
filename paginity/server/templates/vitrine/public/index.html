@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{NOM_DU_SITE}}</title>
+  <meta name="description" content="{{NOM_DU_SITE}} — prestations, tarifs, horaires et contact.">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="hero" id="haut">
+    <div class="hero__texte">
+      <h1 data-champ="nom">{{NOM_DU_SITE}}</h1>
+      <p class="accroche" data-champ="accroche"></p>
+      <a class="bouton" href="#contact">Nous contacter</a>
+    </div>
+    <img class="hero__image" data-champ-image="image" alt="" hidden>
+  </header>
+  <main>
+    <section aria-labelledby="t-presentation">
+      <h2 id="t-presentation">Présentation</h2>
+      <p class="texte" data-champ="presentation"></p>
+    </section>
+    <section aria-labelledby="t-prestations">
+      <h2 id="t-prestations">Prestations et tarifs</h2>
+      <ul class="cartes" id="prestations"></ul>
+    </section>
+    <section aria-labelledby="t-horaires">
+      <h2 id="t-horaires">Horaires</h2>
+      <p class="alerte" id="fermeture" hidden></p>
+      <table class="horaires"><tbody id="horaires"></tbody></table>
+    </section>
+    <section aria-labelledby="t-faq">
+      <h2 id="t-faq">Questions fréquentes</h2>
+      <div id="faq"></div>
+    </section>
+    <section aria-labelledby="t-contact" id="contact">
+      <h2 id="t-contact">Contact</h2>
+      <p><a id="tel" href="#"></a></p>
+      <p><a id="mail" href="#"></a></p>
+      <p class="texte" data-champ="adresse"></p>
+    </section>
+  </main>
+  <footer><p>© <span id="annee"></span> <span data-champ="nom"></span></p></footer>
+  <script src="/site.js" defer></script>
+</body>
+</html>

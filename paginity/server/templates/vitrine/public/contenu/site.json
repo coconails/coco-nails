@@ -1,0 +1,9 @@
+{
+  "nom": "{{NOM_DU_SITE}}",
+  "accroche": "Bienvenue ! Présentez votre activité en une phrase.",
+  "presentation": "Décrivez ici ce que vous proposez, à qui, et ce qui vous rend unique. Ce texte se modifie dans PAGINITY, rubrique « Présentation ».",
+  "image": "",
+  "telephone": "01 23 45 67 89",
+  "email": "contact@exemple.fr",
+  "adresse": "1 rue de l'Exemple\n00000 Ma Ville"
+}

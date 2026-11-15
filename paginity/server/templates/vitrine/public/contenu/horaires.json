@@ -1,0 +1,12 @@
+{
+  "jours": [
+    { "jour": "Lundi", "ouvert": false, "heures": "" },
+    { "jour": "Mardi", "ouvert": true, "heures": "9 h – 12 h, 14 h – 18 h" },
+    { "jour": "Mercredi", "ouvert": true, "heures": "9 h – 12 h, 14 h – 18 h" },
+    { "jour": "Jeudi", "ouvert": true, "heures": "9 h – 12 h, 14 h – 18 h" },
+    { "jour": "Vendredi", "ouvert": true, "heures": "9 h – 12 h, 14 h – 18 h" },
+    { "jour": "Samedi", "ouvert": true, "heures": "9 h – 13 h" },
+    { "jour": "Dimanche", "ouvert": false, "heures": "" }
+  ],
+  "fermeture": ""
+}

@@ -1,0 +1,6 @@
+{
+  "prestations": [
+    { "nom": "Prestation découverte", "prix": "25 €", "duree": 30, "description": "Une première prestation pour faire connaissance." },
+    { "nom": "Prestation complète", "prix": "45 €", "duree": 60, "description": "La prestation la plus demandée." }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "questions": [
+    { "question": "Comment prendre rendez-vous ?", "reponse": "Par téléphone ou par e-mail : les coordonnées sont en bas de la page." },
+    { "question": "Quels moyens de paiement acceptez-vous ?", "reponse": "Espèces et carte bancaire." }
+  ]
+}

@@ -1,0 +1,113 @@
+# Champs modifiables du site (format Pages CMS, lu par PAGINITY)
+media:
+  input: public/images
+  output: /images
+
+content:
+  - name: site
+    label: Présentation
+    type: file
+    path: public/contenu/site.json
+    format: json
+    fields:
+      - name: nom
+        label: Nom du site
+        type: string
+        required: true
+      - name: accroche
+        label: Phrase d'accroche
+        type: string
+      - name: presentation
+        label: Présentation
+        type: text
+      - name: image
+        label: Photo d'accueil
+        type: image
+      - name: telephone
+        label: Téléphone
+        type: string
+        pattern: "^[0-9 +().-]*$"
+      - name: email
+        label: Adresse e-mail
+        type: string
+      - name: adresse
+        label: Adresse
+        type: text
+
+  - name: prestations
+    label: Prestations et tarifs
+    type: file
+    path: public/contenu/prestations.json
+    format: json
+    fields:
+      - name: prestations
+        label: Prestations
+        type: object
+        list: true
+        fields:
+          - name: nom
+            label: Nom
+            type: string
+            required: true
+          - name: prix
+            label: Prix
+            description: "Par exemple : 35 €"
+            type: string
+          - name: duree
+            label: Durée (minutes)
+            type: number
+            options:
+              min: 0
+              max: 600
+          - name: description
+            label: Description
+            type: text
+
+  - name: horaires
+    label: Horaires
+    type: file
+    path: public/contenu/horaires.json
+    format: json
+    fields:
+      - name: jours
+        label: Jours
+        type: object
+        list:
+          max: 7
+        fields:
+          - name: jour
+            label: Jour
+            type: select
+            required: true
+            options:
+              values: [Lundi, Mardi, Mercredi, Jeudi, Vendredi, Samedi, Dimanche]
+          - name: ouvert
+            label: Ouvert
+            type: boolean
+          - name: heures
+            label: Heures
+            description: "Par exemple : 9 h – 12 h, 14 h – 18 h"
+            type: string
+      - name: fermeture
+        label: Fermeture exceptionnelle (facultatif)
+        type: string
+
+  - name: faq
+    label: Questions fréquentes
+    type: file
+    path: public/contenu/faq.json
+    format: json
+    fields:
+      - name: questions
+        label: Questions
+        type: object
+        list: true
+        fields:
+          - name: question
+            label: Question
+            type: string
+            required: true
+          - name: reponse
+            label: Réponse
+            type: text
+            required: true
