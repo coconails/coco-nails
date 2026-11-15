@@ -6,6 +6,7 @@ Plateforme personnelle de création, d'hébergement, de gestion et de publicatio
 - Essayer le prototype : [../docs/GUIDE-PROTOTYPE.md](../docs/GUIDE-PROTOTYPE.md)
 - Architecture du programme : [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
 - Cahier des charges : [../docs/CAHIER-DES-CHARGES.md](../docs/CAHIER-DES-CHARGES.md)
+- Manuel d’utilisation (avec captures) : [../docs/MANUEL.md](../docs/MANUEL.md) — version imprimable : [MANUEL-PAGINITY.pdf](../docs/MANUEL-PAGINITY.pdf)
 - Comptes rendus : [phases 1 et 2](../docs/COMPTE-RENDU-PHASES-1-2.md), [phase 3](../docs/COMPTE-RENDU-PHASE-3.md)
 
 ```bash

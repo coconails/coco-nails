@@ -62,8 +62,8 @@ export function serverHealth(ctx: Ctx) {
 export function computeAlerts(ctx: Ctx, health: ReturnType<typeof serverHealth> | null, siteIds: string[] | null): Alert[] {
   const alerts: Alert[] = [];
   if (health) {
-    if (health.disque && health.disque.utilisePct >= 90) alerts.push({ niveau: 'critique', message: `Disque presque plein (${health.disque.utilisePct} %).` });
-    else if (health.disque && health.disque.utilisePct >= 80) alerts.push({ niveau: 'attention', message: `Disque rempli à ${health.disque.utilisePct} %.` });
+    if (health.disque && health.disque.utilisePct >= 90) alerts.push({ niveau: 'critique', message: `Disque presque plein (${health.disque.utilisePct.toLocaleString('fr-FR')} %).` });
+    else if (health.disque && health.disque.utilisePct >= 80) alerts.push({ niveau: 'attention', message: `Disque rempli à ${health.disque.utilisePct.toLocaleString('fr-FR')} %.` });
     if (health.temperature !== null && health.temperature >= 80) alerts.push({ niveau: 'critique', message: `Température élevée : ${health.temperature} °C.` });
     else if (health.temperature !== null && health.temperature >= 75) alerts.push({ niveau: 'attention', message: `Température à surveiller : ${health.temperature} °C.` });
     if (!health.sauvegardes.configurees) alerts.push({ niveau: 'information', message: 'Sauvegardes automatiques pas encore configurées (prévu en phase 4).' });

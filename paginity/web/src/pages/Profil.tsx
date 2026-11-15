@@ -76,6 +76,9 @@ export function ProfilPage() {
             {u.doubleAuthentification.totp ? (
               <Group gap="xs">
                 <Badge color="green">Activés</Badge>
+                <Button size="xs" variant="subtle" onClick={() => setTotpOpen(true)}>
+                  Changer de téléphone
+                </Button>
                 {u.doubleAuthentification.passkey && (
                   <Button size="xs" variant="subtle" color="red" onClick={() => void act(() => post('/api/profil/2fa/totp/desactiver'), 'Codes à 6 chiffres désactivés.')}>
                     Désactiver

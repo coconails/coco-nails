@@ -16,6 +16,14 @@ interface Tableau {
   activites: Activite[];
 }
 
+function lienAlerte(siteId: string, message: string): { to: string; label: string } {
+  if (/formulaire/i.test(message)) return { to: `/sites/${siteId}/formulaires`, label: 'Voir les messages' };
+  if (/tâche|fonction/i.test(message)) return { to: `/sites/${siteId}/fonctions`, label: 'Voir les tâches' };
+  return { to: `/sites/${siteId}/versions`, label: 'Voir les versions' };
+}
+
+const pct = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+
 export function TableauDeBordPage() {
   const etat = useEtat();
   const q = useQuery({ queryKey: ['tableau'], queryFn: () => get<Tableau>('/api/tableau-de-bord'), refetchInterval: 30_000 });
@@ -53,8 +61,8 @@ export function TableauDeBordPage() {
                   {a.siteId && (
                     <>
                       {' '}
-                      <Anchor component={Link} to={`/sites/${a.siteId}/versions`} size="sm">
-                        Voir les versions
+                      <Anchor component={Link} to={lienAlerte(a.siteId, a.message).to} size="sm">
+                        {lienAlerte(a.siteId, a.message).label}
                       </Anchor>
                     </>
                   )}
@@ -128,13 +136,13 @@ export function TableauDeBordPage() {
                   {q.data.serveur.disque && (
                     <div>
                       <Text size="sm">
-                        Disque : {q.data.serveur.disque.utilisePct} % utilisé ({taille(q.data.serveur.disque.libre)} libres)
+                        Disque : {pct(q.data.serveur.disque.utilisePct)} % utilisé ({taille(q.data.serveur.disque.libre)} libres)
                       </Text>
                       <Progress value={q.data.serveur.disque.utilisePct} color={q.data.serveur.disque.utilisePct > 80 ? 'red' : 'green'} />
                     </div>
                   )}
                   <div>
-                    <Text size="sm">Mémoire : {q.data.serveur.memoire.utilisePct} % utilisée</Text>
+                    <Text size="sm">Mémoire : {pct(q.data.serveur.memoire.utilisePct)} % utilisée</Text>
                     <Progress value={q.data.serveur.memoire.utilisePct} color={q.data.serveur.memoire.utilisePct > 90 ? 'red' : 'blue'} />
                   </div>
                   <Text size="sm">Température : {q.data.serveur.temperature !== null ? `${q.data.serveur.temperature} °C` : 'capteur non disponible'}</Text>
