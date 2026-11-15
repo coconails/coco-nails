@@ -65,19 +65,27 @@ function matchRedirect(rules: Redirect[], pathname: string): { to: string; statu
 
 const SAFE_HEADER = /^[A-Za-z0-9-]{1,64}$/;
 
+type Headers = Record<string, string | string[]>;
+
 export interface ServeOptions {
   extraHeaders?: Record<string, string>;
+  /**
+   * En-têtes imposés par PAGINITY, que les réglages du site ne peuvent pas remplacer (aperçus).
+   * Une politique de sécurité (CSP) du site est gardée en plus de la nôtre : le navigateur applique les deux.
+   */
+  enforcedHeaders?: Record<string, string>;
   /** Réponse pour les appels de fonctions serveur (non disponibles en phase 2). */
   functionsMessage: string;
 }
 
 export function serveStatic(root: string, req: IncomingMessage, res: ServerResponse, opts: ServeOptions): void {
   const rules = readRules(root);
-  const baseHeaders: Record<string, string> = {
+  const baseHeaders: Headers = {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Paginity-Version': rules.version,
     ...opts.extraHeaders,
+    ...opts.enforcedHeaders,
   };
   let url: URL;
   try {
@@ -138,10 +146,25 @@ export function serveStatic(root: string, req: IncomingMessage, res: ServerRespo
       }
     }
     if (!st || !st.isFile() || fs.lstatSync(file).isSymbolicLink()) return notFound(root, res, baseHeaders, req.method === 'HEAD');
-    sendFile(file, st, req, res, { ...baseHeaders, ...headersFor(rules.headers, pathname) });
+    sendFile(file, st, req, res, mergeEnforced({ ...baseHeaders, ...headersFor(rules.headers, pathname) }, opts.enforcedHeaders));
   } catch {
     notFound(root, res, baseHeaders, req.method === 'HEAD');
   }
+}
+
+/** Remet par-dessus les en-têtes imposés ; une CSP du site est conservée à côté de la nôtre (les deux s'appliquent). */
+export function mergeEnforced(h: Headers, enforced: Record<string, string> | undefined): Headers {
+  if (!enforced) return h;
+  const imposed = new Set(Object.keys(enforced).map((k) => k.toLowerCase()));
+  const out: Headers = {};
+  const siteCsp: string[] = [];
+  for (const [k, v] of Object.entries(h)) {
+    const lk = k.toLowerCase();
+    if (!imposed.has(lk)) out[k] = v;
+    else if (lk === 'content-security-policy') for (const x of [v].flat()) if (!Object.values(enforced).includes(x)) siteCsp.push(x);
+  }
+  for (const [k, v] of Object.entries(enforced)) out[k] = k.toLowerCase() === 'content-security-policy' && siteCsp.length ? [...siteCsp, v] : v;
+  return out;
 }
 
 function headersFor(rules: HeaderRule[], pathname: string): Record<string, string> {
@@ -153,11 +176,11 @@ function headersFor(rules: HeaderRule[], pathname: string): Record<string, strin
   return out;
 }
 
-function sendFile(file: string, st: fs.Stats, req: IncomingMessage, res: ServerResponse, headers: Record<string, string>, status = 200): void {
+function sendFile(file: string, st: fs.Stats, req: IncomingMessage, res: ServerResponse, headers: Headers, status = 200): void {
   const ext = path.extname(file).slice(1).toLowerCase();
   const etag = `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`;
   const isHtml = ext === 'html' || ext === 'htm';
-  const h: Record<string, string> = {
+  const h: Headers = {
     'Content-Type': TYPES[ext] ?? 'application/octet-stream',
     'Content-Length': String(st.size),
     'Cache-Control': isHtml || ext === 'json' ? 'no-cache' : 'public, max-age=3600',
@@ -177,7 +200,7 @@ function sendFile(file: string, st: fs.Stats, req: IncomingMessage, res: ServerR
   fs.createReadStream(file).on('error', () => res.destroy()).pipe(res);
 }
 
-function notFound(root: string, res: ServerResponse, headers: Record<string, string>, head: boolean): void {
+function notFound(root: string, res: ServerResponse, headers: Headers, head: boolean): void {
   const page = path.join(root, '404.html');
   const st = fs.statSync(page, { throwIfNoEntry: false });
   if (st?.isFile()) {

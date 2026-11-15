@@ -115,7 +115,7 @@ export function createPreviewServer(ctx: Ctx): http.Server {
     const versFonction = isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/');
     // Même ordre qu'en production : d'abord les fonctions, mais seulement avec des secrets de test (D11).
     if (rules.functionsDir && versFonction && hasTestSecrets(ctx, site.id)) {
-      void ctx.functions.proxy(site, 'test', req, res, clientIp(req));
+      void ctx.functions.proxy(site, 'test', req, res, clientIp(req), previewHeaders(ctx));
       return;
     }
     if (isFormPost(req) && rules.forms?.length && !versFonction) {
@@ -128,12 +128,22 @@ export function createPreviewServer(ctx: Ctx): http.Server {
       functionsMessage: rules.functionsDir
         ? 'Aperçu : les fonctions serveur ne sont pas exécutées tant qu’aucun secret de test n’est enregistré (aucun SMS, e-mail ou paiement réel).'
         : 'Ce site n’a pas de fonction serveur à cette adresse.',
-      extraHeaders: {
-        'X-Robots-Tag': 'noindex, nofollow',
-        'Cache-Control': 'no-store',
-        'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': `frame-ancestors ${adminOrigin(ctx.config)}`,
-      },
+      extraHeaders: { 'Cache-Control': 'no-store' },
+      enforcedHeaders: previewHeaders(ctx),
     });
   });
+}
+
+/**
+ * En-têtes de toutes les réponses d'aperçu, que le site ne peut pas remplacer :
+ * - la page ne peut s'afficher que dans PAGINITY (frame-ancestors) ;
+ * - elle ne peut appeler que sa propre adresse (connect-src) : pas le site en ligne, pas un service extérieur ;
+ * - ses formulaires ne partent que vers elle-même (form-action), où rien n'est envoyé pour de vrai.
+ */
+function previewHeaders(ctx: Ctx): Record<string, string> {
+  return {
+    'X-Robots-Tag': 'noindex, nofollow',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': `frame-ancestors ${adminOrigin(ctx.config)}; connect-src 'self'; form-action 'self'`,
+  };
 }

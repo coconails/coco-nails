@@ -5,7 +5,7 @@ import type { Ctx } from '../context.js';
 import type { SiteRow } from '../sites/service.js';
 import os from 'node:os';
 import { now, randomId, UserError } from '../lib/util.js';
-import { readRules } from '../servers/static.js';
+import { mergeEnforced, readRules } from '../servers/static.js';
 import { Isolation, type RunningWorker } from './isolation.js';
 import { secretValues, type SecretEnv } from './secrets.js';
 
@@ -248,12 +248,12 @@ export class FunctionService {
   }
 
   /** Transmet une requête de visiteur à l'exécuteur du site et renvoie sa réponse. */
-  async proxy(site: SiteRow, env: SecretEnv, req: http.IncomingMessage, res: http.ServerResponse, clientIp: string): Promise<void> {
+  async proxy(site: SiteRow, env: SecretEnv, req: http.IncomingMessage, res: http.ServerResponse, clientIp: string, enforced?: Record<string, string>): Promise<void> {
     let entry: WorkerEntry;
     try {
       entry = await this.ensure(site, env);
     } catch (e) {
-      res.writeHead(503, { 'content-type': 'application/json; charset=utf-8' });
+      res.writeHead(503, { 'content-type': 'application/json; charset=utf-8', ...enforced });
       res.end(JSON.stringify({ erreur: e instanceof UserError ? e.message : 'Fonctions indisponibles.' }));
       return;
     }
@@ -265,7 +265,7 @@ export class FunctionService {
         const h = { ...r.headers };
         delete h['x-paginity-fonction'];
         delete h['x-paginity-duree'];
-        res.writeHead(r.statusCode ?? 502, h);
+        res.writeHead(r.statusCode ?? 502, mergeEnforced(h as Record<string, string | string[]>, enforced));
         r.pipe(res);
         r.on('end', () => {
           if (fn !== '-') this.record(site.id, fn, 'appel', r.statusCode ?? 0, now() - started);
@@ -277,7 +277,7 @@ export class FunctionService {
       up.on('error', (e) => {
         if (!res.headersSent) {
           const timeout = e.message === 'timeout';
-          res.writeHead(timeout ? 504 : 502, { 'content-type': 'application/json; charset=utf-8' });
+          res.writeHead(timeout ? 504 : 502, { 'content-type': 'application/json; charset=utf-8', ...enforced });
           res.end(JSON.stringify({ erreur: timeout ? 'La fonction a mis trop de temps à répondre.' : 'Fonction indisponible.' }));
         } else res.destroy();
         this.record(site.id, '?', 'appel', 504, now() - started, e.message);

@@ -68,11 +68,29 @@ export function setSecret(ctx: Ctx, site: SiteRow, env: SecretEnv, name: unknown
   if (RESERVED.has(name) || name.startsWith('PAGINITY_')) throw new UserError(400, 'Ce nom est réservé par PAGINITY.');
   if (typeof value !== 'string' || value.length === 0) throw new UserError(400, 'La valeur est vide.');
   if (value.length > 16_384) throw new UserError(400, 'Valeur trop longue (16 000 caractères maximum).');
+  if (isSensitiveName(name)) {
+    // Une clé de test identique à la vraie clé permettrait à un aperçu d'envoyer de vrais SMS, e-mails ou paiements (D11).
+    const other: SecretEnv = env === 'production' ? 'test' : 'production';
+    const row = ctx.db.prepare('SELECT value_enc FROM site_secrets WHERE site_id = ? AND env = ? AND name = ?').get(site.id, other, name) as { value_enc: string } | undefined;
+    if (row && ctx.vault.decrypt(row.value_enc) === value) {
+      throw new UserError(
+        400,
+        env === 'test'
+          ? 'Cette valeur de test est identique à celle de production : un aperçu pourrait agir pour de vrai. Utilisez une clé de test (bac à sable) fournie par le service.'
+          : 'Cette valeur est identique à la valeur de test : les aperçus pourraient agir pour de vrai. Changez d’abord la valeur de test.',
+      );
+    }
+  }
   ctx.db
     .prepare(
       'INSERT INTO site_secrets (site_id, env, name, value_enc, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(site_id, env, name) DO UPDATE SET value_enc = excluded.value_enc, updated_at = excluded.updated_at, updated_by = excluded.updated_by',
     )
     .run(site.id, env, name, ctx.vault.encrypt(value), now(), userId);
+}
+
+/** Noms qui désignent une clé, un jeton ou un mot de passe (et non un simple réglage comme un nom d'expéditeur). */
+export function isSensitiveName(name: string): boolean {
+  return /(KEY|CLE|SECRET|TOKEN|JETON|PASSWORD|PASSWD|MOT_DE_PASSE|PASS|PRIVATE|PRIVEE|CREDENTIAL|AUTH|API)/i.test(name);
 }
 
 export function deleteSecret(ctx: Ctx, site: SiteRow, env: SecretEnv, name: string): void {

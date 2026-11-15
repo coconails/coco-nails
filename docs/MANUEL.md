@@ -256,7 +256,8 @@ Les boutons **Téléphone**, **Tablette** et **Ordinateur** montrent le site dan
 
 - **Actualiser** reprend vos dernières modifications. **Nouvel onglet** ouvre l'aperçu en grand. Ce lien reste
   valable 2 heures.
-- Dans l'aperçu, les formulaires, réservations, SMS et e-mails **ne déclenchent aucune action réelle**.
+- Dans l'aperçu, les formulaires, réservations, SMS et e-mails **ne déclenchent aucune action réelle**. Les pages
+  d'aperçu ne peuvent d'ailleurs appeler que leur propre adresse : jamais le site en ligne ni un service extérieur.
 
 ---
 
@@ -404,7 +405,8 @@ Les fonctions ont besoin de mots de passe et de clés pour parler à Google, OVH
 - PAGINITY **repère tout seul** les noms dont le code a besoin. Un « Manquant » orange signale ce qui reste à saisir.
 - **Production** : les valeurs utilisées par le site en ligne.
 - **Test** : les valeurs utilisées **uniquement dans l'aperçu**, avec des comptes de test (agenda de test…). Sans
-  secrets de test, les fonctions ne tournent pas dans l'aperçu.
+  secrets de test, les fonctions ne tournent pas dans l'aperçu. Par sécurité, PAGINITY **refuse une clé de test
+  identique à la clé de production** : utilisez la clé « bac à sable » ou « test » que fournit le service.
 
 Cliquez sur **Définir** (ou **Remplacer**), saisissez la valeur, puis **Enregistrer**.
 
