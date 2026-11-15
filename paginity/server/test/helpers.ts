@@ -9,7 +9,7 @@ import { createPaginity, type Paginity } from '../src/main.js';
 export interface Client {
   cookies: Map<string, string>;
   csrf: string;
-  call(method: string, url: string, payload?: unknown, headers?: Record<string, string>): Promise<{ status: number; json: any; headers: Record<string, any>; body: string }>;
+  call(method: string, url: string, payload?: unknown, headers?: Record<string, string>): Promise<{ status: number; json: any; headers: Record<string, any>; body: string; raw: Buffer }>;
 }
 
 export async function startPaginity(opts: { isolation?: 'podman' | 'processus'; dataDir?: string } = {}): Promise<Paginity & { dir: string }> {
@@ -63,7 +63,7 @@ export function client(p: Paginity): Client {
       } catch {
         /* pas du JSON */
       }
-      return { status: res.statusCode, json, headers: res.headers, body: res.body };
+      return { status: res.statusCode, json, headers: res.headers, body: res.body, raw: res.rawPayload };
     },
   };
   return c;

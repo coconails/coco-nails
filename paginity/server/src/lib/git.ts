@@ -211,6 +211,15 @@ export class Repo {
     });
   }
 
+  /** Chemins enregistrés comme liens symboliques (mode 120000) dans une version. */
+  async symlinksAt(rev: string): Promise<string[]> {
+    const out = await git(this.dir, ['ls-tree', '-r', '-z', '--full-tree', rev]);
+    return out
+      .split('\0')
+      .filter((l) => l.startsWith('120000 '))
+      .map((l) => l.split('\t')[1]);
+  }
+
   async bundle(dest: string): Promise<void> {
     await git(this.dir, ['bundle', 'create', dest, '--all']);
   }

@@ -438,8 +438,11 @@ Ouvrez **Réglages** dans le menu du site.
   3. envoyez-lui le lien affiché (valable 7 jours, utilisable une seule fois).
 
   La personne crée son mot de passe puis configure sa double authentification.
-- **Exporter** télécharge une archive complète : fichiers du site, données et tout l'historique. Elle est utilisable
-  ailleurs, sans PAGINITY. Les secrets ne sont jamais exportés.
+- **Exporter** télécharge une archive complète : fichiers du site, données, messages des formulaires et tout
+  l'historique. Elle est utilisable ailleurs, sans PAGINITY, et peut être **réimportée** dans PAGINITY
+  (*Ajouter un site › Importer une archive*) : le site est reconstruit avec son historique et ses messages.
+  Les secrets ne sont jamais exportés : seuls leurs noms sont indiqués, pour les ressaisir. L'archive contient des
+  données personnelles (messages) : conservez-la en lieu sûr.
 - **Supprimer le site** (propriétaire seulement) demande de retaper le nom du site. Pensez à exporter avant.
 
 ---

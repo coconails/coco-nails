@@ -7,8 +7,10 @@ import type { Ctx } from '../context.js';
 import type { UserRow } from '../auth/service.js';
 import { getUser } from '../auth/service.js';
 import { audit } from '../lib/audit.js';
-import { UserError } from '../lib/util.js';
+import { randomId, UserError } from '../lib/util.js';
 import { assertNoSymlinks, removeTree } from '../publish/build.js';
+import { git, Repo } from '../lib/git.js';
+import { listSubmissions } from '../functions/forms.js';
 import type { JobRun } from '../jobs/queue.js';
 import { readManifest } from './manifest.js';
 import type { SiteRow } from './service.js';
@@ -94,11 +96,59 @@ export function cloneGit(url: string, dest: string): Promise<void> {
 
 export const IMPORT_STEPS = ['Recevoir les fichiers', 'Vérifier', 'Créer le site', 'Analyser'];
 
+/** Archive d'export PAGINITY : historique Git + fichiers + données (+ messages des formulaires). */
+interface ExportLayout {
+  base: string;
+  bundle: string;
+  meta: { nom?: string; secretsARessaisir?: string[] };
+}
+
+export function detectExport(staging: string): ExportLayout | null {
+  const bundle = path.join(staging, 'historique.bundle');
+  if (!fs.existsSync(bundle) || !(fs.existsSync(path.join(staging, 'paginity-export.json')) || fs.existsSync(path.join(staging, 'site')))) return null;
+  let meta: ExportLayout['meta'] = {};
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(staging, 'paginity-export.json'), 'utf8'));
+    if (m && m.format === 'paginity-export') meta = m;
+  } catch {
+    /* ancien format d'export, sans fiche : historique + site/ seulement */
+  }
+  return { base: staging, bundle, meta };
+}
+
+const SECRET_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+
+/** Réinsère les messages de formulaires d'un export (chiffrés comme à la réception). */
+function importSubmissions(ctx: Ctx, siteId: string, file: string): number {
+  if (!fs.existsSync(file) || fs.statSync(file).size > 50 * 1024 * 1024) return 0;
+  let list: unknown;
+  try {
+    list = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return 0;
+  }
+  if (!Array.isArray(list)) return 0;
+  let n = 0;
+  const ins = ctx.db.prepare('INSERT INTO form_submissions (id, site_id, form, at, data_enc, read_at) VALUES (?, ?, ?, ?, ?, ?)');
+  for (const m of list.slice(0, 100_000)) {
+    if (!m || typeof m !== 'object') continue;
+    const r = m as { formulaire?: unknown; le?: unknown; lu?: unknown; donnees?: unknown };
+    if (typeof r.formulaire !== 'string' || typeof r.le !== 'number' || !r.donnees || typeof r.donnees !== 'object') continue;
+    const data: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r.donnees as Record<string, unknown>).slice(0, 60)) data[String(k).slice(0, 100)] = String(v ?? '').slice(0, 20_000);
+    ins.run(randomId('f'), siteId, r.formulaire.slice(0, 100), r.le, ctx.vault.encrypt(JSON.stringify(data)), r.lu ? r.le : null);
+    n++;
+  }
+  return n;
+}
+
 export async function runImport(ctx: Ctx, run: JobRun): Promise<unknown> {
   const user = getUser(ctx, run.userId!) as UserRow;
   const p = run.payload as { nom: string; zip?: string; git?: string };
   const staging = path.join(ctx.config.dataDir, 'temporaire', `import-${run.id}`);
+  const depot = path.join(ctx.config.dataDir, 'temporaire', `import-${run.id}-depot`);
   removeTree(staging);
+  removeTree(depot);
   fs.mkdirSync(staging, { recursive: true });
   try {
     await run.step('Recevoir les fichiers', async () => {
@@ -110,33 +160,58 @@ export async function runImport(ctx: Ctx, run: JobRun): Promise<unknown> {
       }
       throw new UserError(400, 'Rien à importer.');
     }, (n) => (p.zip ? `${n} fichiers extraits de l'archive.` : 'Dépôt récupéré.'));
+    let exp: ExportLayout | null = null;
+    let repoSource = staging;
     const manifest = await run.step('Vérifier', async () => {
       removeTree(path.join(staging, '.git'));
       // Un dépôt Git peut contenir des liens symboliques (une archive ZIP est déjà refusée dans ce cas).
       assertNoSymlinks(staging);
       flattenSingleFolder(staging);
-      const m = readManifest(staging);
-      if (!fs.existsSync(path.join(staging, m.publishDir === '.' ? '' : m.publishDir, 'index.html'))) {
+      exp = detectExport(staging);
+      if (exp) {
+        // Export PAGINITY : l'historique complet est reconstruit à partir du fichier « historique.bundle ».
+        await git(path.dirname(depot), ['clone', '-q', exp.bundle, depot]);
+        await git(depot, ['remote', 'remove', 'origin']).catch(() => undefined);
+        const links = await new Repo(depot).symlinksAt('HEAD');
+        if (links.length) throw new UserError(422, `L’historique contient un lien symbolique (${links.slice(0, 5).join(', ')}), refusé par sécurité.`);
+        assertNoSymlinks(depot);
+        repoSource = depot;
+      }
+      const m = readManifest(repoSource);
+      if (!fs.existsSync(path.join(repoSource, m.publishDir === '.' ? '' : m.publishDir, 'index.html'))) {
         throw new UserError(422, 'Aucune page d’accueil (index.html) trouvée. Vérifiez le contenu de l’archive.');
       }
       return m;
-    }, (m) => `Dossier publié : « ${m.publishDir} » (fiche ${m.source}).`);
+    }, (m) => `Dossier publié : « ${m.publishDir} » (fiche ${m.source})${exp ? ', export PAGINITY reconnu : historique conservé' : ''}.`);
+    const layout = exp as ExportLayout | null;
     const site = await run.step('Créer le site', () =>
       ctx.sites.createSite({
         name: p.nom,
         user,
-        message: p.zip ? 'Import du site (archive ZIP)' : `Import du site depuis ${p.git}`,
+        keepHistory: !!layout,
+        message: layout ? 'Réimport d’un export PAGINITY' : p.zip ? 'Import du site (archive ZIP)' : `Import du site depuis ${p.git}`,
         fill: async (repoDir) => {
           fs.rmSync(repoDir, { recursive: true, force: true });
-          fs.renameSync(staging, repoDir);
+          fs.renameSync(repoSource, repoDir);
         },
       }),
     (s) => `Site « ${s.name} » créé.`);
-    const info = await run.step('Analyser', async () => manifest.warnings, (w) => (w.length ? w.join(' ') : 'Aucune remarque.'));
-    audit(ctx.db, { userId: user.id, action: 'import_site', siteId: site.id, details: { source: p.zip ? 'zip' : p.git } });
+    const remarques = [...manifest.warnings];
+    if (layout) {
+      const donnees = path.join(layout.base, 'donnees');
+      if (fs.existsSync(donnees)) fs.cpSync(donnees, ctx.sites.dataDir(site), { recursive: true, filter: (src) => !fs.lstatSync(src).isSymbolicLink() });
+      const n = importSubmissions(ctx, site.id, path.join(layout.base, 'formulaires.json'));
+      const commits = (await git(ctx.sites.repoDir(site), ['rev-list', '--count', 'HEAD'])).trim();
+      remarques.unshift(`Historique conservé (${commits} enregistrements), ${n} message(s) de formulaires réimporté(s). Les publications de l’ancien serveur ne sont pas reprises : publiez le site.`);
+      const noms = (layout.meta.secretsARessaisir ?? []).filter((x) => typeof x === 'string' && SECRET_NAME.test(x));
+      if (noms.length) remarques.push(`Secrets à ressaisir (ils ne sont jamais exportés) : ${noms.join(', ')}.`);
+    }
+    const info = await run.step('Analyser', async () => remarques, (w) => (w.length ? w.join(' ') : 'Aucune remarque.'));
+    audit(ctx.db, { userId: user.id, action: 'import_site', siteId: site.id, details: { source: layout ? 'export' : p.zip ? 'zip' : p.git } });
     return { siteId: site.id, remarques: info };
   } finally {
     removeTree(staging);
+    removeTree(depot);
     if (p.zip) fs.rmSync(p.zip, { force: true });
   }
 }
@@ -195,6 +270,19 @@ export async function exportSite(ctx: Ctx, site: SiteRow): Promise<NodeJS.Readab
   add(ctx.sites.repoDir(site), 'site');
   add(ctx.sites.dataDir(site), 'donnees');
   zip.addFile(tmp, 'historique.bundle');
+  const secrets = ctx.db.prepare('SELECT DISTINCT name FROM site_secrets WHERE site_id = ? ORDER BY name').all(site.id) as { name: string }[];
+  zip.addBuffer(
+    Buffer.from(
+      JSON.stringify(
+        { format: 'paginity-export', version: 1, nom: site.name, exporteLe: new Date().toISOString(), secretsARessaisir: secrets.map((x) => x.name) },
+        null,
+        2,
+      ),
+    ),
+    'paginity-export.json',
+  );
+  // Messages des formulaires (données personnelles : l'export est réservé aux administrateurs, après confirmation d'identité).
+  zip.addBuffer(Buffer.from(JSON.stringify(listSubmissions(ctx, site.id).reverse(), null, 2)), 'formulaires.json');
   zip.addBuffer(
     Buffer.from(
       [
@@ -203,8 +291,11 @@ export async function exportSite(ctx: Ctx, site: SiteRow): Promise<NodeJS.Readab
         'site/               fichiers du site (brouillon actuel), utilisables sur n’importe quel hébergeur',
         'donnees/            données propres au site (hors historique)',
         'historique.bundle   tout l’historique Git ; pour le récupérer : git clone historique.bundle mon-site',
+        'formulaires.json    messages reçus par les formulaires du site (données personnelles : à conserver en sécurité)',
+        'paginity-export.json fiche de l’export (nom du site, noms des secrets à ressaisir)',
         '',
-        'Les secrets (mots de passe, clés) ne sont jamais exportés.',
+        'Pour reconstruire le site dans PAGINITY : « Ajouter un site » › « Importer une archive » › cette archive ZIP.',
+        'Les secrets (mots de passe, clés) ne sont jamais exportés : seuls leurs noms sont listés, pour les ressaisir.',
       ].join('\n'),
     ),
     'LISEZMOI.txt',

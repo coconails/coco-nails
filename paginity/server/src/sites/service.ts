@@ -181,7 +181,7 @@ export class SiteService {
    * Crée l'enregistrement et les dossiers d'un site. `fill` remplit le dossier source
    * (copie d'un modèle, import…). En cas d'échec, tout est nettoyé.
    */
-  async createSite(input: { name: string; user: UserRow; fill: (repoDir: string) => Promise<void>; message: string }): Promise<SiteRow> {
+  async createSite(input: { name: string; user: UserRow; fill: (repoDir: string) => Promise<void>; message: string; keepHistory?: boolean }): Promise<SiteRow> {
     const name = input.name.trim().slice(0, 80);
     if (!name) throw new UserError(400, 'Donnez un nom au site.');
     const id = randomId('s');
@@ -203,17 +203,22 @@ export class SiteService {
       fs.mkdirSync(this.dataDir(site), { recursive: true });
       fs.mkdirSync(path.join(dir, 'journaux'), { recursive: true });
       await input.fill(this.repoDir(site));
-      // Les dossiers techniques importés ne doivent pas entrer dans l'historique.
-      fs.rmSync(path.join(this.repoDir(site), '.git'), { recursive: true, force: true });
-      fs.rmSync(path.join(this.repoDir(site), 'node_modules'), { recursive: true, force: true });
       const repo = this.repo(site);
-      await repo.init();
+      if (input.keepHistory) {
+        // Réimport d'un export PAGINITY : l'historique Git reconstruit est conservé tel quel.
+        if (!(await repo.head())) throw new UserError(422, 'L’historique de l’archive est vide ou illisible.');
+      } else {
+        // Les dossiers techniques importés ne doivent pas entrer dans l'historique.
+        fs.rmSync(path.join(this.repoDir(site), '.git'), { recursive: true, force: true });
+        await repo.init();
+      }
+      fs.rmSync(path.join(this.repoDir(site), 'node_modules'), { recursive: true, force: true });
       if (!fs.existsSync(path.join(this.repoDir(site), 'paginity.yml'))) {
         const m = readManifest(this.repoDir(site));
         writeManifest(this.repoDir(site), m);
       }
       const commit = await repo.commitAll(input.message, authorOf(input.user));
-      if (!commit) throw new UserError(400, 'Le site est vide.');
+      if (!commit && !input.keepHistory) throw new UserError(400, 'Le site est vide.');
       this.ctx.db
         .prepare('INSERT INTO sites (id, space_id, slug, name, domains, created_at, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(site.id, site.space_id, site.slug, site.name, site.domains, site.created_at, site.created_by);
