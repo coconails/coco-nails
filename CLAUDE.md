@@ -48,6 +48,14 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   Formation (accents et majuscules indifférents, même réglé « Disponible ») → jours fermés sur le site (`fermetureAgenda` dans
   agenda.mjs, renvoyés par `/api/disponibilites` sans les titres, refusés par `/api/reserver`). Sans publication.
   Les « Fermetures exceptionnelles » de Pages CMS restent possibles (elles coûtent une publication).
+- SEO (15/11/2026) : commande de build Netlify `node netlify/preparer-page.mjs` qui écrit dans public/index.html, depuis
+  public/contenu/*.json, la carte beauté, les options, la FAQ, les horaires, le téléphone et les cadres des photos d'accueil
+  (le JS de la page vide puis réaffiche ces zones, les photos sont glissées dans les cadres), remplace le JSON-LD par un
+  @graph NailSalon (téléphone, zone desservie = 16 communes du Val de Sarthe + Noyen, priceRange, OfferCatalog des soins)
+  + FAQPage, et date le sitemap. En cas d'erreur, la page est laissée telle quelle. Titre « Prothésiste ongulaire à
+  Saint-Jean-du-Bois (Sarthe) | Coco Nail's », phrase Val de Sarthe + accès/parking dans « Un espace rien que pour vous »,
+  page `public/404.html`. Nom commercial : toujours « Coco Nail's » (pas « Coco Nails 72 »). Pas de texte caché, pas de llms.txt.
+  Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.

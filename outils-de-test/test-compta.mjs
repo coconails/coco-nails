@@ -470,6 +470,22 @@ if (process.argv[2] !== "--serveur") {
   rs = await reserver(new Request(O + "/api/reserver", { method: "POST", body: JSON.stringify({ nom: "Zoé Ok", email: "z@example.com", telephone: "06 01 02 03 04", soin: "Dépose", options: [], date: "2027-03-30", debut: 600 }) }));
   ok(rs.status === 200, "Réserver le lendemain d'un « Repas de famille » toute la journée : accepté");
 
+  console.log("— Préparation de la page pour Google (build Netlify)");
+  const PP = await imp("netlify/preparer-page.mjs");
+  const brut = readFileSync(RACINE + "public/index.html", "utf8");
+  const cts = PP.contenus(); cts.co = { ...cts.co, telephone: "07 68 22 70 15" };
+  const prete = PP.preparer(brut, cts);
+  ok(prete.includes("Pose semi-permanent</h3>") && prete.includes('<summary>') && prete.includes("<td>Lundi</td>") && prete.includes('href="tel:0768227015"'),
+    "Carte beauté, FAQ, horaires et téléphone écrits dans la page");
+  ok(PP.preparer(prete, cts) === prete, "Relancer la préparation ne duplique rien");
+  const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(prete)[1]);
+  const salon = ld["@graph"][0];
+  ok(salon["@type"] === "NailSalon" && salon.telephone === "+33768227015" && salon.areaServed.length === 17 && salon.hasOfferCatalog.itemListElement.length >= 7,
+    `Données structurées : salon, téléphone, ${salon.areaServed.length} communes, ${salon.hasOfferCatalog.itemListElement.length} prestations`);
+  ok(ld["@graph"][1]["@type"] === "FAQPage" && !JSON.stringify(ld).includes("SIRET"), "FAQ structurée, aucun SIRET inventé");
+  ok(!/<title>[^<]*Coco Nails 72/.test(prete) && /<title>Prothésiste ongulaire à Saint-Jean-du-Bois \(Sarthe\) \| Coco Nail's<\/title>/.test(prete), "Titre : « Prothésiste ongulaire à Saint-Jean-du-Bois (Sarthe) | Coco Nail's »");
+  ok(readFileSync(RACINE + "public/404.html", "utf8").includes('content="noindex"'), "Page 404 en français, non indexée");
+
   console.log("— Tableau non partagé");
   G.tableauPartage = false;
   const { default: fraiche } = await import(RACINE + "netlify/functions/compta.mjs?neuf");

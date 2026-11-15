@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coco Nail's — Prothésiste ongulaire à Saint-Jean-du-Bois (72430)</title>
-<meta name="description" content="Coco Nail's, prothésiste ongulaire diplômée à Saint-Jean-du-Bois (Sarthe) : semi-permanent, gainage, rallongement gel, remplissage, nail art. Réservez votre créneau en ligne.">
+<title>Prothésiste ongulaire à Saint-Jean-du-Bois (Sarthe) | Coco Nail's</title>
+<meta name="description" content="Coco Nail's, prothésiste ongulaire diplômée à Saint-Jean-du-Bois, près de La Suze-sur-Sarthe : semi-permanent, gainage, gel, remplissage, nail art. Tarifs et réservation en ligne.">
 <link rel="icon" type="image/png" href="/images/favicon.png">
 <link rel="canonical" href="https://coconails72.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://coconails72.com/">
-<meta property="og:title" content="Coco Nail's, prothésiste ongulaire à Saint-Jean-du-Bois">
+<meta property="og:title" content="Coco Nail's, prothésiste ongulaire à Saint-Jean-du-Bois (Val de Sarthe)">
 <meta property="og:description" content="Semi-permanent, gainage, rallongement gel et nail art à main levée. Réservez votre créneau en ligne.">
 <meta property="og:image" content="https://coconails72.com/images/nails-fleurs-roses.webp">
 <script type="application/ld+json">
@@ -19,6 +19,7 @@
  "name": "Coco Nail's",
  "url": "https://coconails72.com/",
  "email": "contact@coconails72.com",
+ "telephone": "+33768227015",
  "image": "https://coconails72.com/images/nails-fleurs-roses.webp",
  "logo": "https://coconails72.com/images/logo-coco-nails.webp",
  "description": "Prothésiste ongulaire diplômée à Saint-Jean-du-Bois : semi-permanent, gainage, rallongement gel, remplissages, nail art à main levée.",
@@ -183,7 +184,7 @@ section{padding:84px 0}
 
 /* Carte des soins */
 .soins .entete-section{max-width:640px;margin-bottom:34px}
-.sous-titre-carte{margin:-.3em 0 .8em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.85rem;color:var(--caramel)}
+.sous-titre-carte{margin:-.3em 0 .8em;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:.85rem;color:#7a4f22}
 .carte{list-style:none;margin:0;padding:0;columns:2;column-gap:60px}
 .carte li{break-inside:avoid;padding:20px 0;border-bottom:1px solid var(--rose)}
 .carte .ligne{display:flex;align-items:baseline;gap:10px}
@@ -197,6 +198,7 @@ section{padding:84px 0}
 .espace{background:var(--rose);position:relative;overflow:hidden}
 .espace::after{content:"";position:absolute;inset:0;background:var(--leopard);background-size:150px;opacity:.06;pointer-events:none}
 .espace .wrap{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:center;position:relative;z-index:1}
+.acces{color:var(--gris);font-size:.98rem;margin:-6px 0 18px}
 .adresse{font-family:var(--display);font-style:italic;font-size:clamp(1.6rem,3.5vw,2.2rem);line-height:1.25;color:var(--bordeaux);margin:0 0 18px}
 .photos-duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .photos-duo img{border-radius:var(--ongle);aspect-ratio:3/4;object-fit:cover;width:100%;box-shadow:0 20px 40px -22px rgba(94,15,28,.6)}
@@ -559,7 +561,9 @@ dialog[open]{animation:ouvre .3s ease-out}
     <div>
       <h2 id="t-venir">Un espace rien que pour vous</h2>
       <p>Coralie vous reçoit dans un espace beauté entièrement aménagé, calme et chaleureux.</p>
+      <p>En plein cœur du Val de Sarthe, à quelques minutes de La Suze-sur-Sarthe, Malicorne-sur-Sarthe et Noyen-sur-Sarthe.</p>
       <p class="adresse" data-adresse>23 rue du Bonvouloir<br>72430 Saint-Jean-du-Bois</p>
+      <p class="acces">Quelques minutes depuis La Suze-sur-Sarthe, Fercé-sur-Sarthe ou Chemiré-le-Gaudin, environ 15 à 20 minutes depuis Malicorne, Noyen, Cérans-Foulletourte, Guécélard ou Spay. Parking facile sur place.</p>
       <a class="btn btn-plein" data-maps href="#" rel="noopener">Voir sur Google Maps</a>
     </div>
     <div class="photos-duo" data-duo></div>
@@ -708,7 +712,7 @@ dialog[open]{animation:ouvre .3s ease-out}
 
     // ---- Main et défilé ----
     var main=document.querySelector('[data-main]');
-    photos.slice(0,5).forEach(function(p,i){var d=el('div',{'class':'ongle o'+(i+1)});d.appendChild(el('img',{src:img(p.image),alt:''}));main.appendChild(d)});
+    photos.slice(0,5).forEach(function(p,i){var d=main.children[i]||main.appendChild(el('div',{'class':'ongle o'+(i+1)}));if(!d.querySelector('img'))d.appendChild(el('img',{src:img(p.image),alt:''}))});
     var p1=document.querySelector('[data-piste="1"]'),p2=document.querySelector('[data-piste="2"]');
     photos.forEach(function(p,i){var b=el('button',{type:'button'});b.appendChild(el('img',{src:img(p.image),alt:p.description||"Réalisation Coco Nail's",width:560,height:560,loading:'lazy'}));(i%2?p2:p1).appendChild(b)});
     [p1,p2].forEach(function(p){Array.from(p.children).forEach(function(b){var c=b.cloneNode(true);c.setAttribute('aria-hidden','true');c.tabIndex=-1;p.appendChild(c)})});
@@ -732,7 +736,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     }
 
     // ---- Carte des soins ----
-    var zone=document.querySelector('[data-soins]'),groupes={},ordreG=[];
+    var zone=document.querySelector('[data-soins]'),groupes={},ordreG=[];zone.textContent='';
     soins.forEach(function(s){var g=s.categorie||'Les soins';if(!groupes[g]){groupes[g]=[];ordreG.push(g)}groupes[g].push(s)});
     ordreG.forEach(function(g){
       var bloc=el('div',{'class':'carte-groupe'});bloc.appendChild(el('h3',null,g));var ul=el('ul',{'class':'carte'});
@@ -746,7 +750,7 @@ dialog[open]{animation:ouvre .3s ease-out}
       });
       bloc.appendChild(ul);zone.appendChild(bloc);
     });
-    var zo=document.querySelector('[data-options]');
+    var zo=document.querySelector('[data-options]');zo.textContent='';
     options.forEach(function(o){var d=el('div',{'class':'option'});d.appendChild(el('h4',null,o.nom));if(o.description)d.appendChild(el('p',null,o.description));d.appendChild(el('strong',null,(o.prix||'')+(o.duree?', environ '+fmtDuree(+o.duree)+' en plus':'')));zo.appendChild(d)});
     if(!options.length)zo.parentNode.hidden=true;
     // ---- Paiement accepté sur place ----
@@ -765,7 +769,7 @@ dialog[open]{animation:ouvre .3s ease-out}
       z.appendChild(ul);if(pa.precision)z.appendChild(el('p',null,pa.precision));z.hidden=false})}
 
     // ---- Questions ----
-    var fq=document.querySelector('[data-faq]');
+    var fq=document.querySelector('[data-faq]');fq.textContent='';
     faq.forEach(function(q){if(!q.question)return;var d=el('details');d.appendChild(el('summary',null,q.question));d.appendChild(el('p',null,q.reponse||''));fq.appendChild(d)});
 
     // ---- Horaires, fériés, fermetures ----
@@ -787,7 +791,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     if(avis)document.querySelectorAll('[data-avis-ferie]').forEach(function(a){a.textContent=avis;a.hidden=false});
     }
     majStatut();
-    var tb=document.querySelector('[data-table-horaires]'),jourAuj=nomJour(now.jour);
+    var tb=document.querySelector('[data-table-horaires]'),jourAuj=nomJour(now.jour);tb.textContent='';
     ORDRE.forEach(function(j){var h=semaine[j];if(!h)return;var tr=el('tr');if(j===jourAuj)tr.className='aujourdhui';tr.appendChild(el('td',null,j.charAt(0).toUpperCase()+j.slice(1)));var a=enMinutes(h.debut),b=enMinutes(h.fin);tr.appendChild(el('td',null,(h.ouvert&&a!=null&&b!=null)?fmtHeure(a)+' – '+fmtHeure(b):'Fermé'));tb.appendChild(tr)});
 
     // ---- Réservation ----
@@ -870,7 +874,7 @@ dialog[open]{animation:ouvre .3s ease-out}
     if(adr.length){var a=document.querySelector('[data-adresse]');a.textContent='';a.appendChild(document.createTextNode(adr[0]));if(adr[1]){a.appendChild(el('br'));a.appendChild(document.createTextNode(adr[1]))}document.querySelectorAll('[data-adresse-ligne],[data-adresse-ligne-texte]').forEach(function(n){n.textContent=adr.join(', ')})}
     if(co.lien_google_maps)document.querySelectorAll('[data-maps]').forEach(function(a){a.href=co.lien_google_maps});
     if(co.instagram){var ig='https://www.instagram.com/'+co.instagram.replace(/^@/,'')+'/';document.querySelectorAll('[data-instagram]').forEach(function(a){a.href=ig;if(/^@/.test(a.textContent))a.textContent='@'+co.instagram.replace(/^@/,'')})}
-    if(co.telephone){var dd=document.querySelector('[data-tel-dd]');dd.hidden=false;document.querySelector('[data-tel-dt]').hidden=false;dd.appendChild(el('a',{href:'tel:'+co.telephone.replace(/\s/g,'')},co.telephone))}
+    if(co.telephone){var dd=document.querySelector('[data-tel-dd]');dd.textContent='';dd.hidden=false;document.querySelector('[data-tel-dt]').hidden=false;dd.appendChild(el('a',{href:'tel:'+co.telephone.replace(/\s/g,'')},co.telephone))}
     if(co.lien_avis_google){var av=document.querySelector('[data-avis]');av.href=co.lien_avis_google;av.hidden=false}
     // ---- Boutons Appeler / WhatsApp (apparaissent quand un numéro est rempli) ----
     if(co.telephone){

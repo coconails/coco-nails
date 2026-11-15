@@ -1,5 +1,7 @@
 [build]
   publish = "public"
+  # Écrit tarifs, FAQ, horaires et données Google directement dans la page (voir netlify/preparer-page.mjs)
+  command = "node netlify/preparer-page.mjs"
 
 [functions]
   directory = "netlify/functions"
