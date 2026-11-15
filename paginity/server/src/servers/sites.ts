@@ -45,14 +45,16 @@ export function createSitesServer(ctx: Ctx): http.Server {
       return simplePage(res, 503, site.name, "Ce site n'est pas encore publié.");
     }
     const rules = readRules(root);
+    // Les adresses des fonctions passent en premier (comme chez Netlify) : un formulaire HTML envoyé à une
+    // fonction (ex. « Confirmer le rendez-vous ») doit arriver à la fonction, pas au module formulaires.
+    if (rules.functionsDir && (isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/'))) {
+      void ctx.functions.proxy(site, 'production', req, res, clientIp(req));
+      return;
+    }
     if (isFormPost(req) && rules.forms?.length) {
       handleFormPost(ctx, site, rules.forms, req, res, clientIp(req)).catch((e) => {
         if (!res.headersSent) res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' }).end((e as Error).message);
       });
-      return;
-    }
-    if (rules.functionsDir && (isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/'))) {
-      void ctx.functions.proxy(site, 'production', req, res, clientIp(req));
       return;
     }
     serveStatic(root, req, res, {
@@ -110,14 +112,16 @@ export function createPreviewServer(ctx: Ctx): http.Server {
       return simplePage(res, 404, 'Aperçu non préparé', 'Demandez un aperçu depuis PAGINITY.');
     }
     const rules = readRules(root);
-    if (isFormPost(req) && rules.forms?.length) {
+    const versFonction = isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/');
+    // Même ordre qu'en production : d'abord les fonctions, mais seulement avec des secrets de test (D11).
+    if (rules.functionsDir && versFonction && hasTestSecrets(ctx, site.id)) {
+      void ctx.functions.proxy(site, 'test', req, res, clientIp(req));
+      return;
+    }
+    if (isFormPost(req) && rules.forms?.length && !versFonction) {
       req.resume();
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       res.end('<!doctype html><meta charset="utf-8"><title>Aperçu</title><p>Aperçu : le formulaire fonctionne, mais rien n’a été envoyé ni enregistré.</p>');
-      return;
-    }
-    if (rules.functionsDir && hasTestSecrets(ctx, site.id) && (isFunctionPath(ctx.scheduler.catalog(site.id), pathOf(req)) || pathOf(req).startsWith('/api/'))) {
-      void ctx.functions.proxy(site, 'test', req, res, clientIp(req));
       return;
     }
     serveStatic(root, req, res, {

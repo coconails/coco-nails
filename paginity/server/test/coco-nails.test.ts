@@ -124,6 +124,34 @@ describe.skipIf(!present)('Compatibilité Coco Nail’s (import réel)', () => {
     expect(noms).not.toContain('URL');
   });
 
+  it('transmet aux fonctions les formulaires HTML qui leur sont destinés (Confirmer/Refuser un rendez-vous, désinscription)', async () => {
+    const postForm = (path: string, body: string) =>
+      new Promise<{ status: number; body: string }>((resolve) => {
+        const r = require('node:http').request(
+          { host: '127.0.0.1', port: p.ctx.config.sitesPort, path, method: 'POST', headers: { host: `${slug}.localhost`, 'content-type': 'application/x-www-form-urlencoded' } },
+          (res: any) => {
+            let b = '';
+            res.on('data', (d: Buffer) => (b += d));
+            res.on('end', () => resolve({ status: res.statusCode, body: b }));
+          },
+        );
+        r.end(body);
+      });
+    const avant = (p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n;
+    // Bouton « Confirmer » d'un e-mail de rendez-vous (faux lien, aucun secret : la fonction elle-même répond).
+    const rdv = await postForm('/api/rdv', 'id=faux&a=confirmer&s=fausse-signature');
+    expect(rdv.body).not.toContain('Formulaire inconnu');
+    expect(rdv.status).toBe(503);
+    expect(rdv.body).toContain('Agenda non relié');
+    // Page « Gérer mes messages ».
+    const des = await postForm('/api/desinscription', 'id=faux&s=fausse-signature&ok_veille=oui');
+    expect(des.body).not.toContain('Formulaire inconnu');
+    expect(des.status).toBe(403);
+    expect(des.body).toContain('Lien non valide');
+    // Rien n'a été enregistré comme message de formulaire.
+    expect((p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n).toBe(avant);
+  });
+
   it('reçoit les formulaires Netlify du site (contact et rendez-vous de secours)', async () => {
     const post = (body: string, accept = 'text/html') =>
       new Promise<{ status: number; body: string }>((resolve) => {

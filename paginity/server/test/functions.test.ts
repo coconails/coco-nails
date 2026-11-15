@@ -46,6 +46,12 @@ export const config = { path: "/api/espion" };
 export const config = { schedule: "*/5 * * * *" };
 `,
   'netlify/functions/lent.mjs': 'export default async () => { await new Promise((r) => setTimeout(r, 5000)); return new Response("trop tard"); };\nexport const config = { path: "/api/lent" };\n',
+  'netlify/functions/formulaire-html.mjs': `export default async (req) => {
+  const f = await req.formData();
+  return Response.json({ recu: f.get("nom"), methode: req.method });
+};
+export const config = { path: "/api/formulaire-html" };
+`,
   'netlify/functions/classique.mjs': 'export default async () => new Response("adresse par défaut");\n',
   'public/contact.html': '<!doctype html><title>Contact</title><form name="contact" method="POST" action="/merci.html" data-netlify="true" netlify-honeypot="piege"><input name="nom"><textarea name="message"></textarea><input name="piege"></form>',
   'public/merci.html': '<!doctype html><title>Merci</title><p>Merci</p>',
@@ -122,7 +128,7 @@ describe('Fonctions serveur, secrets, formulaires, tâches planifiées', () => {
     const j = await c.call('POST', `/api/sites/${siteId}/publier`, {});
     const done = await waitJob(p, j.json.id);
     expect(done.erreur).toBeNull();
-    expect(done.etapes.find((e) => e.nom === 'Fonctions serveur')!.message).toMatch(/5 fonction\(s\) prête\(s\) \(processus restreint\)/);
+    expect(done.etapes.find((e) => e.nom === 'Fonctions serveur')!.message).toMatch(/6 fonction\(s\) prête\(s\) \(processus restreint\)/);
   });
 
   it('imite l’environnement Netlify (paramètres, cookies, variables, adresse par défaut)', async () => {
@@ -196,6 +202,25 @@ describe('Fonctions serveur, secrets, formulaires, tâches planifiées', () => {
     await post('form-name=contact&nom=Robot&piege=oui');
     const m = await c.call('GET', `/api/sites/${siteId}/formulaires`);
     expect(m.json.messages.map((x: any) => x.donnees.nom)).toEqual(['Alice']);
+  });
+
+  it('donne la priorité aux fonctions pour un formulaire HTML envoyé à leur adresse (comme Netlify)', async () => {
+    const avant = (p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n;
+    const r = await new Promise<{ status: number; body: string }>((resolve) => {
+      const req = require('node:http').request(
+        { host: '127.0.0.1', port: p.ctx.config.sitesPort, path: '/api/formulaire-html', method: 'POST', headers: { host: `${slug}.localhost`, 'content-type': 'application/x-www-form-urlencoded' } },
+        (res: any) => {
+          let b = '';
+          res.on('data', (d: Buffer) => (b += d));
+          res.on('end', () => resolve({ status: res.statusCode, body: b }));
+        },
+      );
+      req.end('nom=Claire');
+    });
+    expect(r.status).toBe(200);
+    expect(JSON.parse(r.body)).toEqual({ recu: 'Claire', methode: 'POST' });
+    // Jamais pris pour un message de formulaire du site.
+    expect((p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n).toBe(avant);
   });
 
   it('envoie les alertes et les messages des formulaires par e-mail (serveur SMTP de test)', async () => {
@@ -297,6 +322,22 @@ describe('Fonctions serveur, secrets, formulaires, tâches planifiées', () => {
     const host1 = new URL(a1.json.url).hostname;
     const off = await getSite(p, host1, '/api/echo/x', { port: p.ctx.config.previewPort });
     expect(off.status).toBe(503);
+    // Formulaire HTML envoyé à une fonction dans l'aperçu, sans secrets de test : rien n'est exécuté ni enregistré.
+    const nbAvant = (p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n;
+    const appelsAvant = (p.ctx.db.prepare("SELECT COUNT(*) AS n FROM function_log WHERE fn = 'formulaire-html'").get() as { n: number }).n;
+    const formOff = await new Promise<{ status: number }>((resolve) => {
+      const req = require('node:http').request(
+        { host: '127.0.0.1', port: p.ctx.config.previewPort, path: '/api/formulaire-html', method: 'POST', headers: { host: host1, 'content-type': 'application/x-www-form-urlencoded' } },
+        (res: any) => {
+          res.resume();
+          res.on('end', () => resolve({ status: res.statusCode }));
+        },
+      );
+      req.end('nom=Apercu');
+    });
+    expect(formOff.status).toBe(503);
+    expect((p.ctx.db.prepare('SELECT COUNT(*) AS n FROM form_submissions').get() as { n: number }).n).toBe(nbAvant);
+    expect((p.ctx.db.prepare("SELECT COUNT(*) AS n FROM function_log WHERE fn = 'formulaire-html'").get() as { n: number }).n).toBe(appelsAvant);
     await c.call('PUT', `/api/sites/${siteId}/secrets/test/MA_CLE`, { valeur: 'cle-de-test-456' });
     const on = await getSite(p, host1, '/api/echo/x', { port: p.ctx.config.previewPort });
     expect(on.status).toBe(200);
