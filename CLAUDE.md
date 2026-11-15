@@ -73,10 +73,8 @@ GitHub web ignore souvent les fichiers commençant par un point (.pages.yml) : l
 Toujours tester localement avant (Google simulé) et montrer un aperçu avant de livrer.
 
 ## Reste à faire
-- ⚠️ Double SIREN à régulariser (CMA Pays de la Loire ou INSEE 09 72 72 60 00) : EI d'élevage active depuis 2018
-  (SIREN 844 915 629, SIRET 844 915 629 00019, Loire-Authion, prénoms « Coralie Sylvie Olivia ») et création 2026 Coco Nail's
-  (SIREN 132 514 431, prénoms « Coralie Eliane Raymonde »). Une seule EI par personne : attendre la réponse avant de saisir le SIRET,
-  de faire des factures et d'ouvrir SumUp. Vérifier aussi les déclarations URSSAF de l'ancienne activité.
+- SIRET de Coco Nail's : SIREN 132 514 431 (création validée par l'INSEE le 05/11/2026), SIRET pas encore publié
+  (avis de situation introuvable au 14/11). Ne jamais inventer le SIRET ; l'attendre avant les factures, SumUp et le médiateur.
 - OVHcloud SMS (compte sms-fe253701-1) : expéditeur « CocoNails » demandé le 14/11/2026 (en attente de validation), clés API
   recréées (droits GET/POST /sms/*), à mettre dans Netlify avec les 5 variables OVH_* après validation, puis 1 Trigger deploy.
 - Mentions légales (Pages CMS > Informations légales) : SIRET (en attente CMA), médiateur CM2C (adhésion à faire),
