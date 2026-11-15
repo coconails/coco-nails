@@ -284,5 +284,7 @@ export async function installDependencies(workDir: string, cacheRoot: string, on
   await new Promise<void>((resolve, reject) =>
     execFile('cp', ['-al', path.join(cached, 'node_modules'), path.join(workDir, 'node_modules')], (e) => (e ? reject(e) : resolve())),
   );
+  // Les raccourcis de commandes (node_modules/.bin) sont des liens symboliques inutiles aux fonctions : retirés.
+  for (const dir of [path.join(workDir, 'node_modules', '.bin')]) fs.rmSync(dir, { recursive: true, force: true });
   return fs.existsSync(path.join(cached, '.used')) ? 'cache' : (fs.writeFileSync(path.join(cached, '.used'), ''), 'installees');
 }

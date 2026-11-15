@@ -8,7 +8,7 @@ import type { UserRow } from '../auth/service.js';
 import { getUser } from '../auth/service.js';
 import { audit } from '../lib/audit.js';
 import { UserError } from '../lib/util.js';
-import { removeTree } from '../publish/build.js';
+import { assertNoSymlinks, removeTree } from '../publish/build.js';
 import type { JobRun } from '../jobs/queue.js';
 import { readManifest } from './manifest.js';
 import type { SiteRow } from './service.js';
@@ -112,6 +112,8 @@ export async function runImport(ctx: Ctx, run: JobRun): Promise<unknown> {
     }, (n) => (p.zip ? `${n} fichiers extraits de l'archive.` : 'Dépôt récupéré.'));
     const manifest = await run.step('Vérifier', async () => {
       removeTree(path.join(staging, '.git'));
+      // Un dépôt Git peut contenir des liens symboliques (une archive ZIP est déjà refusée dans ce cas).
+      assertNoSymlinks(staging);
       flattenSingleFolder(staging);
       const m = readManifest(staging);
       if (!fs.existsSync(path.join(staging, m.publishDir === '.' ? '' : m.publishDir, 'index.html'))) {

@@ -5,6 +5,22 @@ import { parsePagesYml, validateEntryValue } from '../content/schema.js';
 import { UserError } from '../lib/util.js';
 import { RULES_FILE } from '../servers/static.js';
 import { scanForms } from '../functions/forms.js';
+import { findSymlinks } from '../sites/files.js';
+
+/**
+ * Refuse tout lien symbolique dans le code d'un site : un lien peut pointer vers un fichier de PAGINITY
+ * (clé du coffre, base…) et l'isolation « processus » de Node.js suit les liens (limite documentée).
+ */
+export function assertNoSymlinks(dir: string): void {
+  const links = findSymlinks(dir, 10);
+  if (links.length) {
+    throw new UserError(
+      422,
+      `Le site contient ${links.length > 1 ? 'des liens symboliques' : 'un lien symbolique'} (${links.join(', ')}), refusé par sécurité : remplacez-le par une vraie copie du fichier.`,
+      { liens: links },
+    );
+  }
+}
 
 /**
  * Fabrication d'une version : contrôles, copie du dossier publié, vérification des liens.
@@ -35,6 +51,7 @@ export interface CheckResult {
 
 /** Contrôles avant fabrication, sur une copie figée du dépôt. */
 export function checkSource(srcDir: string): CheckResult {
+  assertNoSymlinks(srcDir);
   const manifest = readManifest(srcDir);
   const warnings = manifest.warnings.filter((w) => !w.startsWith('Fonctions serveur'));
   const errors: string[] = [];

@@ -5,7 +5,7 @@ import type { SiteRow } from '../sites/service.js';
 import type { SiteManifest } from '../sites/manifest.js';
 import { installDependencies } from '../functions/isolation.js';
 import { APP_DIR } from '../functions/service.js';
-import { buildOutput } from './build.js';
+import { assertNoSymlinks, buildOutput } from './build.js';
 
 export interface FabricationResult {
   fichiers: number;
@@ -22,6 +22,8 @@ export interface FabricationResult {
  * 4. si le site a des fonctions : la copie de travail devient le code de l'exécuteur (dossier caché « .app », jamais servi).
  */
 export async function fabricate(ctx: Ctx, site: SiteRow, srcDir: string, outDir: string, version: string, manifest: SiteManifest, env: 'production' | 'test'): Promise<FabricationResult> {
+  // Vérification répétée ici pour tous les cas (publication, aperçu, refabrication d'une ancienne version).
+  assertNoSymlinks(srcDir);
   const log = (l: string) => ctx.functions.log(`${site.id}:${env}`, `[préparation] ${l}`);
   const hasFunctions = !!manifest.functionsDir && fs.existsSync(path.join(srcDir, manifest.functionsDir));
   let dependances: FabricationResult['dependances'] = 'aucune';

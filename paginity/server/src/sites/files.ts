@@ -129,3 +129,20 @@ export function validateText(rel: string, content: string): string[] {
   }
   return errors;
 }
+
+/** Liste les liens symboliques d'un dossier (chemins relatifs), sans les suivre. Le dossier .git est ignoré. */
+export function findSymlinks(root: string, max = 50): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, rel: string) => {
+    if (out.length >= max) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === '.git' && !rel) continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isSymbolicLink()) out.push(r);
+      else if (e.isDirectory()) walk(path.join(dir, e.name), r);
+      if (out.length >= max) return;
+    }
+  };
+  if (fs.existsSync(root)) walk(root, '');
+  return out;
+}

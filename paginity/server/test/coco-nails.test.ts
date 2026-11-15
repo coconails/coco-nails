@@ -4,6 +4,7 @@ import yazl from 'yazl';
 import { createRequire } from 'node:module';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
+import { findSymlinks } from '../src/sites/files.js';
 import { getSite, setupOwner, startPaginity, stopPaginity, waitJob, type Client } from './helpers.js';
 
 /**
@@ -98,6 +99,9 @@ describe.skipIf(!present)('Compatibilité Coco Nail’s (import réel)', () => {
     // Le code des fonctions et la fiche ne sont jamais publiés.
     expect((await getSite(p, `${slug}.localhost`, '/netlify/lib/agenda.mjs')).status).toBe(404);
     expect((await getSite(p, `${slug}.localhost`, '/.app/netlify/lib/agenda.mjs')).status).toBe(404);
+    // Aucun lien symbolique dans le code des fonctions (P0-2), dépendances comprises.
+    const live = fs.realpathSync(p.ctx.sites.liveLink(p.ctx.sites.get(id)!));
+    expect(findSymlinks(path.join(live, '.app'))).toEqual([]);
   });
 
   it('exécute les vraies fonctions (sans secrets : elles le signalent elles-mêmes)', async () => {
