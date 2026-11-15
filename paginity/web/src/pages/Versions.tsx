@@ -88,6 +88,8 @@ export function VersionsPage() {
       <Badge variant="light" color="gray">Publiée</Badge>
     ) : p.etat === 'echouee' ? (
       <Badge color="red">Échouée</Badge>
+    ) : p.etat === 'interrompue' ? (
+      <Badge color="orange">Interrompue</Badge>
     ) : (
       <Badge color="blue">{p.etat}</Badge>
     );

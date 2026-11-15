@@ -23,6 +23,7 @@ import { Scheduler } from './functions/scheduler.js';
 import { Mailer } from './lib/mail.js';
 import { pruneAlerts, sendDigest } from './lib/alerts.js';
 import { pruneSubmissions } from './functions/forms.js';
+import { recoverOnStartup } from './publish/recovery.js';
 
 export interface Paginity {
   ctx: Ctx;
@@ -56,6 +57,11 @@ export async function createPaginity(
     onLog: (key, line) => ctx.functions.log(key, line),
   });
   ctx.scheduler = new Scheduler(ctx);
+  // Remise en ordre après un éventuel arrêt brutal pendant une publication (avant d'accepter des visiteurs).
+  const reprise = recoverOnStartup(ctx);
+  if (reprise.publicationsInterrompues || reprise.sitesCorriges.length) {
+    console.warn(`[reprise] ${reprise.publicationsInterrompues} publication(s) interrompue(s), ${reprise.sitesCorriges.length} site(s) remis en ordre.`);
+  }
   if (overrides.scheduler !== false) ctx.scheduler.start();
   defineSiteJobs(ctx);
   ctx.jobs.define('import', { steps: IMPORT_STEPS, run: (r) => runImport(ctx, r) });
