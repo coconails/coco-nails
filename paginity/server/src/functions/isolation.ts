@@ -37,6 +37,11 @@ export interface IsolationOptions {
   image: string;
   network: string;
   onLog: (key: string, line: string) => void;
+  /**
+   * TESTS UNIQUEMENT (jamais lu dans l'environnement ni dans un réglage) : module chargé avant les fonctions
+   * pour simuler les services extérieurs, et dossier où il range son état. Mode « processus » seulement.
+   */
+  simulation?: { preload: string; dir: string; env: Record<string, string> };
 }
 
 export function detectIsolation(pref: string | undefined): IsolationMode {
@@ -117,6 +122,10 @@ export class Isolation {
     const log = (l: string) => this.opts.onLog(spec.key, l);
 
     if (this.opts.mode === 'processus') {
+      const sim = this.opts.simulation;
+      const simArgs = sim
+        ? [`--allow-fs-read=${path.dirname(sim.preload)}`, `--allow-fs-read=${sim.dir}`, `--allow-fs-write=${sim.dir}`, `--import=${sim.preload}`]
+        : [];
       const child = spawn(
         process.execPath,
         [
@@ -125,11 +134,16 @@ export class Isolation {
           `--allow-fs-read=${path.dirname(WORKER_FILE)}`,
           `--allow-fs-read=${spec.socketDir}`,
           `--allow-fs-write=${spec.socketDir}`,
+          ...simArgs,
           `--max-old-space-size=${spec.memoryMb}`,
           '--disable-warning=ExperimentalWarning',
           WORKER_FILE,
         ],
-        { cwd: spec.appDir, env: { PATH: process.env.PATH ?? '', ...baseEnv(spec, socketHost, spec.appDir) }, stdio: ['ignore', 'pipe', 'pipe'] },
+        {
+          cwd: spec.appDir,
+          env: { PATH: process.env.PATH ?? '', ...baseEnv(spec, socketHost, spec.appDir), ...(sim ? { ...sim.env, PAGINITY_SIMULATION_DIR: sim.dir } : {}) },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
       );
       return this.track(child, socketHost, log, async () => {
         child.kill('SIGTERM');

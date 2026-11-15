@@ -66,11 +66,14 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 ## 5. Tests automatiques
 
 ```bash
-npm test                      # 45 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
+npm test                      # 76 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
 npm run build && npm run e2e  # parcours complet dans Chromium (nécessite Playwright)
 ```
 
-Le test d'import de Coco Nail's s'exécute seulement si le dépôt du site est présent (variable `COCO_NAILS_DIR`).
+Les tests de Coco Nail's s'exécutent seulement si le dépôt du site est présent (variable `COCO_NAILS_DIR`).
+`test/coco-nails-simule.test.ts` fait tourner ses vraies fonctions (réservation, confirmation, refus, rappel SMS, compta,
+SumUp) avec Google, OVHcloud et SumUp **simulés** (`test/simulation/services-simules.mjs`) : toute autre adresse
+extérieure est refusée, aucune action réelle n'est possible. Ce simulateur n'est chargé que par les tests.
 
 ```bash
 COCO_NAILS_DIR=/chemin/vers/coco-nails1 npm run e2e:phase3   # import réel, fonctions, secrets, formulaires

@@ -18,7 +18,7 @@ import { pruneAudit } from './lib/audit.js';
 import { removeTree } from './publish/build.js';
 import path from 'node:path';
 import { FunctionService } from './functions/service.js';
-import { Isolation, detectIsolation } from './functions/isolation.js';
+import { Isolation, detectIsolation, type IsolationOptions } from './functions/isolation.js';
 import { Scheduler } from './functions/scheduler.js';
 import { Mailer } from './lib/mail.js';
 import { pruneAlerts, sendDigest } from './lib/alerts.js';
@@ -36,9 +36,9 @@ export interface Paginity {
 
 /** Assemble PAGINITY (sans ouvrir de port). */
 export async function createPaginity(
-  overrides: Partial<Config> & { isolation?: 'podman' | 'processus'; scheduler?: boolean } = {},
+  overrides: Partial<Config> & { isolation?: 'podman' | 'processus'; scheduler?: boolean; simulation?: IsolationOptions['simulation'] } = {},
 ): Promise<Paginity> {
-  const { isolation: _i, scheduler: _s, ...cfg } = overrides;
+  const { isolation: _i, scheduler: _s, simulation: _sim, ...cfg } = overrides;
   const config = loadConfig(cfg);
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
   // Nettoyage des fichiers temporaires laissés par un arrêt brutal.
@@ -55,6 +55,7 @@ export async function createPaginity(
     image: process.env.PAGINITY_CONTAINER_IMAGE ?? 'docker.io/library/node:22-slim',
     network: process.env.PAGINITY_CONTAINER_NETWORK ?? 'slirp4netns',
     onLog: (key, line) => ctx.functions.log(key, line),
+    simulation: overrides.simulation,
   });
   ctx.scheduler = new Scheduler(ctx);
   // Remise en ordre après un éventuel arrêt brutal pendant une publication (avant d'accepter des visiteurs).

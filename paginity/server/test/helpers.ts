@@ -12,7 +12,9 @@ export interface Client {
   call(method: string, url: string, payload?: unknown, headers?: Record<string, string>): Promise<{ status: number; json: any; headers: Record<string, any>; body: string; raw: Buffer }>;
 }
 
-export async function startPaginity(opts: { isolation?: 'podman' | 'processus'; dataDir?: string } = {}): Promise<Paginity & { dir: string }> {
+export async function startPaginity(
+  opts: { isolation?: 'podman' | 'processus'; dataDir?: string; simulation?: { preload: string; dir: string; env: Record<string, string> } } = {},
+): Promise<Paginity & { dir: string }> {
   // dataDir : redémarrer PAGINITY sur des données existantes (simulation d'une coupure).
   const dir = opts.dataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'paginity-test-'));
   const p = await createPaginity({
@@ -24,6 +26,7 @@ export async function startPaginity(opts: { isolation?: 'podman' | 'processus'; 
     sitesBaseDomain: 'localhost',
     previewBaseDomain: 'localhost',
     webDir: path.join(dir, 'pas-de-web'),
+    simulation: opts.simulation,
   });
   await new Promise<void>((r) => p.sitesServer.listen(0, '127.0.0.1', () => r()));
   await new Promise<void>((r) => p.previewServer.listen(0, '127.0.0.1', () => r()));
