@@ -87,7 +87,8 @@ export function Shell({ children }: { children: ReactNode }) {
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Ouvrir le menu" />
             <UnstyledButton component={Link} to="/" aria-label="PAGINITY, tableau de bord">
               <Group gap={8} wrap="nowrap">
-                <Image src="/icone-192.png" h={34} w={34} radius="sm" alt="" />
+                <Image src="/symbole-paginity.png" h={34} w="auto" alt="" lightHidden />
+                <Image src="/icone-192.png" h={34} w={34} radius="sm" alt="" darkHidden />
                 <Text className="pg-logo-texte" fz={22} visibleFrom="xs">
                   PAGINITY
                 </Text>
