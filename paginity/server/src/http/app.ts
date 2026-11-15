@@ -19,8 +19,7 @@ export async function createAdminApp(ctx: Ctx, opts: { logger?: boolean } = {}):
   const app = Fastify({
     logger: opts.logger ? { level: 'warn' } : false,
     bodyLimit: 3 * 1024 * 1024,
-    trustProxy: process.env.PAGINITY_TRUST_PROXY === 'true',
-    
+    // L'adresse IP réelle derrière le tunnel est lue par lib/ip.ts (seulement pour une connexion locale).
   });
   await app.register(cookie);
   await app.register(multipart, { limits: { fileSize: 200 * 1024 * 1024, files: 1, fields: 10 } });

@@ -5,6 +5,8 @@ import type { Ctx } from '../context.js';
 import { now, randomId, randomToken, sha256, UserError, timingSafeEqualStr } from '../lib/util.js';
 import { checkPasswordPolicy, dummyVerify, hashPassword, verifyPassword } from './passwords.js';
 import { tx } from '../db.js';
+import { raiseAlert } from '../lib/alerts.js';
+import type { Device } from './devices.js';
 
 export interface UserRow {
   id: string;
@@ -66,8 +68,10 @@ export function assertNotLocked(ctx: Ctx, keys: string[]): void {
   }
 }
 
-export function recordFailure(ctx: Ctx, keys: string[]): void {
+/** Compte une erreur pour chaque clé. Renvoie les clés qui viennent d'être bloquées. */
+export function recordFailure(ctx: Ctx, keys: string[]): string[] {
   const t = now();
+  const lockedKeys: string[] = [];
   for (const key of keys) {
     const r = ctx.db.prepare('SELECT failures, first_at FROM login_attempts WHERE key = ?').get(key) as { failures: number; first_at: number } | undefined;
     let failures = 1;
@@ -83,7 +87,28 @@ export function recordFailure(ctx: Ctx, keys: string[]): void {
         'INSERT INTO login_attempts (key, failures, first_at, locked_until) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET failures = excluded.failures, first_at = excluded.first_at, locked_until = excluded.locked_until',
       )
       .run(key, failures, firstAt, locked);
+    if (locked) lockedKeys.push(key);
   }
+  return lockedKeys;
+}
+
+/**
+ * Clés de comptage des erreurs de connexion.
+ * - Depuis un appareil reconnu de CE compte : seulement cet appareil (un inconnu ne peut pas le bloquer).
+ * - Sinon : l'adresse IP et le compte visé (« nouvel appareil »).
+ */
+export function loginKeys(ip: string, email: string, user: { id: string } | undefined, device: Device | null): string[] {
+  if (device && user && device.userId === user.id) return [`appareil:${device.id}`];
+  return [`ip:${ip}`, `email:${email}`];
+}
+
+function warnIfAccountLocked(ctx: Ctx, locked: string[], email: string): void {
+  if (!locked.some((k) => k.startsWith('email:'))) return;
+  raiseAlert(
+    ctx,
+    'attention',
+    `Plusieurs mots de passe erronés pour le compte ${email} : les connexions depuis un nouvel appareil sont bloquées un moment. Les appareils habituels ne sont pas concernés.`,
+  );
 }
 
 export function clearFailures(ctx: Ctx, keys: string[]): void {
@@ -196,17 +221,17 @@ export function pruneExpired(ctx: Ctx): void {
 // Étape 1 : mot de passe
 // ---------------------------------------------------------------------------
 
-export async function checkCredentials(ctx: Ctx, emailInput: unknown, password: unknown, ip: string): Promise<UserRow> {
+export async function checkCredentials(ctx: Ctx, emailInput: unknown, password: unknown, ip: string, device: Device | null = null): Promise<UserRow> {
   const email = normalizeEmail(emailInput);
-  const keys = [`ip:${ip}`, `email:${email}`];
-  assertNotLocked(ctx, keys);
   const user = getUserByEmail(ctx, email);
+  const keys = loginKeys(ip, email, user, device);
+  assertNotLocked(ctx, keys);
   const pw = typeof password === 'string' ? password : '';
   let ok = false;
   if (user && !user.disabled) ok = await verifyPassword(user.password_hash, pw);
   else await dummyVerify(pw);
   if (!ok || !user) {
-    recordFailure(ctx, keys);
+    warnIfAccountLocked(ctx, recordFailure(ctx, keys), email);
     throw new UserError(401, 'Adresse e-mail ou mot de passe incorrect.');
   }
   return user;
@@ -229,10 +254,11 @@ export function getLoginChallenge(ctx: Ctx, token: unknown): LoginChallengeRow {
   return row;
 }
 
-export function failChallenge(ctx: Ctx, row: LoginChallengeRow, ip: string): void {
+export function failChallenge(ctx: Ctx, row: LoginChallengeRow, ip: string, device: Device | null = null): void {
   ctx.db.prepare('UPDATE login_challenges SET attempts = attempts + 1 WHERE token_hash = ?').run(row.token_hash);
   const user = getUser(ctx, row.user_id);
-  recordFailure(ctx, [`ip:${ip}`, ...(user ? [`email:${user.email}`] : [])]);
+  if (!user) return void recordFailure(ctx, [`ip:${ip}`]);
+  warnIfAccountLocked(ctx, recordFailure(ctx, loginKeys(ip, user.email, user, device)), user.email);
 }
 
 export function consumeChallenge(ctx: Ctx, row: LoginChallengeRow): void {

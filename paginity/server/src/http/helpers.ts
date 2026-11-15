@@ -2,6 +2,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Ctx } from '../context.js';
 import type { SessionRow, UserRow } from '../auth/service.js';
 import { now, randomToken, UserError } from '../lib/util.js';
+import { realIp } from '../lib/ip.js';
+import { DEVICE_DAYS, newDeviceToken, readDevice, type Device } from '../auth/devices.js';
 
 export const SESSION_COOKIE = 'paginity_session';
 export const CSRF_COOKIE = 'paginity_csrf';
@@ -12,8 +14,27 @@ declare module 'fastify' {
   }
 }
 
+export const DEVICE_COOKIE = 'paginity_appareil';
+
 export function ipOf(req: FastifyRequest): string {
-  return req.ip;
+  return realIp(req.socket?.remoteAddress ?? req.ip, req.headers);
+}
+
+/** Appareil reconnu (cookie signé posé après une connexion réussie), ou null. */
+export function deviceOf(ctx: Ctx, req: FastifyRequest): Device | null {
+  return readDevice(ctx, req.cookies?.[DEVICE_COOKIE]);
+}
+
+/** Marque ce navigateur comme appareil habituel de la personne (180 jours). Ne donne aucun accès à lui seul. */
+export function setDeviceCookie(ctx: Ctx, reply: FastifyReply, userId: string, current: Device | null): void {
+  if (current && current.userId === userId) return;
+  reply.setCookie(DEVICE_COOKIE, newDeviceToken(ctx, userId), {
+    path: '/api/',
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: ctx.config.secureCookies,
+    maxAge: DEVICE_DAYS * 86_400,
+  });
 }
 
 /** Utilisateur connecté avec double authentification validée (sinon refus). */

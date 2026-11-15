@@ -59,6 +59,8 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 | `PAGINITY_ISOLATION` | `podman` ou `processus` (par défaut : Podman s'il est installé) | automatique |
 | `PAGINITY_CONTAINER_NETWORK` | Réseau des conteneurs (`slirp4netns`, `pasta`, `host`) | `slirp4netns` |
 | `PAGINITY_CONTAINER_IMAGE` | Image Node.js des conteneurs | `docker.io/library/node:22-slim` |
+| `PAGINITY_TRUST_PROXY` | `true` **uniquement** si PAGINITY est derrière un relais installé sur la même machine (Cloudflare Tunnel, Caddy…). L'adresse IP réelle de chaque visiteur est alors lue dans `CF-Connecting-IP` (sinon la dernière adresse de `X-Forwarded-For`), et seulement pour les connexions venant de la machine elle-même. Sans ce réglage derrière un tunnel, tous les visiteurs auraient la même adresse : les limites de tentatives et les journaux seraient faussés. | désactivé |
+| `PAGINITY_SECURE_COOKIES` | Cookies réservés aux connexions chiffrées (https) | `true` si l'adresse publique commence par `https:` |
 | `PAGINITY_ATTENDRE_HORLOGE` | `non` pour ne pas attendre la synchronisation de l'horloge (ordinateur sans systemd) | automatique |
 
 ## 5. Tests automatiques

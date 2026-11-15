@@ -37,7 +37,8 @@ export async function stopPaginity(p: Paginity & { dir: string }): Promise<void>
   fs.rmSync(p.dir, { recursive: true, force: true });
 }
 
-export function client(p: Paginity): Client {
+/** remoteAddress : adresse IP simulée de l'appareil (par défaut 127.0.0.1). */
+export function client(p: Paginity, opts: { remoteAddress?: string } = {}): Client {
   const c: Client = {
     cookies: new Map(),
     csrf: '',
@@ -49,6 +50,7 @@ export function client(p: Paginity): Client {
         url,
         payload: payload === undefined ? undefined : isBuffer ? payload : (payload as any),
         headers: { cookie, 'x-csrf-token': c.csrf, origin: 'http://localhost:8080', ...headers },
+        ...(opts.remoteAddress ? { remoteAddress: opts.remoteAddress } : {}),
       });
       const set = res.headers['set-cookie'];
       for (const sc of Array.isArray(set) ? set : set ? [set] : []) {

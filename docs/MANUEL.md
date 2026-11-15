@@ -113,7 +113,9 @@ Cliquez sur **J'ai rangé mes codes** : vous arrivez au tableau de bord.
 - Pas de téléphone sous la main ? Touchez **utiliser un code de secours**.
 - Après 30 minutes sans activité, PAGINITY vous déconnecte automatiquement.
 - Après plusieurs erreurs de mot de passe ou de code, la connexion est bloquée quelques minutes : c'est une protection
-  contre les pirates.
+  contre les pirates. Si quelqu'un d'autre se trompe sur votre compte, seuls les **nouveaux appareils** sont bloqués :
+  les appareils sur lesquels vous vous êtes déjà connecté continuent de fonctionner, et une alerte vous prévient
+  dans le tableau de bord.
 
 ---
 

@@ -9,13 +9,10 @@ import { readRules, serveStatic, simplePage } from './static.js';
 import { handleFormPost, isFormPost } from '../functions/forms.js';
 import { isFunctionPath } from '../functions/routes.js';
 import { hasTestSecrets } from '../functions/secrets.js';
+import { realIp } from '../lib/ip.js';
 
 export function clientIp(req: http.IncomingMessage): string {
-  if (process.env.PAGINITY_TRUST_PROXY === 'true') {
-    const h = req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',')[0];
-    if (typeof h === 'string' && h.trim()) return h.trim();
-  }
-  return req.socket.remoteAddress ?? '';
+  return realIp(req.socket.remoteAddress, req.headers);
 }
 
 function pathOf(req: http.IncomingMessage): string {

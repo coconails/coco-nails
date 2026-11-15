@@ -7,7 +7,7 @@ import * as W from '../auth/webauthn.js';
 import { verifyPassword } from '../auth/passwords.js';
 import { audit } from '../lib/audit.js';
 import { now, randomToken, sha256, timingSafeEqualStr, UserError } from '../lib/util.js';
-import { body, clearSessionCookie, ensureCsrfCookie, ipOf, requireSession, requireSudo, requireUser, setSessionCookie } from './helpers.js';
+import { body, clearSessionCookie, deviceOf, ensureCsrfCookie, ipOf, requireSession, requireSudo, requireUser, setDeviceCookie, setSessionCookie } from './helpers.js';
 import { isRole, ROLE_RANK, type Role } from '../sites/service.js';
 
 export function setupCodePath(ctx: Ctx): string {
@@ -63,13 +63,13 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
   // ------------------------------------------------------------------ connexion
   app.post('/api/connexion', async (req, reply) => {
     const b = body<{ email?: string; motDePasse?: string }>(req);
-    const user = await A.checkCredentials(ctx, b.email, b.motDePasse, ipOf(req));
+    const user = await A.checkCredentials(ctx, b.email, b.motDePasse, ipOf(req), deviceOf(ctx, req));
     const f = A.userHas2fa(ctx, user);
     if (!f.totp && !f.passkey) {
       // Compte sans double authentification : session limitée à sa configuration.
       const token = A.createSession(ctx, user.id, { mfaOk: false, ip: ipOf(req), userAgent: req.headers['user-agent'] });
       setSessionCookie(ctx, reply, token);
-      A.clearFailures(ctx, [`ip:${ipOf(req)}`, `email:${user.email}`]);
+      A.clearFailures(ctx, A.loginKeys(ipOf(req), user.email, user, deviceOf(ctx, req)));
       return { etape: 'configurer-2fa' };
     }
     return { etape: '2fa', defi: A.createLoginChallenge(ctx, user.id), methodes: { totp: f.totp, passkey: f.passkey, secours: true } };
@@ -78,7 +78,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
   const finishLogin = (req: FastifyRequest, reply: FastifyReply, challenge: A.LoginChallengeRow, method: string) => {
     A.consumeChallenge(ctx, challenge);
     const user = A.getUser(ctx, challenge.user_id)!;
-    A.clearFailures(ctx, [`ip:${ipOf(req)}`, `email:${user.email}`]);
+    const device = deviceOf(ctx, req);
+    // Connexion complète réussie : on efface les erreurs de cet appareil, et ce navigateur devient un appareil reconnu.
+    A.clearFailures(ctx, [`ip:${ipOf(req)}`, ...A.loginKeys(ipOf(req), user.email, user, device)]);
+    setDeviceCookie(ctx, reply, user.id, device);
     const token = A.createSession(ctx, user.id, { mfaOk: true, ip: ipOf(req), userAgent: req.headers['user-agent'] });
     setSessionCookie(ctx, reply, token);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'connexion', details: { methode: method, appareil: String(req.headers['user-agent'] ?? '').slice(0, 120) } });
@@ -90,7 +93,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
     const ch = A.getLoginChallenge(ctx, b.defi);
     const user = A.getUser(ctx, ch.user_id);
     if (!user || !A.verifyTotp(ctx, user, b.code)) {
-      A.failChallenge(ctx, ch, ipOf(req));
+      A.failChallenge(ctx, ch, ipOf(req), deviceOf(ctx, req));
       throw new UserError(401, 'Code incorrect ou déjà utilisé.');
     }
     return finishLogin(req, reply, ch, 'totp');
@@ -100,7 +103,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
     const b = body<{ defi?: string; code?: string }>(req);
     const ch = A.getLoginChallenge(ctx, b.defi);
     if (!A.useRecoveryCode(ctx, ch.user_id, b.code)) {
-      A.failChallenge(ctx, ch, ipOf(req));
+      A.failChallenge(ctx, ch, ipOf(req), deviceOf(ctx, req));
       throw new UserError(401, 'Code de secours incorrect ou déjà utilisé.');
     }
     audit(ctx.db, { userId: ch.user_id, ip: ipOf(req), action: 'code_secours_utilise' });
@@ -119,7 +122,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
     const b = body<{ defi?: string; reponse?: unknown }>(req);
     const ch = A.getLoginChallenge(ctx, b.defi);
     if (!ch.webauthn_challenge || !(await W.verifyPasskey(ctx, ch.user_id, ch.webauthn_challenge, b.reponse))) {
-      A.failChallenge(ctx, ch, ipOf(req));
+      A.failChallenge(ctx, ch, ipOf(req), deviceOf(ctx, req));
       throw new UserError(401, 'La passkey n’a pas été reconnue.');
     }
     return finishLogin(req, reply, ch, 'passkey');
@@ -146,7 +149,8 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/confirmation', async (req) => {
     const { user, session } = requireUser(req);
     const b = body<{ motDePasse?: string; code?: string }>(req);
-    const keys = [`ip:${ipOf(req)}`, `email:${user.email}`];
+    // Personne déjà connectée : ses erreurs sont comptées pour son compte uniquement (un inconnu ne peut pas la bloquer).
+    const keys = [`confirmation:${user.id}`];
     A.assertNotLocked(ctx, keys);
     const okPw = typeof b.motDePasse === 'string' && (await verifyPassword(user.password_hash, b.motDePasse));
     const f = A.userHas2fa(ctx, user);
@@ -169,7 +173,7 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/confirmation/passkey', async (req) => {
     const { user, session } = requireUser(req);
     const b = body<{ motDePasse?: string; reponse?: unknown }>(req);
-    const keys = [`ip:${ipOf(req)}`, `email:${user.email}`];
+    const keys = [`confirmation:${user.id}`];
     A.assertNotLocked(ctx, keys);
     const row = ctx.db.prepare('SELECT webauthn_challenge FROM sessions WHERE id_hash = ?').get(session.id_hash) as { webauthn_challenge: string | null };
     ctx.db.prepare('UPDATE sessions SET webauthn_challenge = NULL WHERE id_hash = ?').run(session.id_hash);
@@ -213,12 +217,13 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
     return A.startTotpSetup(ctx, user);
   });
 
-  app.post('/api/profil/2fa/totp/confirmer', async (req) => {
+  app.post('/api/profil/2fa/totp/confirmer', async (req, reply) => {
     const { user, session } = requireSession(req);
     const b = body<{ code?: string }>(req);
     const user2 = A.getUser(ctx, user.id)!;
     A.confirmTotpSetup(ctx, user2, b.code);
     A.markMfa(ctx, session.id_hash);
+    setDeviceCookie(ctx, reply, user.id, deviceOf(ctx, req));
     const hasCodes = (ctx.db.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').get(user.id) as { n: number }).n > 0;
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'totp_active' });
     return { ok: true, codesSecours: hasCodes ? null : A.generateRecoveryCodes(ctx, user.id) };
@@ -243,11 +248,12 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): void {
     return W.registrationOptions(ctx, user, session.id_hash);
   });
 
-  app.post('/api/profil/passkeys', async (req) => {
+  app.post('/api/profil/passkeys', async (req, reply) => {
     const { user, session } = requireSession(req);
     const b = body<{ reponse?: unknown; nom?: string }>(req);
     await W.registerPasskey(ctx, user, session.id_hash, b.reponse, b.nom);
     A.markMfa(ctx, session.id_hash);
+    setDeviceCookie(ctx, reply, user.id, deviceOf(ctx, req));
     const hasCodes = (ctx.db.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').get(user.id) as { n: number }).n > 0;
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'passkey_ajoutee' });
     return { ok: true, codesSecours: hasCodes ? null : A.generateRecoveryCodes(ctx, user.id) };
