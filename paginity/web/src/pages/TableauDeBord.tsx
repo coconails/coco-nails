@@ -2,7 +2,7 @@ import { Alert, Anchor, Badge, Button, Card, Group, Progress, SimpleGrid, Stack,
 import { useQuery } from '@tanstack/react-query';
 import { IconAlertTriangle, IconExternalLink, IconFileText, IconInfoCircle, IconPlus, IconRocket } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
-import { get } from '../api';
+import { get, post } from '../api';
 import { useEtat } from '../App';
 import { ErrorBox, Loading, Page } from '../components/Page';
 import { JobBadge, StatusBadge } from '../components/Status';
@@ -12,7 +12,7 @@ import type { Activite, SiteResume } from '../types';
 interface Tableau {
   sites: SiteResume[];
   serveur: any | null;
-  alertes: { niveau: 'information' | 'attention' | 'critique'; message: string; siteId?: string }[];
+  alertes: { id?: number; niveau: 'information' | 'attention' | 'critique'; message: string; siteId?: string | null }[];
   activites: Activite[];
 }
 
@@ -45,6 +45,9 @@ export function TableauDeBordPage() {
                   color={a.niveau === 'critique' ? 'red' : a.niveau === 'attention' ? 'orange' : 'blue'}
                   icon={a.niveau === 'information' ? <IconInfoCircle /> : <IconAlertTriangle />}
                   variant="light"
+                  withCloseButton={!!a.id}
+                  closeButtonLabel="Marquer comme lue"
+                  onClose={() => a.id && void post(`/api/alertes/${a.id}/lue`).then(() => q.refetch())}
                 >
                   {a.message}
                   {a.siteId && (

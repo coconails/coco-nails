@@ -8,6 +8,8 @@
 - **Node.js 22.13 ou plus récent** (gratuit : nodejs.org, version « LTS »). Vérification : `node -v`.
 - **Git** (gratuit : git-scm.com). Vérification : `git --version`.
 - Un navigateur récent (Chrome, Edge, Firefox ou Safari).
+- **Facultatif mais recommandé : Podman** (isolation des fonctions serveur dans des conteneurs). Sans Podman,
+  PAGINITY utilise un processus restreint (isolation plus faible) et l'indique sur le tableau de bord.
 
 Fonctionne sur Linux et macOS. Sur Windows, utilisez WSL (sous-système Linux) : le prototype utilise des liens
 symboliques et la commande `tar`, non testés sous Windows directement.
@@ -54,12 +56,28 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 | `PAGINITY_PUBLIC_URL` | Adresse de l'administration (sert aussi aux passkeys) | `http://localhost:8080` |
 | `PAGINITY_SESSION_IDLE_MINUTES` | Déconnexion après inactivité | 30 |
 | `PAGINITY_KEEP_VERSIONS` | Versions fabriquées conservées par site | 20 |
+| `PAGINITY_ISOLATION` | `podman` ou `processus` (par défaut : Podman s'il est installé) | automatique |
+| `PAGINITY_CONTAINER_NETWORK` | Réseau des conteneurs (`slirp4netns`, `pasta`, `host`) | `slirp4netns` |
+| `PAGINITY_CONTAINER_IMAGE` | Image Node.js des conteneurs | `docker.io/library/node:22-slim` |
+| `PAGINITY_ATTENDRE_HORLOGE` | `non` pour ne pas attendre la synchronisation de l'horloge (ordinateur sans systemd) | automatique |
 
 ## 5. Tests automatiques
 
 ```bash
-npm test                      # 28 tests du serveur (connexion, sécurité, publication, droits, import…)
+npm test                      # 45 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
 npm run build && npm run e2e  # parcours complet dans Chromium (nécessite Playwright)
 ```
 
 Le test d'import de Coco Nail's s'exécute seulement si le dépôt du site est présent (variable `COCO_NAILS_DIR`).
+
+```bash
+COCO_NAILS_DIR=/chemin/vers/coco-nails1 npm run e2e:phase3   # import réel, fonctions, secrets, formulaires
+```
+
+## 6. Fonctions serveur, secrets et e-mails
+
+- **Secrets** (clés Google, OVH…) : écran « Secrets » de chaque site. Saisissez-les vous-même ; ils sont chiffrés et ne
+  sont plus jamais affichés. Le jeu « Test » sert uniquement aux aperçus.
+- **Tâches planifiées** : écran « Fonctions et tâches ». Elles sont **désactivées par défaut** pour un site importé.
+- **E-mails** (alertes, messages des formulaires) : « Réglages de la plateforme ». Avec Google Workspace :
+  `smtp.gmail.com`, port 465, et un mot de passe d'application.

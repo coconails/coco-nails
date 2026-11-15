@@ -33,12 +33,28 @@
 | Services externes | Google (Agenda, Gmail, Sheets, Drive), OVH SMS, SumUp (lecture seule, compte pas encore actif) | Aucun changement côté site. **À vérifier** : restriction éventuelle des clés OVH par adresse IP |
 | Délais | Fonctions classiques limitées par Netlify (≈ 10 s), tâches planifiées 30 s | PAGINITY laissera au moins ces durées |
 
-## 3. Ce qui reste avant de pouvoir migrer (phase 3, non commencée)
+## 3. État après la phase 3 (15/11/2026)
 
-1. Exécuteur de fonctions isolé + adaptateur Netlify v2 (requête/réponse standard, variables, `URL`).
-2. Étape de préparation exécutée dans un conteneur à chaque publication.
-3. Planificateur en UTC, avec rattrapage et protection contre les doublons (SMS).
-4. Solution pour les formulaires Netlify (module PAGINITY ou adaptation du site — décision à prendre).
-5. Coffre à secrets pour les sites, saisie par vous.
-6. Tests complets avec des comptes de test (agenda de test, copie de la feuille de compta, SumUp/OVH en mode test).
-7. Vérifications listées dans le cahier des charges (§ 10) : DNS, mentions légales, restrictions IP, liens déjà envoyés.
+| Point | État | Vérifié par |
+|---|---|---|
+| Les 8 fonctions se chargent et répondent | ✅ | test automatique + parcours navigateur (conteneur Podman et processus restreint) |
+| `/api/disponibilites` sans secrets répond `{ actif: false }` ; `/api/compta` signale « non configurée » | ✅ | idem |
+| Étape de préparation `preparer-page.mjs` exécutée dans l'isolation (données pour Google présentes dans la page) | ✅ | idem |
+| Dépendance `pdf-lib` installée (`npm ci` sans scripts, cache) | ✅ | idem |
+| Variable `URL` fournie aux fonctions | ✅ | test (adresse du site) |
+| Tâches `rappels` (9 h UTC) et `rappel-urssaf` (7 h UTC) reconnues, **désactivées par défaut** | ✅ | idem |
+| Formulaires « contact » et « rendez-vous » (secours) reçus par le **module formulaires de PAGINITY**, **sans modifier le site** | ✅ | idem |
+| Secrets attendus détectés automatiquement (Google, compta, OVH, SumUp) | ✅ | idem |
+| **Fonctionnement réel avec Google, OVH, SumUp** | ⏳ **Non testé** | nécessite vos comptes de test (voir ci-dessous) |
+
+Décision prise pour les formulaires : **module PAGINITY** (le site n'est pas modifié). Les messages sont visibles
+dans l'écran « Formulaires » et peuvent être envoyés par e-mail (à configurer dans les Réglages de la plateforme).
+
+## 4. Ce qui reste avant de pouvoir migrer
+
+1. **Tests réels avec des comptes de test** (votre action) : agenda Google de test, copie de la feuille de compta,
+   SumUp et OVH en mode test, saisis dans « Secrets › Test », puis essai complet dans l'aperçu.
+2. Saisie des **secrets de production** (mêmes valeurs que sur Netlify, pour que les liens déjà envoyés restent valables).
+3. Vérifier la restriction éventuelle des clés OVH par adresse IP.
+4. Phase 4 (serveur définitif, sauvegardes) puis phase 5 : activer les tâches planifiées sur PAGINITY **le jour où elles
+   sont désactivées sur Netlify**, jamais avant.

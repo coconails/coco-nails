@@ -1,4 +1,4 @@
-# PAGINITY — Architecture du programme (prototype, phase 2)
+# PAGINITY — Architecture du programme (phases 2 et 3)
 
 > Ce document décrit le programme **tel qu'il est réellement écrit** à la fin de la phase 2.
 > Les décisions et leurs raisons sont dans [CAHIER-DES-CHARGES.md](CAHIER-DES-CHARGES.md).
@@ -104,10 +104,43 @@ viendra en phase 3, dans un conteneur) → `Vérifier le résultat` (liens inter
 | Publication | `/modifications`, `/diff`, `/annuler`, `/apercu`, `/publier`, `/publications[/:n/remettre|reprendre]`, `/historique` |
 | Système | `/api/tableau-de-bord`, `/api/activites[/flux]`, `/api/sante`, `/api/journal`, `/api/utilisateurs` |
 
-## 6. Prévu pour les phases suivantes (emplacements réservés)
+## 6. Fonctions serveur et tâches (phase 3)
 
-- `servers/sites.ts` répond aujourd'hui « fonctions non actives » sur `/api/*` et `/.netlify/functions/*` :
-  c'est là que se branchera l'exécuteur de fonctions (conteneurs Podman, adaptateur Netlify v2).
-- `jobs/queue.ts` accueillera le planificateur (tâches en UTC, rattrapage, verrous anti-doublons).
-- `lib/vault.ts` contiendra les secrets des sites (déjà utilisé pour les secrets à deux facteurs).
-- `routes-system.ts` (`serverHealth`) recevra l'état des sauvegardes et de la surveillance externe.
+```
+ Visiteur ──► serveur des sites ──┬─► fichier statique (version en ligne)
+                                  ├─► formulaire Netlify (data-netlify) ──► module formulaires (chiffré en base, e-mail)
+                                  └─► /api/…, /.netlify/functions/…, adresses déclarées par les fonctions
+                                          │  (socket Unix, jamais de port réseau ouvert)
+                                          ▼
+                            EXÉCUTEUR DU SITE (un par site et par environnement)
+                            runtime/worker.mjs : imite Netlify Functions v2
+                            (Request/Response, context.params/cookies/ip, Netlify.env, config.path/schedule)
+                            ├─ isolation « podman » : conteneur sans privilège, lecture seule,
+                            │   ne voit que /app (le code du site) ; limites mémoire/processeur/processus
+                            └─ isolation « processus » (secours) : modèle de permissions de Node.js
+                                (lecture du code du site seulement, ni écriture, ni sous-processus)
+```
+
+| Élément | Fichier | Rôle |
+|---|---|---|
+| Exécuteur | `server/runtime/worker.mjs` | Charge les fonctions de la version, répond aux appels, exécute les tâches planifiées |
+| Isolation | `src/functions/isolation.ts` | Conteneur Podman ou processus restreint ; étape de préparation isolée (« node script.mjs » seulement, sans réseau en conteneur) ; `npm ci --ignore-scripts` avec cache |
+| Gestion des exécuteurs | `src/functions/service.ts` | Démarrage à la demande, remplacement sans coupure à chaque publication, arrêt après inactivité, journal (secrets masqués), statistiques, délai maximal (30 s) |
+| Fabrication | `src/publish/fabrication.ts` | Dépendances → préparation → copie du dossier publié → code des fonctions dans `.app` (jamais servi) |
+| Secrets | `src/functions/secrets.ts` | Deux jeux (production, test), chiffrés ; noms détectés dans le code (`process.env.X`) |
+| Formulaires | `src/functions/forms.ts` | Formulaires Netlify déclarés dans les pages, champ piège, limite d'envois, messages chiffrés |
+| Planificateur | `src/functions/scheduler.ts`, `cron.ts` | Cron 5 champs en UTC ; une exécution par créneau (unicité en base) ; pas d'exécution simultanée ; attente de la synchronisation de l'horloge ; tâches manquées signalées, rattrapage optionnel (6 h) ; aucune relance automatique ; désactivé par défaut pour un site importé |
+| Alertes et e-mails | `src/lib/alerts.ts`, `src/lib/mail.ts` | Alerte critique = e-mail immédiat ; « attention » = récapitulatif quotidien ; SMTP (ex. Google Workspace) |
+
+Publication : l'étape « Fonctions serveur » démarre l'exécuteur de la nouvelle version **à côté** de l'ancien et
+refuse la publication si une fonction ne se charge pas. Après la bascule et la vérification, le nouvel exécuteur
+remplace l'ancien ; en cas d'échec, l'ancien reste actif.
+
+Aperçu : les fonctions ne tournent que si des **secrets de test** existent (exécuteur séparé, `CONTEXT=deploy-preview`) ;
+les formulaires de l'aperçu n'enregistrent rien.
+
+## 7. Prévu pour les phases suivantes
+
+- Sauvegardes chiffrées hors du serveur, surveillance externe, procédure de restauration (phase 4).
+- Installation sur le serveur définitif : Caddy, Cloudflare Tunnel, utilisateur système dédié, Podman sans droits
+  administrateur avec réseau `slirp4netns` ou `pasta`, limites de ressources (cgroups v2) à vérifier sur le matériel.

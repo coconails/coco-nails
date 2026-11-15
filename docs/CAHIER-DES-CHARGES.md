@@ -1,4 +1,4 @@
-# PAGINITY — Cahier des charges (version 1.1, fin de phase 1)
+# PAGINITY — Cahier des charges (version 1.2, fin de phase 3)
 
 > Plateforme personnelle de création, d'hébergement, de gestion et de publication de sites web.
 > **Créer · Gérer · Publier · Suivre**
@@ -48,6 +48,10 @@ réversibilité · validation par des tests réels · autorisation avant toute m
 | D20 | Base interne **SQLite intégrée à Node.js** (`node:sqlite`) : aucun module compilé à installer | 🔵 |
 | D21 | Mots de passe protégés par **Argon2id** | 🔵 |
 | D22 | Pas de vidéo hébergée sur le serveur (conditions Cloudflare) : utiliser YouTube, Vimeo ou un service dédié | 🔵 |
+| D23 | Formulaires Netlify remplacés par un **module PAGINITY** (aucune modification des sites) | 🔵 |
+| D24 | Si Podman est absent : **processus restreint** (permissions Node.js) en secours, signalé sur le tableau de bord | 🔵 |
+| D25 | Tâches planifiées : **aucune relance automatique** en cas d'échec (alerte), **désactivées par défaut** pour un site importé, rattrapage seulement sur autorisation | 🔵 |
+| D26 | Envoi des e-mails (alertes, formulaires) par **SMTP** (Google Workspace avec mot de passe d'application) | 🔵 |
 
 ## 3. Exigences fonctionnelles
 

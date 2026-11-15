@@ -8,7 +8,7 @@ import { now, UserError } from '../lib/util.js';
 import { requireOwner, requireUser } from './helpers.js';
 import { listAlerts } from '../lib/alerts.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 function readTemperature(): number | null {
   for (const p of ['/sys/class/thermal/thermal_zone0/temp']) {

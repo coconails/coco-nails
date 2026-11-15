@@ -1,6 +1,6 @@
 import { Alert, Anchor, Badge, Button, Card, Group, List, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { IconCode, IconExternalLink, IconEye, IconFileText, IconHistory, IconInfoCircle, IconPhoto, IconRocket, IconSettings } from '@tabler/icons-react';
+import { IconCode, IconExternalLink, IconEye, IconFileText, IconHistory, IconInfoCircle, IconKey, IconMail, IconPhoto, IconRocket, IconServerBolt, IconSettings } from '@tabler/icons-react';
 import { Link, useParams } from 'react-router-dom';
 import { get } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
@@ -92,6 +92,9 @@ export function SitePage() {
         {s.droits.publier && tuile(`/sites/${s.id}/publier`, 'Publier', 'Mettre en ligne les modifications.', <IconRocket size={28} />, s.modificationsEnAttente > 0)}
         {tuile(`/sites/${s.id}/versions`, 'Versions', 'Historique et retour à une version précédente.', <IconHistory size={28} />)}
         {s.droits.code && tuile(`/sites/${s.id}/fichiers`, 'Code', 'Fichiers HTML, CSS, JavaScript, JSON.', <IconCode size={28} />)}
+        {s.droits.publier && tuile(`/sites/${s.id}/formulaires`, 'Formulaires', 'Messages reçus par les formulaires du site.', <IconMail size={28} />)}
+        {tuile(`/sites/${s.id}/fonctions`, 'Fonctions et tâches', 'Code serveur, tâches planifiées, journal.', <IconServerBolt size={28} />)}
+        {s.droits.reglages && tuile(`/sites/${s.id}/secrets`, 'Secrets', 'Clés d’API et mots de passe des fonctions.', <IconKey size={28} />)}
         {s.droits.reglages && tuile(`/sites/${s.id}/reglages`, 'Réglages', 'Nom, domaines, membres, export.', <IconSettings size={28} />)}
       </SimpleGrid>
 

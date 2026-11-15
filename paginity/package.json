@@ -1,16 +1,22 @@
 {
   "name": "paginity",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PAGINITY — plateforme personnelle de création, d'hébergement et de publication de sites",
   "type": "module",
-  "workspaces": ["server", "web"],
-  "engines": { "node": ">=22.13" },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
     "dev": "npm run dev -w server",
     "test": "npm test -w server",
-    "e2e": "node e2e/parcours.mjs"
+    "e2e": "node e2e/parcours.mjs",
+    "e2e:phase3": "node e2e/phase3.mjs"
   }
 }

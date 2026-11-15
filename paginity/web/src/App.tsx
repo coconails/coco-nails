@@ -28,6 +28,10 @@ const SantePage = lazy(() => import('./pages/Sante').then((m) => ({ default: m.S
 const JournalPage = lazy(() => import('./pages/Journal').then((m) => ({ default: m.JournalPage })));
 const ProfilPage = lazy(() => import('./pages/Profil').then((m) => ({ default: m.ProfilPage })));
 
+const FonctionsPage = lazy(() => import('./pages/Fonctions').then((m) => ({ default: m.FonctionsPage })));
+const SecretsPage = lazy(() => import('./pages/Secrets').then((m) => ({ default: m.SecretsPage })));
+const FormulairesPage = lazy(() => import('./pages/Formulaires').then((m) => ({ default: m.FormulairesPage })));
+const ReglagesPlateformePage = lazy(() => import('./pages/ReglagesPlateforme').then((m) => ({ default: m.ReglagesPlateformePage })));
 const EtatContext = createContext<Etat | null>(null);
 export function useEtat(): Etat {
   const e = useContext(EtatContext);
@@ -102,6 +106,10 @@ export function App() {
           <Route path="/sites/:id/publier" element={<PublierPage />} />
           <Route path="/sites/:id/versions" element={<VersionsPage />} />
           <Route path="/sites/:id/reglages" element={<ReglagesPage />} />
+          <Route path="/sites/:id/fonctions" element={<FonctionsPage />} />
+          <Route path="/sites/:id/secrets" element={<SecretsPage />} />
+          <Route path="/sites/:id/formulaires" element={<FormulairesPage />} />
+          <Route path="/reglages" element={<ReglagesPlateformePage />} />
           <Route path="/activites" element={<ActivitesPage />} />
           <Route path="/utilisateurs" element={<UtilisateursPage />} />
           <Route path="/sante" element={<SantePage />} />

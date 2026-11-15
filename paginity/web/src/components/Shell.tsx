@@ -7,7 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconActivity, IconBell, IconClipboardList, IconCode, IconDashboard, IconEye, IconFileText, IconHeartbeat, IconHistory, IconLogout, IconMoon, IconPhoto,
-  IconPlus, IconRocket, IconSettings, IconSun, IconUser, IconUsers, IconWorld,
+  IconPlus, IconRocket, IconSettings, IconSun, IconUser, IconUsers, IconWorld, IconMail, IconServerBolt, IconKey, IconAdjustments,
 } from '@tabler/icons-react';
 import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
@@ -157,6 +157,9 @@ export function Shell({ children }: { children: ReactNode }) {
                   {nav(`/sites/${s.id}/apercu`, 'Aperçu', <IconEye size={16} />)}
                   {site.data.droits.publier && nav(`/sites/${s.id}/publier`, 'Publier', <IconRocket size={16} />)}
                   {nav(`/sites/${s.id}/versions`, 'Versions', <IconHistory size={16} />)}
+                  {site.data.droits.publier && nav(`/sites/${s.id}/formulaires`, 'Formulaires', <IconMail size={16} />)}
+                  {nav(`/sites/${s.id}/fonctions`, 'Fonctions et tâches', <IconServerBolt size={16} />)}
+                  {site.data.droits.reglages && nav(`/sites/${s.id}/secrets`, 'Secrets', <IconKey size={16} />)}
                   {site.data.droits.reglages && nav(`/sites/${s.id}/reglages`, 'Réglages', <IconSettings size={16} />)}
                 </>
               )}
@@ -168,6 +171,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {user.proprietaire && nav('/utilisateurs', 'Utilisateurs', <IconUsers size={18} />)}
           {user.proprietaire && nav('/sante', 'Santé du serveur', <IconHeartbeat size={18} />)}
           {user.proprietaire && nav('/journal', 'Journal', <IconClipboardList size={18} />)}
+          {user.proprietaire && nav('/reglages', 'Réglages de la plateforme', <IconAdjustments size={18} />)}
         </AppShell.Section>
         <AppShell.Section>
           <Group gap={6} px="sm" py={6}>
