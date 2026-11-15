@@ -58,7 +58,8 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
-  SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
+  SumUp (relié le 15/11/2026) : `SUMUP_API_KEY` (clé SECRÈTE `sup_sk_…`, pas la clé publique `sup_pk_` ; ne jamais la demander),
+  `SUMUP_MERCHANT_CODE` = M07DDC5B.
   SMS OVHcloud (100 crédits achetés le 14/11/2026) : `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY` (secrètes),
   `OVH_SMS_SERVICE` (ex. sms-ab12345-1), `OVH_SMS_EXPEDITEUR` (« CocoNails » une fois validé chez OVH).
 - Google : projet Cloud `coco-nails-514415`, compte de service `coconails@coco-nails-514415.iam.gserviceaccount.com`
@@ -87,7 +88,9 @@ Toujours tester localement avant (Google simulé) et montrer un aperçu avant de
   export annuel, avoirs, bons cadeaux, fidélité, compteur de visites sans cookies.
 - Netlify gratuit (300 crédits/mois, 15 par publication) ; badge « Powered by Netlify » non désactivable gratuitement
   (boutons flottants du site remontés au-dessus). Brevo écarté (SMS réservés aux forfaits payants) → OVHcloud.
-- SumUp : compte pas encore créé ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %). Workspace payé au mois, pas de Freebox.
+- SumUp : compte créé et relié à la compta (15/11/2026) ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %).
+  Workspace payé au mois, pas de Freebox. Netlify : formule Personal prise en novembre 2026 pour finir les publications,
+  retour possible à la formule gratuite ensuite (penser à le faire avant le renouvellement).
 
 ## Horaires actuels
 Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h · dim fermé. Tél. 07 68 22 70 15 (WhatsApp actif).
