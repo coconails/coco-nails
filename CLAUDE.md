@@ -58,8 +58,7 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
-  SumUp (relié le 15/11/2026) : `SUMUP_API_KEY` (clé SECRÈTE `sup_sk_…`, pas la clé publique `sup_pk_` ; ne jamais la demander),
-  `SUMUP_MERCHANT_CODE` = M07DDC5B.
+  SumUp (quand le compte existera) : `SUMUP_API_KEY` (secrète, ne jamais la demander), `SUMUP_MERCHANT_CODE` facultatif.
   SMS OVHcloud (100 crédits achetés le 14/11/2026) : `OVH_APPLICATION_KEY`, `OVH_APPLICATION_SECRET`, `OVH_CONSUMER_KEY` (secrètes),
   `OVH_SMS_SERVICE` (ex. sms-ab12345-1), `OVH_SMS_EXPEDITEUR` (« CocoNails » une fois validé chez OVH).
 - Google : projet Cloud `coco-nails-514415`, compte de service `coconails@coco-nails-514415.iam.gserviceaccount.com`
@@ -70,12 +69,18 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
 
 ## Comment livrer une modification
 L'utilisateur envoie les fichiers sur GitHub par le navigateur (Add file > Upload files), Netlify republie.
+**Règle (incident du 16/11/2026)** : ne jamais livrer des fichiers construits depuis une ancienne copie (zip, dossier local, autre conversation).
+Toujours partir de la dernière version de `main` (git pull), car Coralie modifie les contenus via Pages CMS. Le 16/11, un envoi
+de `messages.mjs` et `index.html` du 13/11 a cassé tous les déploiements (exports rappelUrssaf/factureCliente manquants) ;
+corrigé en restaurant ces fichiers (commit e247b6a). Claude peut désormais pousser directement sur `main` du dépôt `coconails/coco-nails1`.
 GitHub web ignore souvent les fichiers commençant par un point (.pages.yml) : les modifier dans l'éditeur GitHub.
 Toujours tester localement avant (Google simulé) et montrer un aperçu avant de livrer.
 
 ## Reste à faire
-- SIRET de Coco Nail's : SIREN 132 514 431 (création validée par l'INSEE le 05/11/2026), SIRET pas encore publié
-  (avis de situation introuvable au 14/11). Ne jamais inventer le SIRET ; l'attendre avant les factures, SumUp et le médiateur.
+- ⚠️ Double SIREN à régulariser (CMA Pays de la Loire ou INSEE 09 72 72 60 00) : EI d'élevage active depuis 2018
+  (SIREN 844 915 629, SIRET 844 915 629 00019, Loire-Authion, prénoms « Coralie Sylvie Olivia ») et création 2026 Coco Nail's
+  (SIREN 132 514 431, prénoms « Coralie Eliane Raymonde »). Une seule EI par personne : attendre la réponse avant de saisir le SIRET,
+  de faire des factures et d'ouvrir SumUp. Vérifier aussi les déclarations URSSAF de l'ancienne activité.
 - OVHcloud SMS (compte sms-fe253701-1) : expéditeur « CocoNails » demandé le 14/11/2026 (en attente de validation), clés API
   recréées (droits GET/POST /sms/*), à mettre dans Netlify avec les 5 variables OVH_* après validation, puis 1 Trigger deploy.
 - Mentions légales (Pages CMS > Informations légales) : SIRET (en attente CMA), médiateur CM2C (adhésion à faire),
@@ -88,9 +93,8 @@ Toujours tester localement avant (Google simulé) et montrer un aperçu avant de
   export annuel, avoirs, bons cadeaux, fidélité, compteur de visites sans cookies.
 - Netlify gratuit (300 crédits/mois, 15 par publication) ; badge « Powered by Netlify » non désactivable gratuitement
   (boutons flottants du site remontés au-dessus). Brevo écarté (SMS réservés aux forfaits payants) → OVHcloud.
-- SumUp : compte créé et relié à la compta (15/11/2026) ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %).
-  Workspace payé au mois, pas de Freebox. Netlify : formule Personal prise en novembre 2026 pour finir les publications,
-  retour possible à la formule gratuite ensuite (penser à le faire avant le renouvellement).
+- SumUp : compte pas encore créé ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %). Workspace payé au mois, pas de Freebox.
 
 ## Horaires actuels
-Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h · dim fermé. Tél. 07 68 22 70 15 (WhatsApp actif).
+Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h · dim fermé. Tél. 07 68 22 70 15 (WhatsApp actif), fixe 02 43 92 62 54
+(champ facultatif `coordonnees.telephone_fixe` : rubrique Contact « Portable » / « Téléphone fixe », mentions légales, e-mails clientes).
