@@ -88,6 +88,17 @@ action dans le journal. Commandes : `etat`, `verifier` (base, clé du coffre, do
 `fermer-sessions <e-mail>`, `mot-de-passe <e-mail>` (demandé au clavier, jamais sur la ligne de commande),
 `reinitialiser-2fa <e-mail> --confirmer`, `activer <e-mail>`, `copie-base <fichier>` (copie cohérente, jamais écrasée).
 
+**Sauvegarde complète** : `paginity-admin sauvegarder <dossier>` produit deux fichiers, à ranger **à des endroits
+différents** : `paginity-sauvegarde-<date>.tar.gz` (base copiée de façon cohérente, sites avec historiques Git, versions
+publiées, données, messages ; empreinte SHA-256 de chaque fichier) et `paginity-cle-coffre-<date>.txt` (clé du coffre,
+indispensable pour relire secrets, codes à 6 chiffres et messages). Fonctionne PAGINITY allumé. Fichiers temporaires,
+cache des dépendances et sockets ne sont pas sauvegardés (ils se recréent).
+
+**Restauration** : PAGINITY arrêté, `PAGINITY_DATA_DIR=<dossier vide> paginity-admin restaurer <archive> --cle <fichier>`.
+Elle refuse un dossier non vide, une mauvaise clé, une archive modifiée, tronquée ou piégée (chemins `..`, liens), puis
+vérifie la base et l'ouverture des données chiffrées, et recalcule les liens « en ligne ». Ensuite : `paginity-admin verifier`.
+L'envoi chiffré hors de la machine (disque externe, second lieu) sera mis en place en phase 4.
+
 **`paginity-maj`** (`paginity/scripts/paginity-maj`) met PAGINITY à jour depuis son dépôt Git, dans l'organisation prévue :
 `/opt/paginity/versions/<date>-<commit>/`, lien `/opt/paginity/actuelle`, données dans `/var/lib/paginity`.
 1. La nouvelle version est récupérée, installée (`npm ci --ignore-scripts`), fabriquée et testée **à côté** :

@@ -547,6 +547,7 @@ PAGINITY fonctionne dans le navigateur du téléphone ou de la tablette (Safari,
 | La publication a échoué | **L'ancienne version reste en ligne.** Ouvrez **Activités** : l'étape en rouge explique la cause (JSON invalide, fonction en erreur…). Corrigez, puis publiez à nouveau. |
 | Le site ne montre pas ma modification | Vérifiez qu'elle est **publiée** (pas seulement enregistrée en brouillon). Puis rechargez la page du site (sur ordinateur : Ctrl+F5). |
 | Je veux revenir à la version d'hier | **Versions › Actions › Remettre cette version en ligne**. |
+| Le serveur est en panne ou le disque est perdu | Sur une machine réinstallée : `paginity-admin restaurer <archive> --cle <fichier de clé>` remet tout (comptes, sites, historiques, secrets, messages) à partir d’une sauvegarde faite avec `paginity-admin sauvegarder`. Gardez toujours l’archive et la clé à deux endroits différents. |
 | Une alerte « tâche manquée » | Le serveur était éteint à l'heure prévue. Décidez s'il faut lancer la tâche à la main (**Lancer maintenant**). |
 | Une photo d'iPhone est refusée (HEIC) | Sur l'iPhone : *Réglages › Appareil photo › Formats › Le plus compatible*, ou partagez la photo en JPEG. |
 | Une image SVG est refusée | Par sécurité, la médiathèque n'accepte pas les SVG. Un administrateur peut l'ajouter par le mode code. |

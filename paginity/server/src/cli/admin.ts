@@ -7,6 +7,7 @@ import { Vault } from '../lib/vault.js';
 import { audit } from '../lib/audit.js';
 import { checkPasswordPolicy, hashPassword } from '../auth/passwords.js';
 import { UserError } from '../lib/util.js';
+import { restaurer, sauvegarder } from './sauvegarde.js';
 
 /**
  * paginity-admin : outil de secours, à lancer sur la machine elle-même (clavier/écran ou SSH).
@@ -29,7 +30,14 @@ Utilisation : paginity-admin <commande> [options]
                                 les passkeys et les codes de secours. La double authentification sera
                                 à reconfigurer à la prochaine connexion (mot de passe exigé).
   activer <e-mail>              Réactive un compte désactivé.
-  copie-base <fichier>          Copie cohérente de la base (même PAGINITY allumé), pour la garder à part.
+  copie-base <fichier>          Copie cohérente de la base seule (même PAGINITY allumé).
+  sauvegarder <dossier> [--sans-cle]
+                                Sauvegarde COMPLÈTE (base, sites, historiques, versions, messages) dans
+                                <dossier> : une archive .tar.gz et, à part, le fichier de la clé du coffre.
+                                Rangez les deux à des endroits différents.
+  restaurer <archive> --cle <fichier>
+                                Restaure une sauvegarde dans PAGINITY_DATA_DIR, qui doit être vide (PAGINITY
+                                arrêté). Tout est vérifié avant de finir (empreintes, clé, base).
   aide                          Affiche cette aide.
 
 Les données utilisées sont celles de PAGINITY_DATA_DIR (comme le serveur).`;
@@ -46,6 +54,24 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
     return cmd ? 0 : 1;
   }
   const config = loadConfig();
+  if (cmd === 'restaurer') {
+    // Se fait dans un dossier vide : pas de base à ouvrir avant.
+    try {
+      const i = args.indexOf('--cle');
+      const archive = args.find((a, k) => !a.startsWith('--') && k !== i + 1);
+      if (!archive || i < 0 || !args[i + 1]) throw new UserError(400, 'Utilisation : paginity-admin restaurer <archive> --cle <fichier de clé>');
+      const r = restaurer(archive, args[i + 1], config.dataDir);
+      const db = openDb(config.dataDir);
+      audit(db, { action: 'secours_restauration', details: { archive: path.basename(archive), sauvegardeDu: r.fiche.creeLe } });
+      db.close();
+      out.log(`Restauration terminée dans ${config.dataDir} : ${r.sites} site(s), ${r.fichiers} fichiers vérifiés (sauvegarde du ${r.fiche.creeLe}).`);
+      out.log('Lancez « paginity-admin verifier », puis démarrez PAGINITY.');
+      return 0;
+    } catch (e) {
+      out.err(e instanceof UserError ? e.message : `Erreur : ${(e as Error).message}`);
+      return 1;
+    }
+  }
   if (!fs.existsSync(path.join(config.dataDir, 'plateforme', 'paginity.db'))) {
     out.err(`Aucune donnée PAGINITY dans ${config.dataDir} (vérifiez PAGINITY_DATA_DIR).`);
     return 2;
@@ -126,6 +152,17 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
         db.prepare('VACUUM INTO ?').run(abs);
         fs.chmodSync(abs, 0o600);
         out.log(`Copie de la base écrite dans ${abs} (sans la clé du coffre : les secrets y restent chiffrés).`);
+        return 0;
+      }
+      case 'sauvegarder': {
+        const dest = args.find((a) => !a.startsWith('--'));
+        if (!dest) throw new UserError(400, 'Indiquez le dossier où ranger la sauvegarde.');
+        const enCours = (db.prepare("SELECT COUNT(*) AS n FROM publications WHERE status = 'en_cours'").get() as { n: number }).n;
+        if (enCours) out.err('Attention : une publication est en cours ; il est préférable de sauvegarder une fois terminée.');
+        const r = sauvegarder(config.dataDir, db, dest, { sansCle: args.includes('--sans-cle') });
+        audit(db, { action: 'secours_sauvegarde', details: { archive: path.basename(r.archive), fichiers: r.fichiers } });
+        out.log(`Sauvegarde : ${r.archive} (${r.fichiers} fichiers, empreintes notées).`);
+        if (r.cle) out.log(`Clé du coffre : ${r.cle}\n→ Rangez la clé À PART de l’archive : qui possède les deux possède tout ; sans la clé, la sauvegarde est inutilisable.`);
         return 0;
       }
       default:
