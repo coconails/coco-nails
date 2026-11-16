@@ -98,4 +98,25 @@ describe('Code exécuté sur le serveur : réservé au propriétaire', () => {
     expect((await ecrire(admin, 'public/style.css', 'body{color:blue}')).status).toBe(200);
     expect((await admin.call('POST', `/api/sites/${siteId}/publications/2/reprendre`, {})).status).toBe(200);
   });
+
+  it('un administrateur du site ne peut ni rétrograder ni retirer un autre administrateur (seul le propriétaire le peut)', async () => {
+    // Un second administrateur, nommé par le propriétaire.
+    const inv = await c.call('POST', '/api/invitations', { email: 'second@exemple.fr', roles: [{ siteId, role: 'admin_site' }] });
+    const token = inv.json.lien.split('/invitation/')[1];
+    const autre = client(p, { remoteAddress: '10.1.1.2' });
+    autre.csrf = (await autre.call('GET', '/api/etat')).json.csrf;
+    await autre.call('POST', `/api/invitations/${token}/accepter`, { nom: 'Second', motDePasse: 'une troisième phrase solide' });
+    const second = (p.ctx.db.prepare("SELECT id FROM users WHERE email = 'second@exemple.fr'").get() as { id: string }).id;
+    const role = () => (p.ctx.db.prepare('SELECT role FROM site_members WHERE site_id = ? AND user_id = ?').get(siteId, second) as { role: string } | undefined)?.role;
+    expect((await admin.call('PUT', `/api/sites/${siteId}/membres/${second}`, { role: 'contributeur' })).status).toBe(403);
+    expect((await admin.call('DELETE', `/api/sites/${siteId}/membres/${second}`)).status).toBe(403);
+    expect(role()).toBe('admin_site');
+    // Le propriétaire, lui, le peut.
+    expect((await c.call('PUT', `/api/sites/${siteId}/membres/${second}`, { role: 'editeur' })).status).toBe(200);
+    expect(role()).toBe('editeur');
+    // Et l'administrateur gère normalement les éditeurs et contributeurs.
+    expect((await admin.call('PUT', `/api/sites/${siteId}/membres/${second}`, { role: 'contributeur' })).status).toBe(200);
+    expect((await admin.call('DELETE', `/api/sites/${siteId}/membres/${second}`)).status).toBe(200);
+    expect(role()).toBeUndefined();
+  });
 });

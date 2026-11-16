@@ -187,7 +187,7 @@ export function ProfilPage() {
                 {sessions.data?.map((s) => (
                   <Table.Tr key={s.id}>
                     <Table.Td>
-                      {s.appareil?.slice(0, 80) ?? 'Appareil inconnu'} {s.courante && <Badge size="xs">cet appareil</Badge>}
+                      {appareilLisible(s.appareil)} {s.courante && <Badge size="xs">cet appareil</Badge>}
                     </Table.Td>
                     <Table.Td>{s.ip}</Table.Td>
                     <Table.Td>{ilYa(s.vueLe)}</Table.Td>
@@ -230,4 +230,12 @@ export function ProfilPage() {
       </Modal>
     </Page>
   );
+}
+
+/** « Mozilla/5.0 (iPhone; …) Safari/… » → « Safari sur iPhone ». */
+export function appareilLisible(ua: string | null | undefined): string {
+  if (!ua) return 'Appareil inconnu';
+  const nav = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /(Chrome|CriOS)\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navigateur';
+  const sys = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'appareil inconnu';
+  return `${nav} sur ${sys}`;
 }

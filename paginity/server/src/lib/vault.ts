@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Coffre : chiffrement des données sensibles (secrets à deux facteurs, et en phase 3 les secrets des sites).
+ * Coffre : chiffrement des données sensibles (codes à deux facteurs, secrets des sites, messages des formulaires, mot de passe de messagerie).
  * Algorithme AES-256-GCM. La clé maître est un fichier lisible uniquement par l'utilisateur système de PAGINITY.
  * Limite connue : si le serveur est entièrement compromis, la clé maître peut être lue.
  */

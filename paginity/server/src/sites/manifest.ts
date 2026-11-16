@@ -20,7 +20,7 @@ export interface HeaderRule {
 export interface SiteManifest {
   /** Dossier publié, relatif à la racine du dépôt ('.' = tout le dépôt). */
   publishDir: string;
-  /** Étape de préparation (exécutée dans un conteneur isolé à partir de la phase 3). */
+  /** Étape de préparation (exécutée dans un environnement isolé à chaque publication). */
   build: string | null;
   functionsDir: string | null;
   functionsFormat: 'netlify-v2' | null;
@@ -107,12 +107,11 @@ export function readManifest(repoDir: string): SiteManifest {
 
   if (m.build) {
     warnings.push(
-      `Étape de préparation détectée (« ${m.build} »). Pour votre sécurité, elle sera exécutée dans un conteneur isolé à partir de la phase 3. ` +
-        'En attendant, PAGINITY publie les fichiers tels qu’ils sont dans le dépôt.',
+      `Étape de préparation détectée (« ${m.build} ») : elle est exécutée à chaque publication et à chaque aperçu, dans un environnement isolé du reste du serveur.`,
     );
   }
   if (m.functionsDir && fs.existsSync(path.join(repoDir, m.functionsDir))) {
-    warnings.push('Fonctions serveur détectées. Elles seront prises en charge à partir de la phase 3 ; les pages fonctionnent déjà.');
+    warnings.push('Fonctions serveur détectées : elles tournent dans un environnement isolé. Leurs clés se règlent dans « Secrets » ; leurs tâches planifiées restent arrêtées tant qu’elles ne sont pas activées dans « Fonctions et tâches ».');
   }
   return m;
 }
@@ -121,6 +120,6 @@ export function writeManifest(repoDir: string, m: Pick<SiteManifest, 'publishDir
   const doc: Record<string, unknown> = { dossier_publie: m.publishDir };
   if (m.build) doc.preparation = m.build;
   if (m.functionsDir) doc.fonctions = { dossier: m.functionsDir, format: m.functionsFormat ?? 'netlify-v2' };
-  const header = '# Fiche technique du site, lue par PAGINITY.\n# dossier_publie : dossier mis en ligne. preparation : commande lancée avant publication (phase 3).\n';
+  const header = '# Fiche technique du site, lue par PAGINITY.\n# dossier_publie : dossier mis en ligne. preparation : commande lancée avant chaque publication.\n';
   fs.writeFileSync(path.join(repoDir, 'paginity.yml'), header + YAML.stringify(doc));
 }

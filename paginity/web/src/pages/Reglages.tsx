@@ -113,18 +113,25 @@ export function ReglagesPage() {
                       </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Select
-                        size="xs"
-                        data={ROLES.filter((r) => etat.utilisateur?.proprietaire || r.value !== 'admin_site')}
-                        value={m.role}
-                        onChange={(v) => v && void act(() => put(`/api/sites/${id}/membres/${m.id}`, { role: v }), 'Rôle modifié.')}
-                        allowDeselect={false}
-                      />
+                      {/* Un administrateur du site est nommé par le propriétaire : lui seul peut changer son rôle. */}
+                      {!etat.utilisateur?.proprietaire && m.role === 'admin_site' ? (
+                        <Text size="sm">{ROLES.find((r) => r.value === m.role)?.label}</Text>
+                      ) : (
+                        <Select
+                          size="xs"
+                          data={ROLES.filter((r) => etat.utilisateur?.proprietaire || r.value !== 'admin_site')}
+                          value={m.role}
+                          onChange={(v) => v && void act(() => put(`/api/sites/${id}/membres/${m.id}`, { role: v }), 'Rôle modifié.')}
+                          allowDeselect={false}
+                        />
+                      )}
                     </Table.Td>
                     <Table.Td>
-                      <Button size="xs" variant="subtle" color="red" onClick={() => window.confirm(`Retirer l’accès de ${m.nom} ?`) && void act(() => del(`/api/sites/${id}/membres/${m.id}`), 'Accès retiré.')}>
-                        Retirer
-                      </Button>
+                      {(etat.utilisateur?.proprietaire || m.role !== 'admin_site') && (
+                        <Button size="xs" variant="subtle" color="red" onClick={() => window.confirm(`Retirer l’accès de ${m.nom} ?`) && void act(() => del(`/api/sites/${id}/membres/${m.id}`), 'Accès retiré.')}>
+                          Retirer
+                        </Button>
+                      )}
                     </Table.Td>
                   </Table.Tr>
                 ))}

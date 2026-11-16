@@ -6,6 +6,7 @@ import { IconUserPlus } from '@tabler/icons-react';
 import { errorMessage, get, patch, post } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
 import { dateHeure } from '../format';
+import { useEtat } from '../App';
 
 interface Donnees {
   utilisateurs: { id: string; email: string; nom: string; proprietaire: boolean; desactive: boolean; creeLe: number; sites: { id: string; nom: string; roleLibelle: string }[] }[];
@@ -13,6 +14,20 @@ interface Donnees {
 }
 
 export function UtilisateursPage() {
+  const etat = useEtat();
+  if (!etat.utilisateur?.proprietaire) {
+    return (
+      <Page titre="Utilisateurs">
+        <Alert color="blue" title="Réservé au propriétaire de la plateforme">
+          Pour inviter quelqu’un sur votre site, passez par les Réglages du site (si votre rôle le permet).
+        </Alert>
+      </Page>
+    );
+  }
+  return <UtilisateursProprietaire />;
+}
+
+function UtilisateursProprietaire() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['utilisateurs'], queryFn: () => get<Donnees>('/api/utilisateurs') });
   const [email, setEmail] = useState('');

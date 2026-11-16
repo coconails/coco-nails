@@ -117,7 +117,7 @@ export function serveStatic(root: string, req: IncomingMessage, res: ServerRespo
 
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { ...baseHeaders, Allow: 'GET, HEAD', 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Méthode non autorisée. (Les formulaires Netlify seront pris en charge par un module PAGINITY à partir de la phase 3.)');
+    res.end('Méthode non autorisée.');
     return;
   }
 

@@ -24,7 +24,7 @@ export function assertNoSymlinks(dir: string): void {
 
 /**
  * Fabrication d'une version : contrôles, copie du dossier publié, vérification des liens.
- * En phase 2, aucune commande du site n'est exécutée (ce sera fait dans un conteneur isolé en phase 3).
+ * L'étape de préparation du site, elle, est exécutée à part, dans un environnement isolé (fabrication.ts).
  */
 
 const VIDEO_EXT = new Set(['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v']);

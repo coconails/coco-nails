@@ -89,6 +89,13 @@ function listRelUnder(dir: string): string[] {
 }
 
 export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
+  /** Un administrateur du site est nommé par le propriétaire : lui seul peut le rétrograder ou le retirer. */
+  const assertMayManage = (siteId: string, myRole: string, targetId: string) => {
+    if (myRole === 'proprietaire') return;
+    const cur = ctx.db.prepare('SELECT role FROM site_members WHERE site_id = ? AND user_id = ?').get(siteId, targetId) as { role: string } | undefined;
+    if (cur?.role === 'admin_site') throw new UserError(403, 'Seul le propriétaire peut modifier ou retirer un administrateur du site.');
+  };
+
   // ------------------------------------------------------------------ tableau de bord et liste
   app.get('/api/sites', async (req) => {
     const { user } = requireUser(req);
@@ -204,6 +211,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const b = body<{ role?: string }>(req);
     if (!isRole(b.role)) throw new UserError(400, 'Rôle invalide.');
     if (role !== 'proprietaire' && ROLE_RANK[b.role] > ROLE_RANK.editeur) throw new UserError(403, 'Seul le propriétaire peut nommer un administrateur de site.');
+    assertMayManage(site.id, role, target.id);
     ctx.db.prepare('INSERT OR REPLACE INTO site_members (site_id, user_id, role) VALUES (?, ?, ?)').run(site.id, target.id, b.role);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'role_modifie', siteId: site.id, details: { utilisateur: target.email, role: b.role } });
     return { ok: true };
@@ -213,6 +221,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'membres');
     const targetId = (req.params as { userId: string }).userId;
+    assertMayManage(site.id, ctx.sites.require(user, site.id, 'membres').role, targetId);
     ctx.db.prepare('DELETE FROM site_members WHERE site_id = ? AND user_id = ?').run(site.id, targetId);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'acces_retire', siteId: site.id, details: { utilisateur: targetId } });
     return { ok: true };
