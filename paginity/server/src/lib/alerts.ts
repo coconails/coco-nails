@@ -1,5 +1,6 @@
 import type { Ctx } from '../context.js';
 import { now } from './util.js';
+import { maskSecrets } from '../functions/secrets.js';
 
 /**
  * Alertes : enregistrées (tableau de bord) et envoyées par e-mail si un serveur d'envoi est configuré.
@@ -7,7 +8,9 @@ import { now } from './util.js';
  */
 export type AlertLevel = 'information' | 'attention' | 'critique';
 
-export function raiseAlert(ctx: Ctx, level: AlertLevel, message: string, siteId?: string | null): void {
+export function raiseAlert(ctx: Ctx, level: AlertLevel, messageIn: string, siteId?: string | null): void {
+  // Une alerte part parfois par e-mail : jamais de valeur de secret dedans.
+  const message = maskSecrets(ctx, siteId, messageIn);
   // Évite les répétitions : même message non lu dans la dernière heure.
   const dup = ctx.db.prepare('SELECT 1 FROM alerts WHERE message = ? AND read_at IS NULL AND at > ?').get(message, now() - 3_600_000);
   if (dup) return;

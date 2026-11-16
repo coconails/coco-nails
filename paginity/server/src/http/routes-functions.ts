@@ -117,7 +117,8 @@ export function registerFunctionRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/formulaires/:fid/lu', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'publier');
-    ctx.db.prepare('UPDATE form_submissions SET read_at = ? WHERE id = ? AND site_id = ?').run(now(), (req.params as { fid: string }).fid, site.id);
+    const r = ctx.db.prepare('UPDATE form_submissions SET read_at = ? WHERE id = ? AND site_id = ?').run(now(), (req.params as { fid: string }).fid, site.id);
+    if (!r.changes) throw new UserError(404, 'Message introuvable.');
     return { ok: true };
   });
 

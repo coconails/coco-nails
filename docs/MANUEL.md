@@ -376,7 +376,7 @@ Ouvrez **Fonctions et tâches** pour les suivre.
   ce site et ses propres secrets.
 - **Le tableau** donne, pour chaque fonction, son adresse, son nombre d'appels et d'erreurs sur 24 heures, et sa durée
   moyenne.
-- **Journal** affiche les messages techniques des fonctions (les secrets y sont toujours masqués).
+- **Journal** affiche les messages techniques des fonctions (les secrets y sont toujours masqués, comme dans les alertes, les e-mails et l’historique des tâches).
 - **Redémarrer** relance les fonctions du site.
 
 **Tâches planifiées**

@@ -124,6 +124,12 @@ export class JobQueue {
     return rows.map((r) => this.toPublic(r));
   }
 
+  /** Identifiant (et non nom affiché) de la personne qui a lancé l'activité. */
+  ownerOf(id: string): string | null {
+    const r = this.db.prepare('SELECT user_id FROM jobs WHERE id = ?').get(id) as { user_id: string | null } | undefined;
+    return r?.user_id ?? null;
+  }
+
   /** Attend la fin d'une activité (utilisé par les tests et certaines opérations internes). */
   wait(id: string): Promise<PublicJob> {
     const j = this.get(id);

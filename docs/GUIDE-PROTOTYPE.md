@@ -66,7 +66,7 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 ## 5. Tests automatiques
 
 ```bash
-npm test                      # 76 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
+npm test                      # 102 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
 npm run build && npm run e2e  # parcours complet dans Chromium (nécessite Playwright)
 npm run verifier              # contrôle des types (serveur, tests, interface) et de la syntaxe des scripts
 ```

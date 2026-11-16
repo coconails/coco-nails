@@ -7,7 +7,7 @@ import os from 'node:os';
 import { now, randomId, UserError } from '../lib/util.js';
 import { mergeEnforced, readRules } from '../servers/static.js';
 import { Isolation, type RunningWorker } from './isolation.js';
-import { secretValues, type SecretEnv } from './secrets.js';
+import { maskSecrets, secretValues, type SecretEnv } from './secrets.js';
 
 /**
  * Gestion des exécuteurs de fonctions : un par site et par environnement (production, aperçu),
@@ -59,14 +59,8 @@ export class FunctionService {
   /** Ajoute une ligne au journal du site, en masquant toute valeur de secret. */
   log(key: string, line: string): void {
     const [siteId, env] = key.split(':') as [string, SecretEnv];
-    let text = line;
-    try {
-      for (const v of Object.values(secretValues(this.ctx, siteId, env))) {
-        if (v.length >= 6) text = text.split(v).join('[secret masqué]');
-      }
-    } catch {
-      /* site supprimé */
-    }
+    void env;
+    const text = maskSecrets(this.ctx, siteId, line);
     const stamped = `${new Date().toISOString()} [${env === 'test' ? 'aperçu' : 'production'}] ${text.slice(0, 4000)}`;
     const buf = this.logs.get(siteId) ?? [];
     buf.push(stamped);
@@ -244,7 +238,7 @@ export class FunctionService {
   record(siteId: string, fn: string, kind: 'appel' | 'planifiee' | 'manuel', status: number, durationMs: number, message?: string): void {
     this.ctx.db
       .prepare('INSERT INTO function_log (site_id, at, fn, kind, status, duration_ms, message) VALUES (?, ?, ?, ?, ?, ?, ?)')
-      .run(siteId, now(), fn, kind, status, durationMs, message ?? null);
+      .run(siteId, now(), fn, kind, status, durationMs, message ? maskSecrets(this.ctx, siteId, message) : null);
   }
 
   /** Transmet une requête de visiteur à l'exécuteur du site et renvoie sa réponse. */
@@ -298,8 +292,10 @@ export class FunctionService {
         r.on('data', (d) => (b.length < 4000 ? (b += d) : undefined));
         r.on('end', () => {
           const ms = now() - started;
-          this.record(site.id, fn, kind, r.statusCode ?? 0, ms, b.slice(0, 500));
-          resolve({ status: r.statusCode ?? 0, body: b, ms });
+          // Masqué AVANT d'être coupé (un secret coupé en deux ne serait plus reconnu).
+          const masque = maskSecrets(this.ctx, site.id, b);
+          this.record(site.id, fn, kind, r.statusCode ?? 0, ms, masque.slice(0, 500));
+          resolve({ status: r.statusCode ?? 0, body: masque, ms });
         });
       });
       req.on('timeout', () => req.destroy(new Error(`délai dépassé (${Math.round(timeoutMs / 1000)} s)`)));

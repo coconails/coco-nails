@@ -115,7 +115,9 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireUser(req);
     const j = ctx.jobs.get((req.params as { id: string }).id);
     const ids = visibleSiteIds(user);
-    if (!j || (ids !== null && !(j.siteId ? ids.includes(j.siteId) : j.utilisateur === user.name))) throw new UserError(404, 'Activité introuvable.');
+    // Visible si elle concerne un site accessible, ou (sans site) si la personne l'a lancée elle-même.
+    // Comparaison par identifiant : le nom affiché peut être choisi librement par chacun.
+    if (!j || (ids !== null && !(j.siteId ? ids.includes(j.siteId) : ctx.jobs.ownerOf(j.id) === user.id))) throw new UserError(404, 'Activité introuvable.');
     return j;
   });
 
@@ -135,7 +137,7 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: Ctx): void {
     const onEvent = (e: PaginityEvent) => {
       if (e.type !== 'activite') return;
       const j = e.data as PublicJob;
-      if (ids !== null && !(j.siteId && ids.includes(j.siteId)) && j.utilisateur !== user.name) return;
+      if (ids !== null && !(j.siteId ? ids.includes(j.siteId) : ctx.jobs.ownerOf(j.id) === user.id)) return;
       res.write(`event: activite\ndata: ${JSON.stringify(j)}\n\n`);
     };
     ctx.events.on('event', onEvent);

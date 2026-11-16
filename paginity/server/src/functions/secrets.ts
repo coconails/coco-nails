@@ -106,6 +106,23 @@ export function secretValues(ctx: Ctx, siteId: string, env: SecretEnv): Record<s
   return out;
 }
 
+/**
+ * Remplace toute valeur de secret du site (production ET test) par « [secret masqué] ».
+ * À appliquer à tout texte qui sort vers un journal, une alerte, un e-mail ou l'interface.
+ */
+export function maskSecrets(ctx: Ctx, siteId: string | null | undefined, text: string): string {
+  if (!siteId || !text) return text;
+  let out = text;
+  try {
+    const rows = ctx.db.prepare('SELECT value_enc FROM site_secrets WHERE site_id = ?').all(siteId) as { value_enc: string }[];
+    const values = rows.map((r) => ctx.vault.decrypt(r.value_enc)).filter((v) => v.length >= 6).sort((a, b) => b.length - a.length);
+    for (const v of values) out = out.split(v).join('[secret masqué]');
+  } catch {
+    /* site supprimé ou coffre illisible : texte laissé tel quel */
+  }
+  return out;
+}
+
 export function hasTestSecrets(ctx: Ctx, siteId: string): boolean {
   return !!ctx.db.prepare("SELECT 1 FROM site_secrets WHERE site_id = ? AND env = 'test' LIMIT 1").get(siteId);
 }
