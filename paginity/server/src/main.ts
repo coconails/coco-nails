@@ -61,7 +61,10 @@ export async function createPaginity(
   ctx.scheduler = new Scheduler(ctx);
   // PAGINITY AI : aucun cerveau branché par défaut (les tests en fournissent des simulés).
   ctx.ia = new Assistant(ctx);
-  if (overrides.cerveaux) ctx.ia.cerveaux = overrides.cerveaux;
+  if (overrides.cerveaux) {
+    ctx.ia.cerveaux = overrides.cerveaux;
+    ctx.ia.surcharge = true;
+  }
   ctx.ia.reprise();
   // Remise en ordre après un éventuel arrêt brutal pendant une publication (avant d'accepter des visiteurs).
   const reprise = recoverOnStartup(ctx);

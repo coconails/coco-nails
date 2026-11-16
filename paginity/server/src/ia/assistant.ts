@@ -8,6 +8,7 @@ import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import { validateEntryValue, type Field } from '../content/schema.js';
 import { isServerCode } from '../sites/server-code.js';
+import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal } from './fournisseurs.js';
 
 /**
  * PAGINITY AI — étape 1 : le cœur de l'agent et l'aiguilleur (« assistant contenus »).
@@ -23,7 +24,10 @@ import { isServerCode } from '../sites/server-code.js';
  *    il est soumis au réglage du propriétaire (jamais / sur accord / automatique) et à un plafond mensuel.
  */
 
-export type NomCerveau = 'local' | 'claude';
+export type NomCerveau = 'local' | 'claude' | 'chatgpt';
+export type NomExterne = 'claude' | 'chatgpt';
+export const NOMS_EXTERNES: NomExterne[] = ['claude', 'chatgpt'];
+export const LIBELLE: Record<NomCerveau, string> = { local: 'le modèle local', claude: 'Claude', chatgpt: 'ChatGPT' };
 
 export interface RubriqueContexte {
   nom: string;
@@ -52,15 +56,33 @@ export interface Cerveau {
   delaiMs: number;
   disponible(): Promise<boolean>;
   proposer(d: DemandeCerveau, signal: AbortSignal): Promise<ReponseCerveau>;
+  /** Coût maximal (centimes) d'un appel, pour ne jamais dépasser un plafond. Absent = gratuit. */
+  estimer?(d: DemandeCerveau): number;
 }
 
 export type ModeRelais = 'jamais' | 'demander' | 'auto';
 export interface ReglagesIA {
   active: boolean;
-  relaisClaude: ModeRelais;
+  /** Relais vers une IA extérieure (Claude, ChatGPT) : jamais, sur accord, automatique. */
+  relaisExterne: ModeRelais;
+  /** Plafond mensuel global de toutes les IA extérieures, en centimes. */
   plafondMensuelCentimes: number;
+  /** Ordre d'essai des IA extérieures. */
+  ordre: NomExterne[];
+  local: ConfigLocal;
+  claude: ConfigExterne;
+  chatgpt: ConfigExterne;
 }
-const REGLAGES_DEFAUT: ReglagesIA = { active: false, relaisClaude: 'demander', plafondMensuelCentimes: 0 };
+const REGLAGES_DEFAUT: ReglagesIA = {
+  active: false,
+  relaisExterne: 'demander',
+  plafondMensuelCentimes: 0,
+  ordre: ['claude', 'chatgpt'],
+  local: { actif: false, url: '', modele: '', tailleMax: 60_000, delaiS: 120 },
+  claude: { actif: false, modele: 'claude-opus-5-5', prixEntree: TARIFS_CLAUDE['claude-opus-5-5'].entree, prixSortie: TARIFS_CLAUDE['claude-opus-5-5'].sortie, plafondCentimes: null, delaiS: 180, url: '' },
+  chatgpt: { actif: false, modele: '', prixEntree: null, prixSortie: null, plafondCentimes: null, delaiS: 180, url: '' },
+};
+const CLE: Record<NomExterne, string> = { claude: 'ia_cle_claude', chatgpt: 'ia_cle_chatgpt' };
 
 export type StatutProposition = 'en_cours' | 'proposee' | 'accord_requis' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
 
@@ -93,31 +115,86 @@ const ESSAIS_LOCAUX = 2;
 const mois = (t = now()) => new Date(t).toISOString().slice(0, 7);
 
 export class Assistant {
+  /** Cerveaux imposés (tests uniquement). */
   cerveaux: Partial<Record<NomCerveau, Cerveau>> = {};
+  surcharge = false;
   private enVol = new Set<AbortController>();
 
   constructor(private ctx: Ctx) {}
 
   // ------------------------------------------------------------------ réglages
   reglages(): ReglagesIA {
+    let r: Partial<ReglagesIA> = {};
     try {
-      return { ...REGLAGES_DEFAUT, ...JSON.parse(getSetting(this.ctx.db, 'ia') ?? '{}') };
+      r = JSON.parse(getSetting(this.ctx.db, 'ia') ?? '{}');
     } catch {
-      return { ...REGLAGES_DEFAUT };
+      /* réglages abîmés : valeurs par défaut */
     }
+    return {
+      ...REGLAGES_DEFAUT,
+      ...r,
+      local: { ...REGLAGES_DEFAUT.local, ...r.local },
+      claude: { ...REGLAGES_DEFAUT.claude, ...r.claude },
+      chatgpt: { ...REGLAGES_DEFAUT.chatgpt, ...r.chatgpt },
+    };
   }
 
-  modifierReglages(input: Partial<ReglagesIA>): ReglagesIA {
+  modifierReglages(input: Record<string, any>): ReglagesIA {
     const r = this.reglages();
+    const centimes = (v: unknown, nul = false): number | null => {
+      if (nul && (v === null || v === '')) return null;
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0 || n > 1_000_000) throw new UserError(400, 'Plafond invalide (en centimes, entre 0 et 10 000).');
+      return n;
+    };
+    const prix = (v: unknown): number | null => {
+      if (v === null || v === '') return null;
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0 || n > 1000) throw new UserError(400, 'Prix invalide (par million de jetons).');
+      return n;
+    };
+    const adresse = (v: unknown): string => {
+      const t = String(v ?? '').trim();
+      if (t && !/^https?:\/\/[^\s]+$/.test(t)) throw new UserError(400, 'Adresse invalide (http:// ou https://).');
+      return t;
+    };
+    const duree = (v: unknown) => {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 5 || n > 900) throw new UserError(400, 'Délai invalide (5 à 900 secondes).');
+      return n;
+    };
     if (typeof input.active === 'boolean') r.active = input.active;
-    if (input.relaisClaude !== undefined) {
-      if (!['jamais', 'demander', 'auto'].includes(input.relaisClaude)) throw new UserError(400, 'Mode de relais inconnu.');
-      r.relaisClaude = input.relaisClaude;
+    if (input.relaisExterne !== undefined) {
+      if (!['jamais', 'demander', 'auto'].includes(input.relaisExterne)) throw new UserError(400, 'Mode de relais inconnu.');
+      r.relaisExterne = input.relaisExterne;
     }
-    if (input.plafondMensuelCentimes !== undefined) {
-      const p = Number(input.plafondMensuelCentimes);
-      if (!Number.isInteger(p) || p < 0 || p > 1_000_000) throw new UserError(400, 'Plafond invalide (en centimes, entre 0 et 10 000 €).');
-      r.plafondMensuelCentimes = p;
+    if (input.plafondMensuelCentimes !== undefined) r.plafondMensuelCentimes = centimes(input.plafondMensuelCentimes)!;
+    if (input.ordre !== undefined) {
+      if (!Array.isArray(input.ordre) || input.ordre.length !== 2 || !NOMS_EXTERNES.every((n) => input.ordre.includes(n))) throw new UserError(400, 'Ordre invalide.');
+      r.ordre = input.ordre;
+    }
+    if (input.local) {
+      const l = input.local;
+      if (typeof l.actif === 'boolean') r.local.actif = l.actif;
+      if (l.url !== undefined) r.local.url = adresse(l.url);
+      if (l.modele !== undefined) r.local.modele = String(l.modele).trim().slice(0, 200);
+      if (l.delaiS !== undefined) r.local.delaiS = duree(l.delaiS);
+      if (l.tailleMax !== undefined) {
+        const n = Number(l.tailleMax);
+        if (!Number.isInteger(n) || n < 1000 || n > 10_000_000) throw new UserError(400, 'Taille maximale invalide.');
+        r.local.tailleMax = n;
+      }
+    }
+    for (const nom of NOMS_EXTERNES) {
+      const e = input[nom];
+      if (!e) continue;
+      if (typeof e.actif === 'boolean') r[nom].actif = e.actif;
+      if (e.modele !== undefined) r[nom].modele = String(e.modele).trim().slice(0, 200);
+      if (e.prixEntree !== undefined) r[nom].prixEntree = prix(e.prixEntree);
+      if (e.prixSortie !== undefined) r[nom].prixSortie = prix(e.prixSortie);
+      if (e.plafondCentimes !== undefined) r[nom].plafondCentimes = centimes(e.plafondCentimes, true);
+      if (e.delaiS !== undefined) r[nom].delaiS = duree(e.delaiS);
+      if (e.url !== undefined) r[nom].url = adresse(e.url);
     }
     setSetting(this.ctx.db, 'ia', JSON.stringify(r));
     // Arrêt d'urgence : tout ce qui tourne est coupé, rien ne pourra plus être accepté.
@@ -125,15 +202,46 @@ export class Assistant {
     return r;
   }
 
-  depenseDuMois(): number {
-    return (this.ctx.db.prepare('SELECT COALESCE(SUM(centimes), 0) AS n FROM ia_usage WHERE mois = ?').get(mois()) as { n: number }).n;
+  /** Clé d'API d'un service extérieur : chiffrée dans le coffre, jamais réaffichée. */
+  definirCle(nom: NomExterne, cle: unknown): void {
+    if (typeof cle !== 'string' || cle.trim().length < 10 || cle.length > 500) throw new UserError(400, 'Clé invalide.');
+    setSetting(this.ctx.db, CLE[nom], this.ctx.vault.encrypt(cle.trim()));
+  }
+  effacerCle(nom: NomExterne): void {
+    this.ctx.db.prepare('DELETE FROM settings WHERE key = ?').run(CLE[nom]);
+  }
+  private cle(nom: NomExterne): string | null {
+    const v = getSetting(this.ctx.db, CLE[nom]);
+    return v ? this.ctx.vault.decrypt(v) : null;
+  }
+
+  depenseDuMois(nom?: NomExterne): number {
+    const sql = nom ? 'SELECT COALESCE(SUM(centimes), 0) AS n FROM ia_usage WHERE mois = ? AND fournisseur = ?' : 'SELECT COALESCE(SUM(centimes), 0) AS n FROM ia_usage WHERE mois = ?';
+    return (this.ctx.db.prepare(sql).get(...(nom ? [mois(), nom] : [mois()])) as { n: number }).n;
+  }
+
+  /** Cerveaux en service : ceux fournis par les tests, sinon construits d'après les réglages. */
+  cerveauxActifs(): Partial<Record<NomCerveau, Cerveau>> {
+    if (this.surcharge) return this.cerveaux;
+    const r = this.reglages();
+    const out: Partial<Record<NomCerveau, Cerveau>> = {};
+    if (r.local.actif && r.local.url && r.local.modele) out.local = cerveauLocal(r.local);
+    const cc = this.cle('claude');
+    if (r.claude.actif && cc && r.claude.modele && r.claude.prixEntree !== null && r.claude.prixSortie !== null) out.claude = cerveauClaude(r.claude, cc);
+    const co = this.cle('chatgpt');
+    if (r.chatgpt.actif && co && r.chatgpt.modele && r.chatgpt.prixEntree !== null && r.chatgpt.prixSortie !== null) out.chatgpt = cerveauChatGPT(r.chatgpt, co);
+    return out;
   }
 
   etat() {
+    const r = this.reglages();
     return {
-      reglages: this.reglages(),
+      reglages: r,
+      cles: { claude: !!getSetting(this.ctx.db, CLE.claude), chatgpt: !!getSetting(this.ctx.db, CLE.chatgpt) },
       depenseDuMoisCentimes: this.depenseDuMois(),
-      cerveaux: { local: !!this.cerveaux.local, claude: !!this.cerveaux.claude },
+      depenseParService: { claude: this.depenseDuMois('claude'), chatgpt: this.depenseDuMois('chatgpt') },
+      enService: Object.fromEntries(Object.keys(this.cerveauxActifs()).map((k) => [k, true])),
+      tarifsClaude: TARIFS_CLAUDE,
     };
   }
 
@@ -157,7 +265,7 @@ export class Assistant {
   }
 
   // ------------------------------------------------------------------ demande
-  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcerClaude?: boolean } = {}) {
+  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcer?: NomExterne } = {}) {
     const reg = this.reglages();
     if (!reg.active) throw new UserError(409, 'L’assistant est désactivé. Le propriétaire peut l’activer dans les Réglages de la plateforme.');
     const demande = typeof texte === 'string' ? texte.trim() : '';
@@ -167,7 +275,7 @@ export class Assistant {
       .prepare("INSERT INTO ia_propositions (id, site_id, user_id, demande, statut, journal, cree_le) VALUES (?, ?, ?, ?, 'en_cours', '[]', ?)")
       .run(id, site.id, user.id, demande, now());
     audit(this.ctx.db, { userId: user.id, action: 'ia_demande', siteId: site.id, details: { id } });
-    await this.traiter(id, site, opts.forcerClaude ? 'claude' : 'local');
+    await this.traiter(id, site, opts.forcer ?? 'local');
     return this.lire(site, id);
   }
 
@@ -176,23 +284,25 @@ export class Assistant {
     const p = this.ligne(site, id);
     if (p.statut !== 'accord_requis') throw new UserError(409, 'Cette demande n’attend pas d’accord.');
     if (!this.reglages().active) throw new UserError(409, 'L’assistant est désactivé.');
-    this.noter(id, `Relais vers Claude accepté par ${user.name}.`);
+    this.noter(id, `Relais vers une IA extérieure accepté par ${user.name}.`);
     audit(this.ctx.db, { userId: user.id, action: 'ia_relais_accepte', siteId: site.id, details: { id } });
-    await this.traiter(id, site, 'claude', true);
+    const voulu = (this.ctx.db.prepare('SELECT cerveau FROM ia_propositions WHERE id = ?').get(id) as { cerveau: string | null }).cerveau;
+    await this.traiter(id, site, voulu === 'claude' || voulu === 'chatgpt' ? voulu : 'externe', true);
     return this.lire(site, id);
   }
 
-  private async traiter(id: string, site: SiteRow, depart: NomCerveau, relaisAccepte = false): Promise<void> {
+  private async traiter(id: string, site: SiteRow, depart: NomCerveau | 'externe', relaisAccepte = false): Promise<void> {
     const { rubriques, versions } = this.contexte(site);
     if (!rubriques.length) return this.finir(id, 'impossible', { raison: 'Ce site n’a pas de contenus modifiables par formulaire : l’assistant n’a rien sur quoi travailler.' });
     const demande = (this.ctx.db.prepare('SELECT demande FROM ia_propositions WHERE id = ?').get(id) as { demande: string }).demande;
     const taille = JSON.stringify(rubriques).length + demande.length;
+    const cerveaux = this.cerveauxActifs();
     let raisonRelais: string | null = null;
 
     // 1. Modèle local, sauf si la tâche lui échappe d'emblée.
     if (depart === 'local') {
-      const local = this.cerveaux.local;
-      if (!local) raisonRelais = 'aucun modèle local n’est installé';
+      const local = cerveaux.local;
+      if (!local) raisonRelais = 'aucun modèle local n’est en service';
       else if (taille > local.tailleMax) raisonRelais = 'la demande est trop volumineuse pour le modèle local';
       else if (!(await local.disponible().catch(() => false))) raisonRelais = 'le modèle local ne répond pas';
       else {
@@ -216,37 +326,72 @@ export class Assistant {
           raisonRelais = 'les propositions du modèle local ne passent pas les vérifications';
         }
       }
-      this.noter(id, `Relais envisagé vers Claude : ${raisonRelais}.`);
+      this.noter(id, `Relais envisagé vers une IA extérieure : ${raisonRelais}.`);
     }
 
-    // 2. Claude, selon les règles du propriétaire.
+    // 2. IA extérieures, dans l'ordre choisi, selon les règles du propriétaire.
     const reg = this.reglages();
-    const claude = this.cerveaux.claude;
-    const blocage = !claude
-      ? 'Claude n’est pas relié à PAGINITY'
-      : reg.relaisClaude === 'jamais'
-        ? 'le relais vers Claude est désactivé dans les réglages'
-        : this.depenseDuMois() >= reg.plafondMensuelCentimes
-          ? `le plafond mensuel de dépense est atteint (${(reg.plafondMensuelCentimes / 100).toFixed(2)} €)`
-          : null;
-    if (blocage) {
+    const candidates: NomExterne[] = depart === 'claude' || depart === 'chatgpt' ? [depart] : reg.ordre;
+    const blocages: string[] = [];
+    const possibles: NomExterne[] = [];
+    if (reg.relaisExterne === 'jamais') blocages.push('le relais vers les IA extérieures est désactivé dans les réglages');
+    else {
+      for (const nom of candidates) {
+        const c = cerveaux[nom];
+        if (!c) {
+          blocages.push(`${LIBELLE[nom]} n’est pas en service`);
+          continue;
+        }
+        const estimation = c.estimer?.({ demande, rubriques }) ?? 0;
+        const plafondService = reg[nom].plafondCentimes;
+        const depasse = (depense: number, plafond: number) => depense >= plafond || depense + estimation > plafond;
+        if (depasse(this.depenseDuMois(), reg.plafondMensuelCentimes)) {
+          blocages.push(`le plafond mensuel global serait dépassé (${euros(reg.plafondMensuelCentimes)})`);
+          continue;
+        }
+        if (plafondService !== null && depasse(this.depenseDuMois(nom), plafondService)) {
+          blocages.push(`le plafond de ${LIBELLE[nom]} serait dépassé (${euros(plafondService)})`);
+          continue;
+        }
+        possibles.push(nom);
+      }
+    }
+    if (!possibles.length) {
       return this.finir(id, 'impossible', {
-        raison: `${raisonRelais ? `${capitale(raisonRelais)}, et ` : ''}${blocage}. Rien n’a été modifié ; vous pouvez faire la modification vous-même dans « Contenus ».`,
+        raison: `${raisonRelais ? `${capitale(raisonRelais)}, et ` : ''}${[...new Set(blocages)].join(', ')}. Rien n’a été modifié ; vous pouvez faire la modification vous-même dans « Contenus ».`,
       });
     }
-    if (reg.relaisClaude === 'demander' && !relaisAccepte) {
-      return this.finir(id, 'accord_requis', { raison: `${capitale(raisonRelais ?? 'vous avez demandé Claude')}. Passer la demande à Claude ? (contenus publics du site uniquement, payant)` });
+    if (reg.relaisExterne === 'demander' && !relaisAccepte) {
+      if (depart === 'claude' || depart === 'chatgpt') this.ctx.db.prepare('UPDATE ia_propositions SET cerveau = ? WHERE id = ?').run(depart, id);
+      return this.finir(id, 'accord_requis', {
+        raison: `${capitale(raisonRelais ?? `vous avez demandé ${LIBELLE[possibles[0]]}`)}. Passer la demande à ${LIBELLE[possibles[0]]} ? (contenus publics du site uniquement, payant)`,
+      });
     }
-    const r = await this.appeler(claude!, { demande, rubriques });
-    if (r.cout) this.compter(id, r.cout);
-    if (r.erreur) return this.finir(id, 'impossible', { raison: `Claude n’a pas pu répondre (${r.erreur}). Rien n’a été modifié.` });
-    if (r.reponse!.statut === 'impossible') return this.finir(id, 'impossible', { cerveau: 'claude', raison: `Claude ne sait pas faire cette demande : ${r.reponse!.raison}` });
-    const v = this.verifier(r.reponse!.changements, rubriques, versions);
-    if (!v.ok) {
-      this.noter(id, `Claude : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
-      return this.finir(id, 'impossible', { cerveau: 'claude', raison: 'La proposition de Claude ne passe pas les vérifications de PAGINITY. Rien n’a été modifié.' });
+    let derniere = '';
+    for (const nom of possibles) {
+      const c = cerveaux[nom]!;
+      const nomL = capitale(LIBELLE[nom]);
+      const r = await this.appeler(c, { demande, rubriques });
+      if (r.cout) this.compter(id, nom, r.cout);
+      if (r.erreur) {
+        this.noter(id, `${nomL} n’a pas pu répondre (${r.erreur}).`);
+        derniere = `${nomL} n’a pas pu répondre (${r.erreur})`;
+        continue;
+      }
+      if (r.reponse!.statut === 'impossible') {
+        this.noter(id, `${nomL} : « je ne sais pas faire » (${r.reponse!.raison}).`);
+        derniere = `${nomL} ne sait pas faire cette demande : ${r.reponse!.raison}`;
+        continue;
+      }
+      const v = this.verifier(r.reponse!.changements, rubriques, versions);
+      if (!v.ok) {
+        this.noter(id, `${nomL} : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
+        derniere = `la proposition de ${LIBELLE[nom]} ne passe pas les vérifications de PAGINITY`;
+        continue;
+      }
+      return this.finir(id, 'proposee', { cerveau: nom, explication: r.reponse!.explication, changements: v.changements, site });
     }
-    return this.finir(id, 'proposee', { cerveau: 'claude', explication: r.reponse!.explication, changements: v.changements, site });
+    return this.finir(id, 'impossible', { raison: `${capitale(derniere)}. Rien n’a été modifié.` });
   }
 
   /** Appel protégé : délai maximal, arrêt d'urgence, réponse de forme inattendue. */
@@ -268,7 +413,8 @@ export class Assistant {
       if (reponse.statut === 'proposition' && !Array.isArray(reponse.changements)) return { erreur: 'réponse illisible', cout };
       return { reponse, cout };
     } catch (e) {
-      return { erreur: (e as Error).message || 'erreur' };
+      const cout = Math.max(0, Math.round(Number((e as { coutCentimes?: number })?.coutCentimes) || 0));
+      return { erreur: (e as Error).message || 'erreur', cout };
     } finally {
       clearTimeout(minuteur);
       this.enVol.delete(ctl);
@@ -300,8 +446,8 @@ export class Assistant {
     return erreurs.length ? { ok: false as const, erreurs: erreurs.slice(0, 10) } : { ok: true as const, changements };
   }
 
-  private compter(id: string, centimes: number) {
-    this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes) VALUES (?, ?, ?, ?)').run(mois(), now(), id, centimes);
+  private compter(id: string, nom: NomExterne, centimes: number) {
+    this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes, fournisseur) VALUES (?, ?, ?, ?, ?)').run(mois(), now(), id, centimes, nom);
     this.ctx.db.prepare('UPDATE ia_propositions SET cout_centimes = cout_centimes + ? WHERE id = ?').run(centimes, id);
   }
 
@@ -389,6 +535,11 @@ export class Assistant {
   reprise(): void {
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'interrompue' WHERE statut = 'en_cours'").run();
   }
+}
+
+/** Montant en devise de facturation des services (dollars US chez Anthropic et OpenAI). */
+function euros(c: number): string {
+  return `${(c / 100).toFixed(2).replace('.', ',')} $`;
 }
 
 function capitale(s: string): string {

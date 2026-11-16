@@ -1,6 +1,6 @@
 import { Alert, Anchor, Badge, Button, Card, Group, List, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { IconCode, IconExternalLink, IconEye, IconFileText, IconHistory, IconInfoCircle, IconKey, IconMail, IconPhoto, IconRocket, IconServerBolt, IconSettings } from '@tabler/icons-react';
+import { IconCode, IconExternalLink, IconEye, IconFileText, IconHistory, IconInfoCircle, IconKey, IconMail, IconPhoto, IconRobot, IconRocket, IconServerBolt, IconSettings } from '@tabler/icons-react';
 import { Link, useParams } from 'react-router-dom';
 import { get } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
@@ -88,6 +88,7 @@ export function SitePage() {
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
         {tuile(`/sites/${s.id}/contenus`, 'Contenus', 'Textes, tarifs, horaires, FAQ… par formulaires.', <IconFileText size={28} />)}
         {tuile(`/sites/${s.id}/medias`, 'Médias', 'Photos et documents du site.', <IconPhoto size={28} />)}
+        {tuile(`/sites/${s.id}/assistant`, 'Assistant', 'Demandez une modification de contenu en quelques mots.', <IconRobot size={28} />)}
         {tuile(`/sites/${s.id}/apercu`, 'Aperçu', 'Voir le brouillon sur téléphone, tablette, ordinateur.', <IconEye size={28} />)}
         {s.droits.publier && tuile(`/sites/${s.id}/publier`, 'Publier', 'Mettre en ligne les modifications.', <IconRocket size={28} />, s.modificationsEnAttente > 0)}
         {tuile(`/sites/${s.id}/versions`, 'Versions', 'Historique et retour à une version précédente.', <IconHistory size={28} />)}

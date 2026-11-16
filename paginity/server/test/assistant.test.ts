@@ -77,7 +77,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
 
   it('est désactivé par défaut ; seul le propriétaire, identité confirmée, peut l’activer', async () => {
     expect((await demander('Change l’accroche')).status).toBe(409);
-    expect((await c.call('GET', '/api/reglages/ia')).json.reglages).toEqual({ active: false, relaisClaude: 'demander', plafondMensuelCentimes: 0 });
+    expect((await c.call('GET', '/api/reglages/ia')).json.reglages).toMatchObject({ active: false, relaisExterne: 'demander', plafondMensuelCentimes: 0 });
     expect((await reglages({ active: true })).status).toBe(200);
   });
 
@@ -134,7 +134,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
 
   it('le cerveau ne peut viser qu’une rubrique de contenu proposée : tout le reste est refusé', async () => {
     local.comportement = () => ({ statut: 'proposition', changements: [{ rubrique: 'netlify/functions/piege', valeur: 'export default 1' }], explication: 'piège' });
-    await reglages({ relaisClaude: 'jamais' });
+    await reglages({ relaisExterne: 'jamais' });
     const r = await demander('Fais quelque chose');
     expect(r.json.statut).toBe('impossible');
     expect(r.json.journal.map((j: any) => j.texte).join(' ')).toMatch(/rubrique inconnue/);
@@ -142,7 +142,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
   });
 
   it('relais vers Claude : décidé par les règles, sur accord par défaut, et bloqué par le plafond de 0 €', async () => {
-    await reglages({ relaisClaude: 'demander', plafondMensuelCentimes: 0 });
+    await reglages({ relaisExterne: 'demander', plafondMensuelCentimes: 0 });
     local.comportement = () => ({ statut: 'impossible', raison: 'trop compliqué pour moi' });
     claude.comportement = accroche('Accroche par Claude', 40);
     const r = await demander('Réécris l’accroche avec élégance');
@@ -161,7 +161,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
   });
 
   it('mode automatique : relais direct, jusqu’au plafond, puis arrêt', async () => {
-    await reglages({ relaisClaude: 'auto', plafondMensuelCentimes: 100 });
+    await reglages({ relaisExterne: 'auto', plafondMensuelCentimes: 100 });
     local.comportement = () => ({ statut: 'impossible', raison: 'non' });
     claude.comportement = accroche('Accroche auto', 70);
     const r = await demander('Accroche plus chaleureuse');
@@ -172,7 +172,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
   });
 
   it('modèle local trop lent, absent ou dépassé par la taille : relais ; Claude peut aussi répondre « je ne sais pas »', async () => {
-    await reglages({ relaisClaude: 'auto', plafondMensuelCentimes: 10_000 });
+    await reglages({ relaisExterne: 'auto', plafondMensuelCentimes: 10_000 });
     claude.comportement = () => ({ statut: 'impossible', raison: 'la demande est ambiguë : quel soin ?', coutCentimes: 5 });
     local.comportement = () => new Promise((r) => setTimeout(() => r({ statut: 'impossible', raison: 'x' }), 2000));
     local.delaiMs = 100;
@@ -211,7 +211,7 @@ describe('PAGINITY AI — assistant contenus (faux cerveaux)', () => {
   });
 
   it('droits : une contributrice demande et accepte, mais ne peut pas engager de dépense Claude ; un autre site est invisible', async () => {
-    await reglages({ relaisClaude: 'demander', plafondMensuelCentimes: 10_000 });
+    await reglages({ relaisExterne: 'demander', plafondMensuelCentimes: 10_000 });
     const inv = await c.call('POST', '/api/invitations', { email: 'camille@exemple.fr', roles: [{ siteId, role: 'contributeur' }] });
     const camille = client(p, { remoteAddress: '10.3.3.3' });
     camille.csrf = (await camille.call('GET', '/api/etat')).json.csrf;

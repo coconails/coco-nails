@@ -7,7 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   IconActivity, IconBell, IconClipboardList, IconCode, IconDashboard, IconEye, IconFileText, IconHeartbeat, IconHistory, IconLogout, IconMoon, IconPhoto,
-  IconPlus, IconRocket, IconSettings, IconSun, IconUser, IconUsers, IconWorld, IconMail, IconServerBolt, IconKey, IconAdjustments,
+  IconPlus, IconRocket, IconSettings, IconSun, IconUser, IconUsers, IconWorld, IconMail, IconServerBolt, IconKey, IconAdjustments, IconRobot,
 } from '@tabler/icons-react';
 import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { get, post } from '../api';
@@ -153,6 +153,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 <>
                   {nav(`/sites/${s.id}/contenus`, 'Contenus', <IconFileText size={16} />)}
                   {nav(`/sites/${s.id}/medias`, 'Médias', <IconPhoto size={16} />)}
+                  {nav(`/sites/${s.id}/assistant`, 'Assistant', <IconRobot size={16} />)}
                   {site.data.droits.code && nav(`/sites/${s.id}/fichiers`, 'Code', <IconCode size={16} />)}
                   {nav(`/sites/${s.id}/apercu`, 'Aperçu', <IconEye size={16} />)}
                   {site.data.droits.publier && nav(`/sites/${s.id}/publier`, 'Publier', <IconRocket size={16} />)}

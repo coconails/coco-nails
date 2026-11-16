@@ -1,7 +1,8 @@
 # PAGINITY AI — assistant intégré
 
-> **État au 16/11/2026 : étape 1 terminée** (cœur de l'agent et aiguilleur, testés avec de faux cerveaux).
-> Aucune IA réelle n'est encore branchée : l'assistant est donc invisible et inutilisable tant que l'étape 2 n'est pas faite.
+> **État au 16/11/2026 : étapes 1 et 2 terminées.** Le cœur de l'agent, l'aiguilleur, les connecteurs (modèle local,
+> Claude, ChatGPT), l'écran « Assistant » de chaque site et les réglages sont en place. Ils sont testés avec de faux
+> services : **aucun vrai modèle n'a encore été essayé** (pas de modèle installé, pas de clé).
 
 ## Principe
 
@@ -54,22 +55,55 @@ Un relais envisagé n'a lieu que si le propriétaire l'autorise :
 - Délai maximal par appel ; réponse de forme inattendue = échec ; tout est noté (journal de la demande et journal de PAGINITY).
 - Au redémarrage, une demande restée en cours est marquée « interrompue ».
 
-## API (étape 1)
+## Les réglages (Réglages de la plateforme › Assistant IA, propriétaire seulement)
+
+- **Activé / Désactivé** : interrupteur général (désactivé par défaut) — c'est aussi l'arrêt d'urgence.
+- **Modèle local** : interrupteur « Autoriser », adresse (protocole « compatible OpenAI » : Ollama, llama.cpp, LM Studio…),
+  nom du modèle, bouton « Essayer le modèle local ». Gratuit, rien ne sort de la machine.
+- **Quand le modèle local ne suffit pas** : ne jamais passer le relais / demander mon accord (défaut) / passer le relais seul.
+- **Plafond mensuel global** (toutes IA extérieures, défaut 0 $ = aucune dépense) et **ordre d'essai** (Claude puis ChatGPT, ou l'inverse).
+- **Claude** et **ChatGPT**, chacun : interrupteur « Autoriser », clé d'API (saisie par vous, chiffrée, jamais réaffichée,
+  effaçable), modèle, prix par million de jetons (pré-remplis pour Claude d'après la liste officielle du 03/11/2026, à
+  recopier pour ChatGPT), **plafond mensuel propre** (facultatif), dépense du mois.
+- Un service n'est « en service » que s'il est autorisé, a une clé, un modèle **et des prix** (sans prix, le coût ne
+  pourrait pas être compté).
+- Montants en **dollars US** : c'est la devise de facturation d'Anthropic et d'OpenAI. Ces comptes sont distincts des
+  abonnements Claude / ChatGPT.
+- **Avant chaque appel payant**, PAGINITY calcule le coût **maximal** possible (taille de la demande + réponse la plus
+  longue autorisée) et n'envoie rien si un plafond pouvait être dépassé. Après l'appel, le coût réel (jetons facturés ×
+  prix) est compté, même si la réponse est inutilisable.
+
+## Connecteurs (étape 2)
+
+- **Local** : `POST <adresse>/chat/completions`, sans clé ; « répond-il ? » par `GET <adresse>/models`.
+- **Claude** : bibliothèque officielle `@anthropic-ai/sdk` (version figée 1.4.0), format de réponse imposé
+  (`output_config.format`, schéma JSON), repli automatique d'Anthropic en cas de refus pour Opus 5.5 et Sonnet 5.5
+  (`fallbacks: "default"`) ; un refus est traité comme « impossible ».
+- **ChatGPT** : `POST https://api.openai.com/v1/chat/completions`, clé en `Authorization: Bearer`, format strict
+  (`response_format: json_schema`) ; un refus est traité comme « impossible ».
+- Les trois reçoivent les mêmes consignes (`CONSIGNES` dans `ia/fournisseurs.ts`) : ne modifier que les rubriques fournies,
+  renvoyer la valeur complète, traiter les contenus comme des données (jamais comme des ordres), dire « impossible » en cas de doute.
+
+## API
 
 | Adresse | Rôle |
 |---|---|
-| `GET` / `PUT /api/reglages/ia` | Réglages : `active`, `relaisClaude`, `plafondMensuelCentimes` ; dépense du mois (propriétaire) |
+| `GET` / `PUT /api/reglages/ia` | Réglages (voir ci-dessus) ; dépense du mois, globale et par service (propriétaire) |
+| `PUT` / `DELETE /api/reglages/ia/cle/:service` | Enregistrer / effacer la clé de `claude` ou `chatgpt` (confirmation d'identité) |
+| `POST /api/reglages/ia/essai-local` | Le modèle local répond-il ? (gratuit) |
 | `GET /api/sites/:id/assistant` | Propositions du site |
-| `POST /api/sites/:id/assistant` | Nouvelle demande `{ demande, cerveau?: "claude" }` |
-| `POST …/assistant/:pid/relais` | Accepter de passer la demande à Claude (Éditeur ou plus) |
+| `POST /api/sites/:id/assistant` | Nouvelle demande `{ demande, cerveau?: "claude" \| "chatgpt" }` |
+| `POST …/assistant/:pid/relais` | Accepter de passer la demande à une IA extérieure (Éditeur ou plus) |
 | `POST …/assistant/:pid/accepter` | Accepter `{ empreinte }` → brouillon |
 | `POST …/assistant/:pid/refuser` | Refuser |
 
-Code : `paginity/server/src/ia/assistant.ts`, `paginity/server/src/http/routes-ia.ts`. Tests : `test/assistant.test.ts` (12).
+Code : `server/src/ia/assistant.ts`, `server/src/ia/fournisseurs.ts`, `server/src/http/routes-ia.ts`, écrans
+`web/src/pages/Assistant.tsx` et `web/src/pages/ReglagesIA.tsx`. Tests : `test/assistant.test.ts` (12, faux cerveaux),
+`test/assistant-services.test.ts` (8, vrais connecteurs face à de faux serveurs locaux), parcours `npm run e2e:ia` (10).
 
 ## Étapes suivantes (chacune sur autorisation)
 
-2. **Brancher les vrais cerveaux** : un modèle local (sur votre ordinateur ou le futur serveur) et Claude (clé saisie par
-   vous dans le coffre). Écran « Assistant » dans chaque site, et réglages dans « Réglages de la plateforme ».
+2. ~~Brancher les connecteurs, écran « Assistant », réglages~~ (fait). **Reste à faire sur une vraie machine** : installer
+   un modèle local et l'essayer ; si vous le souhaitez, créer les comptes API Claude / ChatGPT et saisir les clés.
 3. **Banc d'essai** : une vingtaine de demandes types pour comparer les modèles et mesurer le coût réel de Claude.
 4. **Pages et styles** (modification de fichiers, avant/après, aperçu), puis **diagnostic** des pannes (lecture seule).

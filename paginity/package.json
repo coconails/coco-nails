@@ -20,6 +20,7 @@
     "e2e:phase3": "node e2e/phase3.mjs",
     "manuel": "node e2e/captures-manuel.mjs && node e2e/manuel-pdf.mjs",
     "admin": "node --disable-warning=ExperimentalWarning server/dist/cli/admin.js",
-    "verifier": "tsc --noEmit -p server && tsc -p server/tsconfig.test.json && tsc --noEmit -p web && bash -n scripts/paginity-maj && bash -n scripts/paginity-admin && bash -n scripts/paginity-installer && node --check server/runtime/worker.mjs && node --check server/test/simulation/services-simules.mjs"
+    "verifier": "tsc --noEmit -p server && tsc -p server/tsconfig.test.json && tsc --noEmit -p web && bash -n scripts/paginity-maj && bash -n scripts/paginity-admin && bash -n scripts/paginity-installer && node --check server/runtime/worker.mjs && node --check server/test/simulation/services-simules.mjs",
+    "e2e:ia": "node e2e/assistant.mjs"
   }
 }

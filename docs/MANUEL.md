@@ -555,6 +555,24 @@ PAGINITY fonctionne dans le navigateur du téléphone ou de la tablette (Safari,
 
 ---
 
+## 20 bis. L'assistant IA
+
+*Désactivé par défaut. Réglages réservés au propriétaire : « Réglages de la plateforme › Assistant IA ».*
+
+Dans chaque site, **Assistant** permet de demander une modification de contenu en quelques mots (« ajoute la pose gel à
+45 € », « nous sommes fermés du 24 au 26 décembre »). L'assistant prépare une **proposition** : vous voyez le **avant /
+après** champ par champ, puis **Accepter (brouillon)** ou **Refuser**. Rien n'est modifié sans votre accord, et une
+modification acceptée va **dans le brouillon** : vérifiez l'aperçu, puis publiez comme d'habitude.
+
+- Le **modèle local** (installé sur votre serveur) est gratuit et rien ne sort de chez vous.
+- S'il ne sait pas faire, PAGINITY peut passer le relais à **Claude** ou **ChatGPT** (payants), selon vos réglages :
+  jamais, avec votre accord (bouton « Oui, passer à l'IA extérieure »), ou automatiquement.
+- Vous fixez un **plafond mensuel global** et, si vous voulez, un plafond par service. Au-delà, plus rien n'est envoyé.
+- Les IA ne reçoivent que les **contenus publics** du site : jamais les secrets, les messages des clientes ni la compta.
+- **Ce qui s'est passé** (sous chaque demande) détaille chaque étape : quel modèle, pourquoi le relais, le coût.
+
+---
+
 ## 21. Ce qui n'est pas encore disponible
 
 | Fonction | Prévue |

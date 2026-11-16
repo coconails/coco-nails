@@ -236,6 +236,10 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX ia_usage_mois ON ia_usage(mois);
   `,
+  // 5 — PAGINITY AI : dépense par service extérieur (ajout de colonne seulement).
+  `
+  ALTER TABLE ia_usage ADD COLUMN fournisseur TEXT;
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

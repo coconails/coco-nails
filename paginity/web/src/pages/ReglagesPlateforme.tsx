@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { IconMail } from '@tabler/icons-react';
 import { errorMessage, get, post, put } from '../api';
 import { Loading, Page } from '../components/Page';
+import { ReglagesIA } from './ReglagesIA';
 
 interface Messagerie {
   hote: string;
@@ -96,6 +97,7 @@ export function ReglagesPlateformePage() {
           </Text>
         </Stack>
       </Card>
+      <ReglagesIA />
     </Page>
   );
 }
