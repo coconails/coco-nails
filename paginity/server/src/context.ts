@@ -7,6 +7,7 @@ import type { Events } from './lib/events.js';
 import type { FunctionService } from './functions/service.js';
 import type { Scheduler } from './functions/scheduler.js';
 import type { Mailer } from './lib/mail.js';
+import type { Assistant } from './ia/assistant.js';
 
 /** Tout ce dont les différentes parties de PAGINITY ont besoin, regroupé en un seul objet. */
 export interface Ctx {
@@ -19,4 +20,5 @@ export interface Ctx {
   functions: FunctionService;
   scheduler: Scheduler;
   mailer: Mailer;
+  ia: Assistant;
 }

@@ -19,6 +19,7 @@ import { removeTree } from './publish/build.js';
 import path from 'node:path';
 import { FunctionService } from './functions/service.js';
 import { Isolation, detectIsolation, type IsolationOptions } from './functions/isolation.js';
+import { Assistant } from './ia/assistant.js';
 import { Scheduler } from './functions/scheduler.js';
 import { Mailer } from './lib/mail.js';
 import { pruneAlerts, sendDigest } from './lib/alerts.js';
@@ -36,9 +37,9 @@ export interface Paginity {
 
 /** Assemble PAGINITY (sans ouvrir de port). */
 export async function createPaginity(
-  overrides: Partial<Config> & { isolation?: 'podman' | 'processus'; scheduler?: boolean; simulation?: IsolationOptions['simulation'] } = {},
+  overrides: Partial<Config> & { isolation?: 'podman' | 'processus'; scheduler?: boolean; simulation?: IsolationOptions['simulation']; cerveaux?: Assistant['cerveaux'] } = {},
 ): Promise<Paginity> {
-  const { isolation: _i, scheduler: _s, simulation: _sim, ...cfg } = overrides;
+  const { isolation: _i, scheduler: _s, simulation: _sim, cerveaux: _c, ...cfg } = overrides;
   const config = loadConfig(cfg);
   fs.mkdirSync(config.dataDir, { recursive: true, mode: 0o700 });
   // Nettoyage des fichiers temporaires laissés par un arrêt brutal.
@@ -58,6 +59,10 @@ export async function createPaginity(
     simulation: overrides.simulation,
   });
   ctx.scheduler = new Scheduler(ctx);
+  // PAGINITY AI : aucun cerveau branché par défaut (les tests en fournissent des simulés).
+  ctx.ia = new Assistant(ctx);
+  if (overrides.cerveaux) ctx.ia.cerveaux = overrides.cerveaux;
+  ctx.ia.reprise();
   // Remise en ordre après un éventuel arrêt brutal pendant une publication (avant d'accepter des visiteurs).
   const reprise = recoverOnStartup(ctx);
   if (reprise.publicationsInterrompues || reprise.sitesCorriges.length) {

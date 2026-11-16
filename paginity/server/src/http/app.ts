@@ -13,6 +13,7 @@ import { registerAuthRoutes } from './routes-auth.js';
 import { registerSiteRoutes } from './routes-sites.js';
 import { registerSystemRoutes } from './routes-system.js';
 import { registerFunctionRoutes } from './routes-functions.js';
+import { registerIaRoutes } from './routes-ia.js';
 
 /** Serveur de l'administration : interface web + API, avec les protections communes à toutes les requêtes. */
 export async function createAdminApp(ctx: Ctx, opts: { logger?: boolean } = {}): Promise<FastifyInstance> {
@@ -83,6 +84,7 @@ export async function createAdminApp(ctx: Ctx, opts: { logger?: boolean } = {}):
   registerSiteRoutes(app, ctx);
   registerSystemRoutes(app, ctx);
   registerFunctionRoutes(app, ctx);
+  registerIaRoutes(app, ctx);
 
   // Interface web (déjà fabriquée dans web/dist).
   const hasWeb = fs.existsSync(path.join(ctx.config.webDir, 'index.html'));

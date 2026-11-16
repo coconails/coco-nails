@@ -208,6 +208,34 @@ const MIGRATIONS: string[] = [
     read_at INTEGER
   );
   `,
+  // 4 — PAGINITY AI : propositions de l'assistant et dépenses (ajout de tables seulement).
+  `
+  CREATE TABLE ia_propositions (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    demande TEXT NOT NULL,
+    statut TEXT NOT NULL,
+    cerveau TEXT,
+    explication TEXT,
+    raison TEXT,
+    changements TEXT,
+    empreinte TEXT,
+    cout_centimes INTEGER NOT NULL DEFAULT 0,
+    journal TEXT NOT NULL DEFAULT '[]',
+    cree_le INTEGER NOT NULL,
+    decide_le INTEGER
+  );
+  CREATE INDEX ia_propositions_site ON ia_propositions(site_id, cree_le);
+  CREATE TABLE ia_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mois TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    proposition_id TEXT,
+    centimes INTEGER NOT NULL
+  );
+  CREATE INDEX ia_usage_mois ON ia_usage(mois);
+  `,
 ];
 
 export function openDb(dataDir: string): Db {
