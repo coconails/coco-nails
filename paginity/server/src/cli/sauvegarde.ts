@@ -49,6 +49,9 @@ function walk(base: string, rel: string, out: string[] = []): string[] {
 }
 
 export function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, opts: { sansCle?: boolean } = {}): { archive: string; cle: string | null; fichiers: number } {
+  if (fs.existsSync(path.join(dataDir, 'coffre', 'cle-maitre.nouvelle'))) {
+    throw new UserError(409, 'Un changement de la clé du coffre est inachevé : lancez d’abord « paginity-admin changer-cle --confirmer ».');
+  }
   const dest = path.resolve(destDir);
   fs.mkdirSync(dest, { recursive: true, mode: 0o700 });
   if (dest === path.resolve(dataDir) || dest.startsWith(path.resolve(dataDir) + path.sep)) {

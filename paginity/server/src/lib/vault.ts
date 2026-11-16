@@ -14,11 +14,22 @@ export class Vault {
     const dir = path.join(dataDir, 'coffre');
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     const keyFile = path.join(dir, 'cle-maitre');
+    if (fs.existsSync(path.join(dir, 'cle-maitre.nouvelle'))) {
+      throw new Error('Un changement de la clé du coffre a été interrompu. Lancez « paginity-admin changer-cle --confirmer » pour le terminer avant de démarrer PAGINITY.');
+    }
     if (!fs.existsSync(keyFile)) {
       fs.writeFileSync(keyFile, crypto.randomBytes(32).toString('base64'), { mode: 0o600, flag: 'wx' });
     }
     this.key = Buffer.from(fs.readFileSync(keyFile, 'utf8').trim(), 'base64');
     if (this.key.length !== 32) throw new Error('Clé maître du coffre invalide');
+  }
+
+  /** Coffre ouvert avec une clé donnée (changement de clé, contrôles). */
+  static fromKey(key: Buffer): Vault {
+    if (key.length !== 32) throw new Error('Clé du coffre invalide');
+    const v = Object.create(Vault.prototype) as Vault;
+    (v as unknown as { key: Buffer }).key = key;
+    return v;
   }
 
   encrypt(plain: string): string {

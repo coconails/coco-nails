@@ -99,6 +99,13 @@ Elle refuse un dossier non vide, une mauvaise clé, une archive modifiée, tronq
 vérifie la base et l'ouverture des données chiffrées, et recalcule les liens « en ligne ». Ensuite : `paginity-admin verifier`.
 L'envoi chiffré hors de la machine (disque externe, second lieu) sera mis en place en phase 4.
 
+**Changement de la clé du coffre** (si la clé a pu être copiée, ou par précaution) : PAGINITY arrêté,
+`paginity-admin changer-cle --confirmer`. Toutes les valeurs chiffrées de la base (codes à 6 chiffres, secrets des sites,
+messages, mot de passe de messagerie) sont rechiffrées en une seule opération ; l'ancienne clé n'ouvre plus rien.
+En cas de coupure au milieu, PAGINITY refuse de démarrer et la même commande termine ou annule proprement.
+Ensuite : faire une nouvelle sauvegarde (les anciennes ne s'ouvrent qu'avec l'ancienne clé, rangée avec elles).
+Les appareils reconnus devront se reconnecter une fois.
+
 **`paginity-maj`** (`paginity/scripts/paginity-maj`) met PAGINITY à jour depuis son dépôt Git, dans l'organisation prévue :
 `/opt/paginity/versions/<date>-<commit>/`, lien `/opt/paginity/actuelle`, données dans `/var/lib/paginity`.
 1. La nouvelle version est récupérée, installée (`npm ci --ignore-scripts`), fabriquée et testée **à côté** :

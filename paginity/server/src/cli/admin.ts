@@ -8,6 +8,7 @@ import { audit } from '../lib/audit.js';
 import { checkPasswordPolicy, hashPassword } from '../auth/passwords.js';
 import { UserError } from '../lib/util.js';
 import { restaurer, sauvegarder } from './sauvegarde.js';
+import { changerCle, enMarche } from './rotation.js';
 
 /**
  * paginity-admin : outil de secours, à lancer sur la machine elle-même (clavier/écran ou SSH).
@@ -38,6 +39,8 @@ Utilisation : paginity-admin <commande> [options]
   restaurer <archive> --cle <fichier>
                                 Restaure une sauvegarde dans PAGINITY_DATA_DIR, qui doit être vide (PAGINITY
                                 arrêté). Tout est vérifié avant de finir (empreintes, clé, base).
+  changer-cle --confirmer       Change la clé du coffre (PAGINITY ARRÊTÉ) et rechiffre toutes les données
+                                chiffrées. Termine aussi un changement interrompu. Faites ensuite une sauvegarde.
   aide                          Affiche cette aide.
 
 Les données utilisées sont celles de PAGINITY_DATA_DIR (comme le serveur).`;
@@ -152,6 +155,22 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
         db.prepare('VACUUM INTO ?').run(abs);
         fs.chmodSync(abs, 0o600);
         out.log(`Copie de la base écrite dans ${abs} (sans la clé du coffre : les secrets y restent chiffrés).`);
+        return 0;
+      }
+      case 'changer-cle': {
+        if (!args.includes('--confirmer')) {
+          out.err('Action importante : arrêtez PAGINITY, puis relancez avec --confirmer.');
+          return 1;
+        }
+        if (await enMarche(config.adminPort)) throw new UserError(409, 'PAGINITY est en marche : arrêtez-le avant de changer la clé du coffre (il garde l’ancienne clé en mémoire).');
+        const r = changerCle(config.dataDir, db);
+        audit(db, { action: 'secours_changer_cle', details: { resultat: r.action, valeurs: r.valeurs } });
+        if (r.action === 'changee') {
+          out.log(`Clé du coffre changée : ${r.valeurs} valeur(s) rechiffrée(s).`);
+          out.log('→ Faites MAINTENANT une nouvelle sauvegarde (paginity-admin sauvegarder) : les anciennes sauvegardes ne s’ouvrent qu’avec l’ancienne clé, conservée avec elles.');
+          out.log('→ Les appareils reconnus devront se reconnecter une fois avec mot de passe et code (ils redeviennent « nouveaux »).');
+        } else if (r.action === 'terminee') out.log(`Changement de clé interrompu : terminé (${r.valeurs} valeur(s) déjà rechiffrées).`);
+        else out.log('Changement de clé interrompu avant le rechiffrement : annulé, l’ancienne clé reste en service.');
         return 0;
       }
       case 'sauvegarder': {
