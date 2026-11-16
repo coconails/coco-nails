@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# paginity-installer : première installation de PAGINITY sur un serveur Debian (phase 4).
+#
+# Ce qu'il fait, dans l'ordre (rien n'est effacé ; il refuse si PAGINITY est déjà installé) :
+#   1. vérifie les outils : node (22.13 ou plus ; 24 conseillé), git, podman, tar, curl, flock ;
+#   2. crée l'utilisateur système « paginity » (sans mot de passe ni connexion) et lui permet Podman sans droits root ;
+#   3. crée /opt/paginity (code), /var/lib/paginity (données, 700), /etc/paginity/paginity.env (réglages) ;
+#   4. récupère le code, installe ses dépendances (sans scripts d'installation), le fabrique, lance les tests ;
+#   5. installe le service systemd et le démarre, puis vérifie que PAGINITY répond.
+# Le code d'installation à saisir dans le navigateur est ensuite dans /var/lib/paginity/plateforme/code-installation.txt.
+#
+# Utilisation (en root) : paginity-installer --source <adresse du dépôt> [--ref main] [--sans-tests] [--sans-demarrage]
+# Essai sans rien toucher au système : PAGINITY_INSTALL_SIMULATION=1 PAGINITY_INSTALL_RACINE=/tmp/essai paginity-installer …
+#   (les commandes système sont alors seulement affichées ; tout le reste est fait sous /tmp/essai).
+set -euo pipefail
+
+R="${PAGINITY_INSTALL_RACINE:-}"
+SIMU="${PAGINITY_INSTALL_SIMULATION:-0}"
+SOURCE=""
+REF="main"
+TESTS=1
+DEMARRER=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source) SOURCE="$2"; shift 2 ;;
+    --ref) REF="$2"; shift 2 ;;
+    --sans-tests) TESTS=0; shift ;;
+    --sans-demarrage) DEMARRER=0; shift ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Option inconnue : $1" >&2; exit 1 ;;
+  esac
+done
+
+dire() { printf '[paginity-installer] %s\n' "$*"; }
+echec() { dire "ÉCHEC : $*" >&2; exit 1; }
+systeme() { if [ "$SIMU" = 1 ]; then dire "(simulation) $*"; else "$@"; fi; }
+
+[ -n "$SOURCE" ] || echec "indiquez l'adresse du dépôt avec --source."
+if [ "$SIMU" != 1 ]; then
+  [ "$(id -u)" = 0 ] || echec "à lancer en root (sudo)."
+  [ -z "$R" ] || echec "PAGINITY_INSTALL_RACINE n'est permis qu'en simulation."
+fi
+DEPLOIEMENT_DIR="$(cd "$(dirname "$0")/../deploiement" && pwd)"
+
+# 1. Outils.
+for outil in node npm git podman tar curl flock; do command -v "$outil" >/dev/null || echec "outil manquant : $outil (apt install …)."; done
+VERSION_NODE="$(node -p 'process.versions.node')"
+node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=13)?0:1)' || echec "Node.js $VERSION_NODE trop ancien (22.13 minimum, 24 conseillé)."
+case "$VERSION_NODE" in 22.*) dire "Attention : Node.js 22 — la version 24 (LTS) est conseillée pour une installation durable." ;; esac
+
+OPT="$R/opt/paginity"; VAR="$R/var/lib/paginity"; ETC="$R/etc/paginity"; UNIT_DIR="$R/etc/systemd/system"
+[ -e "$OPT/actuelle" ] && echec "PAGINITY est déjà installé ($OPT/actuelle). Pour une mise à jour : paginity-maj."
+if [ -d "$VAR" ] && [ -n "$(ls -A "$VAR" 2>/dev/null)" ]; then
+  echec "$VAR contient déjà des données : rien n'est écrasé. (Restauration : paginity-admin restaurer.)"
+fi
+
+# 2. Utilisateur système.
+if ! id paginity >/dev/null 2>&1 || [ "$SIMU" = 1 ]; then
+  systeme useradd --system --create-home --home-dir /home/paginity --shell /usr/sbin/nologin --comment "PAGINITY" paginity
+fi
+systeme usermod --add-subuids 200000-265535 --add-subgids 200000-265535 paginity
+systeme loginctl enable-linger paginity
+
+# 3. Dossiers et réglages.
+mkdir -p "$OPT/versions" "$VAR" "$ETC" "$UNIT_DIR"
+chmod 755 "$OPT"; chmod 700 "$VAR"
+systeme chown paginity:paginity "$VAR"
+if [ ! -f "$ETC/paginity.env" ]; then
+  install -m 640 "$DEPLOIEMENT_DIR/paginity.env.exemple" "$ETC/paginity.env"
+  systeme chown root:paginity "$ETC/paginity.env"
+  [ -n "$R" ] && sed -i "s|^PAGINITY_DATA_DIR=.*|PAGINITY_DATA_DIR=$VAR|" "$ETC/paginity.env"
+fi
+
+# 4. Code : récupéré, installé, fabriqué, testé, à côté (dossier temporaire puis nom définitif).
+TEMP="$OPT/versions/.en-preparation-$$"
+trap 'rm -rf "$TEMP"' EXIT
+dire "Récupération de « $REF » depuis $SOURCE…"
+git clone -q --depth 1 --branch "$REF" "$SOURCE" "$TEMP" 2>/dev/null || git clone -q --branch "$REF" "$SOURCE" "$TEMP" || echec "récupération impossible."
+COMMIT="$(git -C "$TEMP" rev-parse --short HEAD)"
+APP="$TEMP"; [ -f "$TEMP/paginity/package.json" ] && APP="$TEMP/paginity"
+dire "Installation des dépendances…"
+(cd "$APP" && npm ci --ignore-scripts --no-audit --no-fund --loglevel=error) || echec "installation des dépendances impossible."
+dire "Fabrication…"
+(cd "$APP" && npm run build --silent) || echec "fabrication impossible."
+if [ "$TESTS" = 1 ]; then
+  dire "Tests automatiques…"
+  (cd "$APP" && npm test --silent) || echec "des tests ont échoué : installation arrêtée."
+fi
+NOM="$(date -u +%Y%m%d-%H%M%S)-$COMMIT"
+mv "$TEMP" "$OPT/versions/$NOM"
+trap - EXIT
+ln -sfn "$OPT/versions/$NOM" "$OPT/actuelle"
+chmod -R go-w "$OPT/versions/$NOM"
+dire "Version $COMMIT installée dans $OPT/versions/$NOM."
+
+# Outils de secours et de mise à jour accessibles partout.
+for outil in paginity-admin paginity-maj; do
+  systeme ln -sfn "$OPT/actuelle/paginity/scripts/$outil" "/usr/local/bin/$outil"
+done
+
+# 5. Service.
+install -m 644 "$DEPLOIEMENT_DIR/paginity.service" "$UNIT_DIR/paginity.service"
+systeme systemctl daemon-reload
+if [ "$DEMARRER" = 1 ]; then
+  systeme systemctl enable --now paginity
+  if [ "$SIMU" != 1 ]; then
+    PORT="$(sed -n 's/^PAGINITY_ADMIN_PORT=//p' "$ETC/paginity.env")"
+    for _ in $(seq 1 60); do curl -fsS -m 3 -o /dev/null "http://127.0.0.1:${PORT:-8080}/api/etat" && break; sleep 1; done
+    curl -fsS -m 3 -o /dev/null "http://127.0.0.1:${PORT:-8080}/api/etat" || echec "PAGINITY ne répond pas : journalctl -u paginity pour voir pourquoi."
+    dire "PAGINITY répond. Code d'installation : $(cat "$VAR/plateforme/code-installation.txt" 2>/dev/null || echo 'voir journalctl -u paginity')"
+  fi
+fi
+dire "Installation terminée."

@@ -1,0 +1,43 @@
+# Service systemd de PAGINITY (phase 4, Debian). Installé par paginity-installer dans /etc/systemd/system/.
+# À VALIDER SUR LA MACHINE : écrit et contrôlé (systemd-analyze verify) mais jamais démarré sur un vrai Debian.
+[Unit]
+Description=PAGINITY — plateforme de sites
+Documentation=file:///opt/paginity/actuelle/docs/GUIDE-PROTOTYPE.md
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=paginity
+Group=paginity
+EnvironmentFile=/etc/paginity/paginity.env
+# Podman sans droits administrateur a besoin du dossier d'exécution de l'utilisateur (« loginctl enable-linger »).
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+WorkingDirectory=/opt/paginity/actuelle/paginity
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/paginity/actuelle/paginity/server/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+
+# Durcissement compatible avec Podman sans droits administrateur.
+# NoNewPrivileges n'est PAS activé : Podman en a besoin (newuidmap/newgidmap) pour isoler les fonctions des sites.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/paginity /home/paginity /run/user/%U
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=no
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=no
+RestrictRealtime=yes
+LockPersonality=yes
+RestrictNamespaces=no
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
