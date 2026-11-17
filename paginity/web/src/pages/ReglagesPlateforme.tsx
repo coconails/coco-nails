@@ -9,6 +9,7 @@ import { ReglagesIA } from './ReglagesIA';
 import { ReglagesSauvegarde } from './ReglagesSauvegarde';
 import { ReglagesAlerte } from './ReglagesAlerte';
 import { ReglagesMisesAJour } from './ReglagesMisesAJour';
+import { ReglagesSearchConsole } from './ReglagesSearchConsole';
 
 interface Messagerie {
   hote: string;
@@ -103,6 +104,7 @@ export function ReglagesPlateformePage() {
       <ReglagesSauvegarde />
       <ReglagesAlerte />
       <ReglagesMisesAJour />
+      <ReglagesSearchConsole />
       <ReglagesIA />
     </Page>
   );

@@ -192,6 +192,8 @@ export async function runPublication(ctx: Ctx, run: JobRun): Promise<unknown> {
       pruneVersions(ctx, site);
       audit(ctx.db, { userId: user.id, action: 'publication', siteId: site.id, details: { numero: number, commit } });
     }, () => `Publication n°${number} enregistrée en ${((now() - started) / 1000).toFixed(1)} s.`);
+    // IndexNow (si activé pour ce site) : en arrière-plan, n'influence jamais la publication.
+    void ctx.searchConsole?.apresPublication(ctx.sites.get(site.id)!).catch(() => {});
 
     return { numero: number, duree: now() - started, avertissements: warnings };
   } catch (e) {

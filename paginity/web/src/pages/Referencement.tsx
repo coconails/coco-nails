@@ -7,6 +7,7 @@ import { useParams } from 'react-router-dom';
 import { errorMessage, get, post, put } from '../api';
 import { Loading, Page } from '../components/Page';
 import { useSite } from './Site';
+import { SearchConsoleSite } from './SearchConsoleSite';
 
 type Niveau = 'probleme' | 'attention' | 'info';
 interface Constat {
@@ -205,6 +206,8 @@ export function ReferencementPage() {
           )}
         </>
       )}
+
+      <SearchConsoleSite siteId={id!} peutRegler={!!site.data.droits.reglages} />
 
       {e.historique.length > 0 && (
         <Accordion variant="separated">

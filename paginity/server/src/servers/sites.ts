@@ -55,6 +55,12 @@ export function createSitesServer(ctx: Ctx): http.Server {
       });
       return;
     }
+    // Fichier de clé IndexNow (si activé) : servi par PAGINITY, sans rien écrire dans le site.
+    const cleIndexNow = req.method === 'GET' ? ctx.searchConsole?.cleIndexNow(site, pathOf(req)) : null;
+    if (cleIndexNow) {
+      res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }).end(cleIndexNow);
+      return;
+    }
     compterVisite(ctx, site, req, res);
     serveStatic(root, req, res, {
       functionsMessage: 'Ce site n’a pas de fonction serveur à cette adresse.',

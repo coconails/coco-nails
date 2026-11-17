@@ -13,6 +13,7 @@ import type { Battement } from './lib/battement.js';
 import type { MisesAJour } from './lib/mises-a-jour.js';
 import type { Push } from './lib/push.js';
 import type { Referencement } from './marketing/service.js';
+import type { SearchConsole } from './marketing/searchconsole.js';
 
 /** Tout ce dont les différentes parties de PAGINITY ont besoin, regroupé en un seul objet. */
 export interface Ctx {
@@ -31,4 +32,5 @@ export interface Ctx {
   misesAJour: MisesAJour;
   push: Push;
   referencement: Referencement;
+  searchConsole: SearchConsole;
 }

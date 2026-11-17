@@ -172,6 +172,23 @@ rôle Administrateur du site), migration 11 (`seo_audits`). Le brouillon est fab
 (l'aperçu habituel n'est pas touché). Écran `web/src/pages/Referencement.tsx`. Tests : `test/referencement.test.ts` (8) ;
 parcours `npm run e2e:referencement` (7, dont l'audit d'une copie de Coco Nail's importée en ZIP).
 
+## Marketing — M2 : Search Console en lecture seule (17/11/2026)
+
+`marketing/google.ts` : clé de compte de service (vérifiée, chiffrée dans le coffre), jeton JWT RS256 avec le seul
+périmètre `webmasters.readonly`, **sans `sub`** (aucune délégation d'utilisateur, donc aucun accès Gmail/Drive/Agenda
+même si le compte en avait). `marketing/searchconsole.ts` : liaison site ↔ propriété (seulement une propriété
+accessible), relevé quotidien (28 jours + 28 précédents, fin = J−3, `type: web`, `dataState: final`), rapport rédigé
+de façon déterministe (seuil 100 apparitions, position « moyenne », pistes = apparitions ≥ 20, taux de clic < 2 %,
+position ≤ 15), inspection d'indexation (sitemap du site en ligne, 20 adresses max), alerte si le relevé échoue,
+IndexNow facultatif (fichier de clé servi par le serveur des sites, envoi après publication réussie, en arrière-plan).
+Routes : `GET/POST/DELETE /api/reglages/search-console` (propriétaire, confirmation d'identité pour connecter et
+déconnecter), `GET /api/reglages/search-console/proprietes`, `GET/PUT /api/sites/:id/search-console` (lier : propriétaire),
+`POST …/search-console/releve`, `POST …/search-console/inspection`, `PUT /api/sites/:id/indexnow`. Migration 12.
+Adresses remplaçables pour les tests : `PAGINITY_GOOGLE_TOKEN_URL`, `PAGINITY_GOOGLE_API_URL`,
+`PAGINITY_GOOGLE_INSPECTION_URL`, `PAGINITY_INDEXNOW_URL`. Tests : `test/search-console.test.ts` (9, faux Google qui
+vérifie signature, périmètre et absence de `sub`) ; parcours `npm run e2e:search-console` (7).
+**Non testé avec le vrai Google** (aucun compte connecté pendant le développement).
+
 ## API
 
 | Adresse | Rôle |

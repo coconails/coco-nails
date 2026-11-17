@@ -285,6 +285,30 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX seo_audits_site ON seo_audits(site_id, le);
   `,
+  // 12 — Référencement (M2) : Search Console en lecture seule (liaisons, chiffres par jour, rapports, inspections).
+  `
+  CREATE TABLE seo_gsc_liens (
+    site_id TEXT PRIMARY KEY REFERENCES sites(id) ON DELETE CASCADE,
+    propriete TEXT NOT NULL,
+    lie_le INTEGER NOT NULL,
+    par TEXT
+  );
+  CREATE TABLE seo_gsc_jours (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    jour TEXT NOT NULL,
+    clics INTEGER NOT NULL,
+    impressions INTEGER NOT NULL,
+    position REAL,
+    PRIMARY KEY (site_id, jour)
+  );
+  CREATE TABLE seo_gsc_releves (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    type TEXT NOT NULL,
+    le INTEGER NOT NULL,
+    donnees TEXT NOT NULL
+  );
+  CREATE INDEX seo_gsc_releves_site ON seo_gsc_releves(site_id, type, le);
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

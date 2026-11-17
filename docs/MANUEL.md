@@ -671,6 +671,29 @@ pas des règles officielles de Google.
 **Chaque semaine** (case à cocher, Administrateur du site) : PAGINITY refait l'audit du site en ligne et crée une
 alerte uniquement s'il apparaît un **nouveau** problème.
 
+**Dans Google (Search Console, lecture seule).** Une fois Search Console connecté (voir ci-dessous), la page
+Référencement d'un site montre, sur les 28 derniers jours : le nombre d'**apparitions** dans les résultats de Google,
+les **clics**, le **taux de clic** et la **position moyenne**, un petit rapport en français, deux graphiques par jour,
+les recherches et les pages principales, et l'**état d'indexation** des pages (« Vérifier l'indexation »). Google
+publie ses chiffres avec environ **3 jours de retard**. La position est une **moyenne** (elle varie selon la personne,
+le lieu et la recherche), pas un classement fixe. En dessous de 100 apparitions, le rapport dit que les chiffres sont
+trop faibles pour conclure. Les « pistes » (recherches souvent vues mais peu cliquées) sont des idées à vérifier, sans
+garantie. Les chiffres sont relevés automatiquement une fois par jour.
+
+*Connexion (propriétaire, une fois)* — Réglages de la plateforme › **Google Search Console** : la carte explique les
+étapes. Créez dans Google Cloud un **nouveau** compte de service réservé à PAGINITY (jamais celui qui envoie déjà des
+e-mails ou lit l'agenda), téléchargez sa clé JSON et envoyez-la : elle est vérifiée auprès de Google et rangée
+chiffrée. Ajoutez ensuite l'adresse du compte de service dans Search Console, autorisation « Restreinte ». Enfin,
+dans la page Référencement de chaque site, choisissez sa propriété et « Relier ». PAGINITY ne demande que la
+**lecture** des données Search Console : il ne peut rien modifier chez Google, ni lire e-mails, Drive ou agenda.
+« Déconnecter » efface la clé, les liaisons et les chiffres ; pour couper aussi chez Google, supprimez la clé dans
+Google Cloud et retirez l'adresse dans Search Console.
+
+**IndexNow** (facultatif, désactivé par défaut, Administrateur du site) : après chaque publication, PAGINITY signale
+les pages du plan du site à Bing et aux moteurs IndexNow. **Google n'utilise pas IndexNow.** Il faut un nom de domaine
+configuré pour le site.
+
+
 ## 21. Ce qui n'est pas encore disponible
 
 | Fonction | Prévue |
