@@ -583,21 +583,77 @@ demande (*Textes* ou *Données*) relit toutes les propositions et rend la versio
 au moment de la demande et désigner vous-même le vérificateur de chaque domaine. Sous la proposition, « Propositions des
 autres IA » montre ce que chacune avait proposé. Vos « Accepter » et « Refuser » améliorent les notes des IA.
 
+**Il pose une question** quand il lui manque une information (« quel prix ? ») : répondez dans la case, la demande
+repart complétée. **« Annuler cette modification »** remet le brouillon comme avant une proposition acceptée (si
+personne n'a retouché la rubrique depuis). **Dicter** (si le propriétaire l'a autorisé) : la voix est transcrite par
+le service du navigateur (Google ou Apple).
+
+**Pages et styles** (personnes ayant accès au Code) : l'assistant peut aussi modifier les fichiers HTML et CSS
+(couleurs, mise en page, textes fixes). Vous voyez les lignes changées, et **« Voir avant / après »** montre les deux
+versions du site côte à côte. Il ne peut jamais ajouter de programme (script), de lien vers un autre site, ni
+toucher au JavaScript ou au code serveur.
+
+**Diagnostic du site** (en bas de la page Assistant) : PAGINITY vérifie publications, fonctions, liens et alertes, et
+explique ce qu'il trouve, avec un conseil. Rien n'est modifié. Si l'assistant est actif, un modèle installé sur la
+machine reformule le tout.
+
+**Démarrage rapide** (réglages de l'assistant) : « Détecter les modèles installés » trouve les modèles d'Ollama et
+les ajoute en un clic.
+
 **Banc d'essai** (en bas des réglages de l'assistant) : « Lancer le banc d'essai » pose 12 demandes types à chaque modèle
 local sur un salon imaginaire (vos sites ne sont pas touchés) et affiche une note sur 100 pour les *Textes* et les
 *Données*, le nombre de réussites, le temps moyen et le coût. « Détail » explique chaque échec. Ces notes servent à choisir
 le vérificateur final de la salle de réunion. Les IA payantes ne passent le banc que si vous cochez « Inclure les IA
-payantes », toujours dans vos plafonds.
+payantes », toujours dans vos plafonds. Chaque proposition que vous acceptez devient aussi une demande type (20 au
+plus) : les IA sont alors notées sur vos vraies demandes. « Les oublier » efface cette liste.
 
 ---
+
+## 20 ter. Protéger le site : sauvegarde, alerte, page de secours
+
+*Réglages de la plateforme (propriétaire) et Réglages de chaque site.*
+
+**Sauvegarde automatique (hors de la machine).** Choisissez une **phrase de sauvegarde** (au moins 16 caractères,
+par exemple quatre mots sans rapport) et **notez-la sur papier, hors de la maison** : sans elle, les sauvegardes ne
+s'ouvrent pas. Indiquez ensuite un dossier *hors des données de PAGINITY* : disque USB, ou dossier synchronisé avec
+Google Drive / OneDrive. Chaque nuit à l'heure choisie, PAGINITY y dépose un fichier `paginity-auto-….paginity`,
+chiffré : Google ne peut pas le lire. Les plus anciens sont effacés (14 gardés par défaut). Une fois par mois,
+PAGINITY **essaie de restaurer** la dernière sauvegarde dans un dossier temporaire ; en cas d'échec : alerte.
+« Sauvegarder maintenant » et « Essayer de restaurer la dernière » font la même chose à la demande.
+*Panne totale* : sur la nouvelle machine, `paginity-admin ouvrir-sauvegarde <fichier> <dossier>` (la phrase est
+demandée), puis `paginity-admin restaurer <archive> --cle <fichier de clé>` comme indiqué à l'écran.
+
+**Alerte si le serveur s'arrête.** Un serveur éteint ne peut prévenir personne : PAGINITY envoie donc un petit signal
+toutes les 5 minutes à un service de surveillance gratuit (healthchecks.io ou équivalent). Si les signaux
+s'arrêtent, c'est ce service qui vous prévient (e-mail, SMS…). Si PAGINITY tourne mais va mal (disque plein, base
+abîmée, sites arrêtés), il envoie un signal « en panne ». La marche à suivre est rappelée dans la carte.
+
+**Page de secours.** Dans les Réglages d'un site : une petite page autonome (nom, téléphone, bouton WhatsApp, e-mail,
+adresse, horaires), pré-remplie depuis vos contenus. Téléchargez-la (`index.html`) et déposez-la chez un hébergeur
+gratuit. En cas de panne longue, faites pointer le domaine vers elle chez Squarespace (Domaines › DNS) : avec
+Squarespace, cette bascule est **manuelle** (quelques minutes à quelques heures).
+
+**Matériel conseillé** : un petit onduleur pour le serveur (environ 60 €).
+
+## 20 quater. Confort
+
+- **Visites** (page de chaque site) : pages vues par jour sur 7, 30 ou 90 jours, et les pages les plus vues. Sans
+  cookies ni donnée personnelle (pas de bandeau à afficher) ; les robots ne sont pas comptés. Ce sont des pages vues,
+  pas des personnes différentes.
+- **Vérifier sur téléphone avant de publier** (page Publier) : le brouillon dans un cadre de téléphone.
+- **Failles de sécurité connues** (Réglages de la plateforme) : « Vérifier maintenant » demande au registre de npm si
+  un composant de PAGINITY a une faille connue (seule la liste des composants est envoyée). Rien n'est mis à jour
+  tout seul : PAGINITY prévient, la mise à jour se fait avec `paginity-maj`. Vérification hebdomadaire possible.
+- **Notifications sur le téléphone** (Mon profil) : « Activer sur cet appareil ». Vous recevez les alertes et un
+  avis à chaque nouveau message d'un formulaire (le contenu du message n'est pas dans la notification). Sur iPhone,
+  ajoutez d'abord PAGINITY à l'écran d'accueil.
 
 ## 21. Ce qui n'est pas encore disponible
 
 | Fonction | Prévue |
 |---|---|
 | Installation sur le Raspberry Pi (ou mini-PC), accès depuis internet, accès local de secours | Phase 4 |
-| Sauvegardes automatiques chiffrées hors du serveur, surveillance extérieure | Phase 4 |
 | Branchement de vos noms de domaine, bascule de Coco Nail's depuis Netlify | Phase 5 |
 | Éditeur visuel par blocs (créer des pages sans code) | Phase 6 |
-| Statistiques de visites sans cookies, publication programmée, notifications sur le téléphone | Phase 6 |
+| Publication programmée | Phase 6 |
 | Envoi automatique des invitations par e-mail (aujourd'hui : lien à copier) | Plus tard |

@@ -99,7 +99,7 @@ try {
   // Le panneau permanent est réduit pour cet essai de l'écran des réglages (il a ses propres essais).
   await onglet.getByRole('button', { name: 'Réduire le panneau de l’assistant' }).click();
   await onglet.waitForTimeout(400);
-  ok(await page.getByText('Désactivé').isVisible(), 'Assistant désactivé par défaut');
+  ok(await page.getByText('Désactivé', { exact: true }).isVisible(), 'Assistant désactivé par défaut');
   // Deux modèles locaux ajoutés depuis l'écran.
   for (const [nom, port] of [['GLM', portPrudent], ['Qwen3-Coder', portLocal]]) {
     await page.getByRole('button', { name: 'Ajouter un modèle local' }).click();

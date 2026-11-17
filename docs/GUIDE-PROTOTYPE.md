@@ -14,6 +14,25 @@
 Fonctionne sur Linux et macOS. Sur Windows, utilisez WSL (sous-système Linux) : le prototype utilise des liens
 symboliques et la commande `tar`, non testés sous Windows directement.
 
+## 1 bis. Installation guidée (conseillée)
+
+Un script fait tout, en **demandant avant chaque installation** : il regarde la machine (mémoire, place libre),
+vérifie Node.js et Git, installe et fabrique PAGINITY, propose Ollama et les modèles d'IA adaptés à la mémoire,
+puis crée un lanceur.
+
+- **Mac ou Linux** : dans un terminal, depuis le dossier `paginity` : `bash scripts/essai-ordinateur.sh`
+- **Windows 10/11** : clic droit sur `scripts\essai-windows.ps1` › « Exécuter avec PowerShell ». Il installe
+  d'abord WSL (Ubuntu) s'il manque — un redémarrage est alors demandé, relancez le script ensuite — puis pose un
+  raccourci « Lancer PAGINITY » sur le Bureau.
+
+Modèles proposés : moins de 8 Go → qwen3:1.7b ; 8 à 15 Go → qwen3:4b ; 16 à 31 Go → qwen3:8b + glm4:9b ; 32 Go et plus
+→ qwen3:14b + glm4:9b + qwen3-coder:30b (noms de la bibliothèque Ollama, vérifiés au téléchargement). Kimi K2 et
+DeepSeek V3 complets sont trop gros pour un ordinateur.
+
+> **Limite honnête** : le script Mac/Linux a été essayé en mode simulation (`PAGINITY_ESSAI_SIMULATION=1`) pour les
+> différentes tailles de mémoire ; le script Windows n'a pas pu être exécuté dans l'environnement de développement
+> (pas de Windows). Le premier vrai essai se fera sur votre ordinateur.
+
 ## 2. Installation (une seule fois)
 
 Dans un terminal, depuis le dossier `paginity` du dépôt :

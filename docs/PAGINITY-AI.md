@@ -138,6 +138,30 @@ seules les rubriques concernées touchées, résultat attendu présent, rien d'a
 - **Limite actuelle** : seuls des modèles **simulés** ont passé le banc. Un vrai modèle (Ollama…) n'a pas pu être
   téléchargé dans l'environnement de développement (sites de modèles bloqués) : le premier vrai essai se fera sur votre ordinateur.
 
+## Améliorations (17/11/2026)
+
+- **Question de précision** : statut `question` (la question est dans `raison`) ; `POST …/:pid/repondre { reponse }`
+  relance la demande complétée (« Précision demandée : … Réponse : … »), l'ancienne passe en `repondue`.
+- **Annuler** : `POST …/:pid/annuler` remet les valeurs « avant » si la version actuelle de chaque rubrique est encore
+  celle écrite à l'acceptation (`versions_apres`, migration 7) ; sinon refus (rien n'est écrasé). Statut `annulee`.
+- **Banc appris de l'usage réel** : chaque acceptation (contenus) enregistre la demande, l'instantané des rubriques
+  et le résultat validé (`ia_banc_reelles`, 20 au plus) ; contrôle : mêmes rubriques, données identiques, textes
+  longs libres mais seuls ceux que vous aviez fait changer peuvent changer (`tacheReelle` dans `banc.ts`).
+  `DELETE /api/reglages/ia/banc/reelles` les oublie. Une annulation retire la demande.
+- **Dictée** : réglage `dictee` (désactivé par défaut) ; reconnaissance vocale du navigateur (Google/Apple).
+- **Kit de démarrage** : `POST /api/reglages/ia/detecter { url }` (liste `GET <url>/v1/models`, modèles « embed »
+  ignorés) puis `POST /api/reglages/ia/ajouter-detectes { url, ids }` (confirmation d'identité).
+- **Pages et styles** (`ia/pages.ts`) : portée `pages` (rôle Code). Les fichiers HTML/CSS publiés deviennent des
+  rubriques `fichier:<chemin>` (jamais le JS ni le code serveur ; 120 ko par fichier, 400 ko au total). Refusé :
+  nouveau `<script>`, nouvel attribut `on…`, `javascript:`, adresse d'un nouveau site, HTML sans `</html>`, CSS aux
+  accolades déséquilibrées. `POST …/:pid/apercu` fabrique l'aperçu du brouillon et celui du brouillon + fichiers
+  proposés (dossier `apercus-propositions/<pid>`, lien d'aperçu avec `racine`, migration 8) : avant / après côte à côte.
+- **Diagnostic** (`ia/diagnostic.ts`, `POST /api/sites/:id/diagnostic`) : lecture seule ; constats (publications,
+  fonctions 24 h, liens cassés du brouillon, alertes, disque), explication par le premier modèle **local** qui répond
+  (`expliquer`), jamais par une IA payante.
+- Tests : `assistant-plus` (5), `assistant-pages` (3), `diagnostic` (2), `kit-demarrage` (3) ; parcours
+  `npm run e2e:assistant-plus` (12).
+
 ## API
 
 | Adresse | Rôle |
