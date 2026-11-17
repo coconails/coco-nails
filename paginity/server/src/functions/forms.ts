@@ -112,6 +112,7 @@ export async function handleFormPost(ctx: Ctx, site: SiteRow, forms: DeclaredFor
   for (const [k, v] of Object.entries(fields)) if (k !== 'form-name' && k !== form.piege) data[k] = v;
   const id = randomId('f');
   ctx.db.prepare('INSERT INTO form_submissions (id, site_id, form, at, data_enc) VALUES (?, ?, ?, ?, ?)').run(id, site.id, form.nom, now(), ctx.vault.encrypt(JSON.stringify(data)));
+  ctx.push?.surMessage(site.id, site.name, form.nom);
   const to = (site as SiteRow & { notify_email?: string | null }).notify_email;
   if (to && ctx.mailer?.configured()) {
     const text = Object.entries(data)

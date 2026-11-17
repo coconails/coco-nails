@@ -15,6 +15,7 @@ export function raiseAlert(ctx: Ctx, level: AlertLevel, messageIn: string, siteI
   const dup = ctx.db.prepare('SELECT 1 FROM alerts WHERE message = ? AND read_at IS NULL AND at > ?').get(message, now() - 3_600_000);
   if (dup) return;
   const r = ctx.db.prepare('INSERT INTO alerts (at, level, message, site_id) VALUES (?, ?, ?, ?)').run(now(), level, message, siteId ?? null);
+  ctx.push?.surAlerte(level, message);
   if (level === 'critique' && ctx.mailer?.configured()) {
     void ctx.mailer
       .sendAlert(`PAGINITY — alerte : ${message.slice(0, 90)}`, `${message}\n\nConsultez le tableau de bord de PAGINITY pour plus de détails.`)

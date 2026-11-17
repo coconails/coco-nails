@@ -1,3 +1,4 @@
+import { NotificationsTelephone } from './NotificationsTelephone';
 import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Group, Modal, PasswordInput, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -228,6 +229,7 @@ export function ProfilPage() {
       <Modal opened={!!codes} onClose={() => setCodes(null)} title="Codes de secours" size="lg">
         {codes && <RecoveryCodes codes={codes} onDone={() => setCodes(null)} />}
       </Modal>
+      <NotificationsTelephone />
     </Page>
   );
 }

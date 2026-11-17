@@ -8,6 +8,7 @@ import { Loading, Page } from '../components/Page';
 import { ReglagesIA } from './ReglagesIA';
 import { ReglagesSauvegarde } from './ReglagesSauvegarde';
 import { ReglagesAlerte } from './ReglagesAlerte';
+import { ReglagesMisesAJour } from './ReglagesMisesAJour';
 
 interface Messagerie {
   hote: string;
@@ -101,6 +102,7 @@ export function ReglagesPlateformePage() {
       </Card>
       <ReglagesSauvegarde />
       <ReglagesAlerte />
+      <ReglagesMisesAJour />
       <ReglagesIA />
     </Page>
   );

@@ -252,6 +252,27 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE preview_links ADD COLUMN racine TEXT;
   `,
+  // 9 — Compteur de visites sans cookies : pages vues par jour, sans aucune donnée personnelle.
+  `
+  CREATE TABLE visites (
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    jour TEXT NOT NULL,
+    chemin TEXT NOT NULL,
+    vues INTEGER NOT NULL,
+    PRIMARY KEY (site_id, jour, chemin)
+  );
+  `,
+  // 10 — Notifications sur le téléphone (Web Push) : appareils abonnés.
+  `
+  CREATE TABLE push_abonnements (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    cree_le INTEGER NOT NULL
+  );
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

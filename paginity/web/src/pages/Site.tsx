@@ -7,6 +7,7 @@ import { ErrorBox, Loading, Page } from '../components/Page';
 import { StatusBadge } from '../components/Status';
 import { dateHeure, ilYa } from '../format';
 import type { SiteDetail } from '../types';
+import { VisitesSite } from './Visites';
 
 export function useSite() {
   const { id } = useParams();
@@ -98,6 +99,8 @@ export function SitePage() {
         {s.droits.reglages && tuile(`/sites/${s.id}/secrets`, 'Secrets', 'Clés d’API et mots de passe des fonctions.', <IconKey size={28} />)}
         {s.droits.reglages && tuile(`/sites/${s.id}/reglages`, 'Réglages', 'Nom, domaines, membres, export.', <IconSettings size={28} />)}
       </SimpleGrid>
+
+      <VisitesSite siteId={s.id} />
 
       {s.fiche.remarques.length > 0 && (
         <Alert icon={<IconInfoCircle />} color="blue" variant="light" title="À savoir sur ce site">

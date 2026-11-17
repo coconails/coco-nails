@@ -1,3 +1,4 @@
+import { ApercuTelephone } from './ApercuTelephone';
 import { useState } from 'react';
 import { Alert, Anchor, Badge, Button, Card, Group, Modal, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -214,6 +215,7 @@ export function PublierPage() {
       <Modal opened={!!diff} onClose={() => setDiff(null)} title={diff?.chemin} size="xl">
         {diff && (diff.binaire ? <Text>Fichier non textuel (image, document) : modifié.</Text> : <DiffView avant={diff.avant} apres={diff.apres} />)}
       </Modal>
+      <ApercuTelephone siteId={id!} />
     </Page>
   );
 }

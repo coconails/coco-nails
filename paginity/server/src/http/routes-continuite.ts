@@ -3,6 +3,7 @@ import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
 import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
 import { enregistrerFiche, lireFiche, pageSecours } from '../sites/secours.js';
+import { lireVisites } from '../sites/visites.js';
 
 /** Continuité de service : sauvegarde automatique hors machine (propriétaire seulement). */
 export function registerContinuiteRoutes(app: FastifyInstance, ctx: Ctx): void {
@@ -75,5 +76,50 @@ export function registerContinuiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
     reply.header('content-type', 'text/html; charset=utf-8').header('content-disposition', 'attachment; filename="index.html"');
     return pageSecours(lireFiche(ctx, site).fiche);
+  });
+
+  // Visites (sans cookies) : pages vues par jour.
+  app.get('/api/sites/:id/visites', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    const j = Number((req.query as { jours?: string }).jours ?? 30);
+    return lireVisites(ctx, site, [7, 30, 90].includes(j) ? j : 30);
+  });
+
+  // Failles connues dans les composants de PAGINITY.
+  app.get('/api/reglages/mises-a-jour', async (req) => {
+    requireOwner(req);
+    return ctx.misesAJour.etat();
+  });
+  app.put('/api/reglages/mises-a-jour', async (req) => {
+    const { user } = sudoProprio(req);
+    const e = ctx.misesAJour.regler(body<{ hebdo?: boolean }>(req).hebdo);
+    audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'maj_reglages', details: { hebdo: e.hebdo } });
+    return e;
+  });
+  app.post('/api/reglages/mises-a-jour/verifier', async (req) => {
+    requireOwner(req);
+    return ctx.misesAJour.verifier();
+  });
+
+  // Notifications sur le téléphone : chaque personne abonne ses propres appareils.
+  app.get('/api/push', async (req) => {
+    const { user } = requireUser(req);
+    return { cle: ctx.push.clePublique(), appareils: ctx.push.nombre(user.id) };
+  });
+  app.post('/api/push/abonnement', async (req) => {
+    const { user } = requireUser(req);
+    ctx.push.abonner(user.id, body<{ endpoint?: string; keys?: { p256dh?: string; auth?: string } }>(req));
+    audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'push_abonnement' });
+    return { appareils: ctx.push.nombre(user.id) };
+  });
+  app.delete('/api/push/abonnement', async (req) => {
+    const { user } = requireUser(req);
+    ctx.push.desabonner(user.id, body<{ endpoint?: string }>(req).endpoint);
+    return { appareils: ctx.push.nombre(user.id) };
+  });
+  app.post('/api/push/essai', async (req) => {
+    const { user } = requireUser(req);
+    return { envoyes: await ctx.push.envoyer(user.id, { titre: 'PAGINITY', texte: 'Notification d’essai : tout fonctionne.', url: '/' }) };
   });
 }

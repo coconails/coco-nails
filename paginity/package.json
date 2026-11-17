@@ -26,6 +26,7 @@
     "e2e:reunion": "node e2e/reunion.mjs",
     "e2e:banc": "node e2e/banc.mjs",
     "e2e:continuite": "node e2e/continuite.mjs",
-    "e2e:assistant-plus": "node e2e/assistant-plus.mjs"
+    "e2e:assistant-plus": "node e2e/assistant-plus.mjs",
+    "e2e:confort": "node e2e/confort.mjs"
   }
 }

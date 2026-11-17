@@ -1,3 +1,4 @@
+import { compterVisite } from '../sites/visites.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -54,6 +55,7 @@ export function createSitesServer(ctx: Ctx): http.Server {
       });
       return;
     }
+    compterVisite(ctx, site, req, res);
     serveStatic(root, req, res, {
       functionsMessage: 'Ce site n’a pas de fonction serveur à cette adresse.',
     });

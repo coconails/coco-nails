@@ -10,6 +10,8 @@ import type { Mailer } from './lib/mail.js';
 import type { Assistant } from './ia/assistant.js';
 import type { SauvegardeAuto } from './lib/sauvegarde-auto.js';
 import type { Battement } from './lib/battement.js';
+import type { MisesAJour } from './lib/mises-a-jour.js';
+import type { Push } from './lib/push.js';
 
 /** Tout ce dont les différentes parties de PAGINITY ont besoin, regroupé en un seul objet. */
 export interface Ctx {
@@ -25,4 +27,6 @@ export interface Ctx {
   ia: Assistant;
   sauvegardeAuto: SauvegardeAuto;
   battement: Battement;
+  misesAJour: MisesAJour;
+  push: Push;
 }

@@ -63,7 +63,7 @@ export const get = <T = any>(url: string) => api<T>('GET', url);
 export const post = <T = any>(url: string, body: unknown = {}) => api<T>('POST', url, body);
 export const put = <T = any>(url: string, body: unknown = {}) => api<T>('PUT', url, body);
 export const patch = <T = any>(url: string, body: unknown = {}) => api<T>('PATCH', url, body);
-export const del = <T = any>(url: string) => api<T>('DELETE', url);
+export const del = <T = any>(url: string, payload?: unknown) => api<T>('DELETE', url, payload);
 
 export function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
