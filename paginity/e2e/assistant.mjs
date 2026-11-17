@@ -74,11 +74,19 @@ try {
   await ctx.request.post(`${ADMIN}/api/profil/2fa/totp/confirmer`, { data: { code: totp(d.secret) }, headers: h });
   const site = await (await ctx.request.post(`${ADMIN}/api/sites`, { data: { nom: 'Salon Démo', modele: 'vitrine' }, headers: h })).json();
 
-  const page = await ctx.newPage();
-  page.on('pageerror', (e) => erreursJs.push(e.message));
+  const onglet = await ctx.newPage();
+  onglet.on('pageerror', (e) => erreursJs.push(e.message));
+  // Les recherches se font dans la zone de la page (le panneau permanent de l'assistant a ses propres essais : e2e/panneau.mjs).
+  const zone = onglet.locator('main');
+  const page = new Proxy(onglet, {
+    get: (t, k) => (['getByText', 'getByLabel', 'getByRole', 'getByPlaceholder'].includes(k) ? zone[k].bind(zone) : typeof t[k] === 'function' ? t[k].bind(t) : t[k]),
+  });
   // 1. Réglages de la plateforme : activer, configurer le modèle local, plafond.
   await page.goto(`${ADMIN}/reglages`);
   await page.getByText('Assistant IA').waitFor();
+  // Le panneau permanent est réduit pour cet essai de l'écran des réglages (il a ses propres essais).
+  await onglet.getByRole('button', { name: 'Réduire le panneau de l’assistant' }).click();
+  await onglet.waitForTimeout(400);
   ok(await page.getByText('Désactivé').isVisible(), 'Assistant désactivé par défaut');
   await page.getByPlaceholder('http://127.0.0.1:11434/v1').fill(`http://127.0.0.1:${portLocal}/v1`);
   await page.getByPlaceholder('nom du modèle installé').fill('modele-demo');
@@ -86,17 +94,17 @@ try {
   await page.getByLabel('Autoriser').first().check({ force: true });
   await page.getByRole('button', { name: 'Enregistrer les réglages de l’assistant' }).click();
   // Action sensible : confirmation d'identité.
-  const dlg = page.getByRole('dialog', { name: /Confirmez/ });
+  const dlg = onglet.getByRole('dialog', { name: /Confirmez/ });
   await dlg.waitFor();
   await dlg.getByLabel(/^Mot de passe/).fill(MDP);
   await dlg.getByLabel('Code à 6 chiffres (ou code de secours)').fill(totp(d.secret, 1));
   await dlg.getByRole('button', { name: /Confirmer/ }).click();
-  await page.getByText('Réglages de l’assistant enregistrés.').waitFor();
+  await onglet.getByText('Réglages de l’assistant enregistrés.').waitFor();
   await page.getByLabel('Désactivé').check({ force: true });
   await page.getByText('Activé', { exact: true }).waitFor();
   ok(true, 'Assistant activé depuis les réglages (avec confirmation d’identité)');
   await page.getByRole('button', { name: 'Essayer le modèle local' }).click();
-  ok(await page.getByText('Le modèle local répond.').isVisible({ timeout: 5000 }).catch(() => false) || (await page.getByText('Le modèle local répond.').waitFor().then(() => true)), 'Essai du modèle local : il répond');
+  ok(await onglet.getByText('Le modèle local répond.').waitFor().then(() => true), 'Essai du modèle local : il répond');
   ok(await page.getByText(/Dépensé ce mois-ci : 0,00 \$ sur 0,00 \$/).isVisible(), 'Plafond global et dépense du mois affichés (0 $ par défaut)');
   await page.screenshot({ path: path.join(OUT, 'ia-01-reglages.png'), fullPage: true });
 
@@ -105,7 +113,7 @@ try {
   await page.getByLabel('Votre demande').fill('Remplace la phrase d’accroche par : Votre pause beauté, sur rendez-vous');
   await page.getByRole('button', { name: 'Envoyer à l’assistant' }).click();
   await page.getByText('À valider').waitFor();
-  ok(await page.getByText('préparée par Modèle local').first().isVisible().catch(() => false) || (await page.getByText(/Modèle local/).first().isVisible()), 'Proposition préparée par le modèle local (gratuit)');
+  ok(await page.getByText(/préparée par Modèle local · gratuit/).first().isVisible(), 'Proposition préparée par le modèle local (gratuit)');
   ok(await page.getByRole('cell', { name: 'Votre pause beauté, sur rendez-vous' }).isVisible(), 'Avant / après affiché champ par champ');
   await page.screenshot({ path: path.join(OUT, 'ia-02-proposition.png'), fullPage: true });
   await page.getByRole('button', { name: 'Accepter (brouillon)' }).click();

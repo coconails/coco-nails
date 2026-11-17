@@ -14,6 +14,7 @@ import { get, post } from '../api';
 import { useEtat } from '../App';
 import type { Activite, SiteDetail, SiteResume } from '../types';
 import { StatusDot } from './Status';
+import { PanneauAssistant, usePanneau } from './PanneauAssistant';
 
 function useLiveActivities() {
   const qc = useQueryClient();
@@ -60,6 +61,11 @@ export function Shell({ children }: { children: ReactNode }) {
   const site = useQuery({ queryKey: ['site', siteId], queryFn: () => get<SiteDetail>(`/api/sites/${siteId}`), enabled: !!siteId });
 
   useEffect(() => close(), [location.pathname, close]);
+  const panneau = usePanneau();
+  // Place réservée au panneau de l'assistant pour qu'il ne cache jamais le contenu.
+  const reserve = panneau.mobile
+    ? { paddingBottom: panneau.m.mobile.reduit ? 44 + 16 : `calc(${panneau.m.mobile.hauteurVh}dvh + 16px)` }
+    : { paddingRight: (panneau.m.bureau.reduit ? 44 : panneau.m.bureau.largeur) + 16 };
 
   const logout = async () => {
     await post('/api/deconnexion');
@@ -184,7 +190,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main>{children}</AppShell.Main>
+      <AppShell.Main style={reserve}>{children}</AppShell.Main>
+      <PanneauAssistant etat={panneau} siteRoute={siteId} sites={sites.data ?? []} />
     </AppShell>
   );
 }

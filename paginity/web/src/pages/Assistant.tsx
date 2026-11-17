@@ -8,6 +8,7 @@ import { errorMessage, get, post } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
 import { dateHeure } from '../format';
 import { useSite } from './Site';
+import type { SiteDetail } from '../types';
 
 interface Proposition {
   id: string;
@@ -51,6 +52,22 @@ function differences(avant: unknown, apres: unknown): { champ: string; avant: st
 export function AssistantPage() {
   const { id } = useParams();
   const site = useSite();
+  return (
+    <Page
+      titre="Assistant"
+      sousTitre="Décrivez une modification de contenu : l’assistant prépare une proposition, vous la vérifiez avant qu’elle n’entre dans le brouillon."
+      fil={[{ label: 'Tableau de bord', to: '/' }, { label: site.data?.nom ?? 'Site', to: `/sites/${id}` }, { label: 'Assistant' }]}
+      largeur={900}
+    >
+      <FilAssistant siteId={id!} />
+    </Page>
+  );
+}
+
+/** Zone de demande et propositions de l'assistant pour un site (page Assistant et panneau permanent). */
+export function FilAssistant({ siteId, compact = false }: { siteId: string; compact?: boolean }) {
+  const id = siteId;
+  const site = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetail>(`/api/sites/${id}`) });
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
   const [demande, setDemande] = useState('');
@@ -72,26 +89,22 @@ export function AssistantPage() {
     }
   };
   const peutPublier = !!site.data?.droits.publier;
+  const pad = compact ? 'sm' : 'lg';
 
   return (
-    <Page
-      titre="Assistant"
-      sousTitre="Décrivez une modification de contenu : l’assistant prépare une proposition, vous la vérifiez avant qu’elle n’entre dans le brouillon."
-      fil={[{ label: 'Tableau de bord', to: '/' }, { label: site.data?.nom ?? 'Site', to: `/sites/${id}` }, { label: 'Assistant' }]}
-      largeur={900}
-    >
+    <Stack gap={compact ? 'sm' : 'lg'}>
       {!q.data.etat.active ? (
         <Alert color="blue" title="L’assistant est désactivé">
           Le propriétaire de la plateforme peut l’activer dans « Réglages de la plateforme ».
         </Alert>
       ) : (
-        <Card withBorder radius="lg" padding="lg">
-          <Stack>
+        <Card withBorder radius="lg" padding={pad}>
+          <Stack gap="sm">
             <Textarea
               label="Votre demande"
               placeholder="Exemple : ajoute la pose gel à 45 € dans les tarifs, ou : nous sommes fermés du 24 au 26 décembre."
               autosize
-              minRows={3}
+              minRows={compact ? 2 : 3}
               maxLength={2000}
               value={demande}
               onChange={(e) => setDemande(e.currentTarget.value)}
@@ -117,7 +130,7 @@ export function AssistantPage() {
 
       {q.data.propositions.length === 0 && <Text c="dimmed">Aucune demande pour l’instant.</Text>}
       {q.data.propositions.map((p) => (
-        <Card key={p.id} withBorder radius="lg" padding="lg">
+        <Card key={p.id} withBorder radius="lg" padding={pad}>
           <Stack gap="sm">
             <Group justify="space-between" align="flex-start">
               <Stack gap={2} style={{ flex: 1 }}>
@@ -143,28 +156,47 @@ export function AssistantPage() {
                 <Text size="sm" fw={500}>
                   {c.libelle}
                 </Text>
+                {compact ? (
+                  // Panneau étroit : un bloc par champ, « avant » au-dessus, « après » en dessous.
+                  <Stack gap={6}>
+                    {differences(c.avant, c.apres).map((d) => (
+                      <Card key={d.champ} withBorder radius="md" padding="xs">
+                        <Text size="xs" fw={600}>
+                          {d.champ}
+                        </Text>
+                        <Text size="xs" c="dimmed" style={{ wordBreak: 'break-word', textDecoration: 'line-through' }}>
+                          {d.avant}
+                        </Text>
+                        <Text size="sm" style={{ wordBreak: 'break-word' }}>
+                          {d.apres}
+                        </Text>
+                      </Card>
+                    ))}
+                  </Stack>
+                ) : (
                 <Table.ScrollContainer minWidth={420}>
-                  <Table withTableBorder fz="sm">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th w="22%">Champ</Table.Th>
-                        <Table.Th>Avant</Table.Th>
-                        <Table.Th>Après</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {differences(c.avant, c.apres).map((d) => (
-                        <Table.Tr key={d.champ}>
-                          <Table.Td>{d.champ}</Table.Td>
-                          <Table.Td c="dimmed" style={{ wordBreak: 'break-word' }}>
-                            {d.avant}
-                          </Table.Td>
-                          <Table.Td style={{ wordBreak: 'break-word' }}>{d.apres}</Table.Td>
+                    <Table withTableBorder fz="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th w="22%">Champ</Table.Th>
+                          <Table.Th>Avant</Table.Th>
+                          <Table.Th>Après</Table.Th>
                         </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                </Table.ScrollContainer>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {differences(c.avant, c.apres).map((d) => (
+                          <Table.Tr key={d.champ}>
+                            <Table.Td>{d.champ}</Table.Td>
+                            <Table.Td c="dimmed" style={{ wordBreak: 'break-word' }}>
+                              {d.avant}
+                            </Table.Td>
+                            <Table.Td style={{ wordBreak: 'break-word' }}>{d.apres}</Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                )}
               </Stack>
             ))}
             <Group gap="xs">
@@ -224,6 +256,6 @@ export function AssistantPage() {
           </Stack>
         </Card>
       ))}
-    </Page>
+    </Stack>
   );
 }
