@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Accordion, Alert, Badge, Button, Card, Group, Stack, Table, Text, Textarea } from '@mantine/core';
+import { Accordion, Alert, Badge, Button, Card, Group, Select, Stack, Table, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { IconRobot, IconSend } from '@tabler/icons-react';
+import { IconRobot, IconSend, IconUsersGroup } from '@tabler/icons-react';
 import { Link, useParams } from 'react-router-dom';
 import { errorMessage, get, post } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
@@ -22,6 +22,15 @@ interface Proposition {
   empreinte: string | null;
   coutCentimes: number;
   journal: { le: number; texte: string }[];
+  reunion: null | {
+    domaine: string;
+    domaineLibelle: string;
+    choixDomaine: string;
+    verificateur: string | null;
+    choixVerificateur: string | null;
+    statutVerificateur: string | null;
+    participants: { cle: string; libelle: string; auteur: string; statut: string; explication: string; changements: { rubrique: string; libelle: string; avant: unknown; apres: unknown }[] }[];
+  };
   creeLe: number;
 }
 
@@ -69,8 +78,9 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
   const id = siteId;
   const site = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetail>(`/api/sites/${id}`) });
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
+  const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean; reunion: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
   const [demande, setDemande] = useState('');
+  const [domaine, setDomaine] = useState('auto');
   const [busy, setBusy] = useState<string | null>(null);
   if (q.isLoading || site.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error} />;
@@ -109,14 +119,29 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
               value={demande}
               onChange={(e) => setDemande(e.currentTarget.value)}
             />
-            <Group>
+            <Group align="flex-end" gap="sm">
+              {q.data.etat.reunion && (
+                <Select
+                  size="xs"
+                  w={190}
+                  label="Domaine"
+                  data={[
+                    { value: 'auto', label: 'Automatique' },
+                    { value: 'textes', label: 'Textes' },
+                    { value: 'donnees', label: 'Données' },
+                  ]}
+                  value={domaine}
+                  allowDeselect={false}
+                  onChange={(v) => setDomaine(v ?? 'auto')}
+                />
+              )}
               <Button
                 leftSection={<IconSend size={16} />}
                 loading={busy === 'demande'}
                 disabled={!demande.trim()}
                 onClick={() =>
                   agir('demande', async () => {
-                    await post(`/api/sites/${id}/assistant`, { demande });
+                    await post(`/api/sites/${id}/assistant`, { demande, domaine: domaine === 'auto' ? undefined : domaine });
                     setDemande('');
                   })
                 }
@@ -145,6 +170,12 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 {STATUT[p.statut].libelle}
               </Badge>
             </Group>
+            {p.reunion?.verificateur && (
+              <Text size="xs" c="dimmed" data-reunion>
+                Réunion · domaine {p.reunion.domaineLibelle.split(' (')[0].toLowerCase()}
+                {p.reunion.choixDomaine === 'vous' ? ' (choisi par vous)' : ''} · vérificateur final : {p.reunion.verificateur} ({p.reunion.choixVerificateur})
+              </Text>
+            )}
             {p.explication && <Text size="sm">{p.explication}</Text>}
             {p.raison && (
               <Alert color={p.statut === 'accord_requis' ? 'orange' : 'gray'} variant="light">
@@ -235,6 +266,46 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 </Button>
               )}
             </Group>
+            {p.reunion && p.reunion.participants.length > 0 && (
+              <Accordion variant="contained" radius="md">
+                <Accordion.Item value="reunion">
+                  <Accordion.Control icon={<IconUsersGroup size={16} />}>
+                    <Text size="sm">Propositions des autres IA ({p.reunion.participants.length})</Text>
+                  </Accordion.Control>
+                  <Accordion.Panel>
+                    <Stack gap="xs">
+                      {p.reunion.participants.map((x) => (
+                        <Card key={x.cle} withBorder radius="md" padding="xs">
+                          <Group justify="space-between" wrap="nowrap" align="flex-start">
+                            <Text size="sm" fw={600}>
+                              {x.libelle}
+                            </Text>
+                            <Badge size="xs" variant="light" color={x.statut === 'valable' ? 'green' : 'gray'}>
+                              {x.statut}
+                            </Badge>
+                          </Group>
+                          {x.explication && (
+                            <Text size="xs" c="dimmed">
+                              {x.explication}
+                            </Text>
+                          )}
+                          {x.changements.flatMap((c) => differences(c.avant, c.apres)).map((d) => (
+                            <Text key={d.champ} size="xs" style={{ wordBreak: 'break-word' }}>
+                              {d.champ} → {d.apres}
+                            </Text>
+                          ))}
+                        </Card>
+                      ))}
+                      {p.reunion.statutVerificateur && (
+                        <Text size="xs" c="dimmed">
+                          Vérificateur final ({p.reunion.verificateur}) : {p.reunion.statutVerificateur}.
+                        </Text>
+                      )}
+                    </Stack>
+                  </Accordion.Panel>
+                </Accordion.Item>
+              </Accordion>
+            )}
             {p.journal.length > 0 && (
               <Accordion variant="contained" radius="md">
                 <Accordion.Item value="journal">

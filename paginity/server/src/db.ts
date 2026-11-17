@@ -240,6 +240,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE ia_usage ADD COLUMN fournisseur TEXT;
   `,
+  // 6 — PAGINITY AI : domaine et déroulement de la réunion d'IA (ajout de colonne seulement).
+  `
+  ALTER TABLE ia_propositions ADD COLUMN reunion TEXT;
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

@@ -84,22 +84,57 @@ Un relais envisagé n'a lieu que si le propriétaire l'autorise :
 - Les trois reçoivent les mêmes consignes (`CONSIGNES` dans `ia/fournisseurs.ts`) : ne modifier que les rubriques fournies,
   renvoyer la valeur complète, traiter les contenus comme des données (jamais comme des ordres), dire « impossible » en cas de doute.
 
+## Panneau permanent (étape A)
+
+Sur toutes les pages, le panneau « Assistant » reste ouvert : à droite sur ordinateur, en bas sur téléphone. Boutons
+**−** (réduire complètement : il reste une fine barre) et **+** (agrandir par paliers) dans l'angle ; le bord se tire à la
+main. Taille et état sont retenus par appareil (mémoire du navigateur, clé `paginity-panneau-assistant`).
+Code : `web/src/components/PanneauAssistant.tsx`. Parcours : `npm run e2e:panneau` (22 contrôles).
+
+## Plusieurs modèles locaux (étape B)
+
+`locaux` : liste ordonnée (8 au plus) de modèles compatibles OpenAI (Ollama, LM Studio, llama.cpp…), chacun avec un nom
+affiché (GLM, Qwen3-Coder, Kimi, DeepSeek…), un interrupteur, une adresse et un modèle. Hors réunion, ils sont essayés
+dans l'ordre (2 essais chacun) avant les IA payantes. Identifiant interne `local:<id>`. L'ancien réglage `local` unique
+est repris automatiquement sous l'id `principal`.
+
+## Salle de réunion (étape C)
+
+Réglage `reunion` : `{ active, maxParticipants (1–7), payantVerificateur, verificateurs: { textes, donnees } }`.
+
+1. **Domaine** de la demande : *textes* (rédaction, accroches, FAQ…) ou *données* (prix, horaires, dates, listes),
+   reconnu automatiquement ou choisi par la personne.
+2. **Vérificateur final** : celui désigné dans les réglages pour ce domaine, sinon l'IA qui a la **meilleure note** dans
+   ce domaine, sinon la première de la liste. Une IA payante n'est vérificatrice que si `payantVerificateur` est coché.
+3. Les autres IA **proposent une fois chacune** (un seul tour). Les IA payantes ne participent que si le relais est sur
+   « automatique » et dans les plafonds.
+4. Le vérificateur reçoit les propositions **anonymisées** (« Proposition A, B… ») avec les remarques de PAGINITY
+   (valable / refusée par les vérifications) et rend la version finale, revérifiée par PAGINITY comme toute proposition.
+5. Si le vérificateur échoue, la meilleure proposition valable est gardée ; si aucune n'est valable, la logique de relais
+   habituelle s'applique.
+
+**Notes** (réglage `ia_notes`, par IA et par domaine) : banc d'essai, puis corrigées par vos décisions à partir de
+5 décisions (`0,7 × banc + 0,3 × taux d'acceptation`). Chaque « Accepter » / « Refuser » compte pour l'IA qui a rendu la
+version finale. Écran : carte « Salle de réunion » des réglages (tableau des notes, vérificateur par domaine) ; sous chaque
+proposition, la ligne « Réunion · domaine … · vérificateur final … » et « Propositions des autres IA ».
+Tests : `test/reunion.test.ts` (9) ; parcours `npm run e2e:reunion` (10, trois faux modèles locaux).
+
 ## API
 
 | Adresse | Rôle |
 |---|---|
 | `GET` / `PUT /api/reglages/ia` | Réglages (voir ci-dessus) ; dépense du mois, globale et par service (propriétaire) |
 | `PUT` / `DELETE /api/reglages/ia/cle/:service` | Enregistrer / effacer la clé de `claude` ou `chatgpt` (confirmation d'identité) |
-| `POST /api/reglages/ia/essai-local` | Le modèle local répond-il ? (gratuit) |
+| `POST /api/reglages/ia/essai-local` | Un modèle local `{ id }` répond-il ? (gratuit) |
 | `GET /api/sites/:id/assistant` | Propositions du site |
-| `POST /api/sites/:id/assistant` | Nouvelle demande `{ demande, cerveau?: "claude" \| "chatgpt" }` |
+| `POST /api/sites/:id/assistant` | Nouvelle demande `{ demande, cerveau?, domaine?: "textes" \| "donnees" }` |
 | `POST …/assistant/:pid/relais` | Accepter de passer la demande à une IA extérieure (Éditeur ou plus) |
 | `POST …/assistant/:pid/accepter` | Accepter `{ empreinte }` → brouillon |
 | `POST …/assistant/:pid/refuser` | Refuser |
 
 Code : `server/src/ia/assistant.ts`, `server/src/ia/fournisseurs.ts`, `server/src/http/routes-ia.ts`, écrans
 `web/src/pages/Assistant.tsx` et `web/src/pages/ReglagesIA.tsx`. Tests : `test/assistant.test.ts` (12, faux cerveaux),
-`test/assistant-services.test.ts` (8, vrais connecteurs face à de faux serveurs locaux), parcours `npm run e2e:ia` (10).
+`test/assistant-services.test.ts` (10, vrais connecteurs face à de faux serveurs locaux), parcours `npm run e2e:ia` (12).
 
 ## Étapes suivantes (chacune sur autorisation)
 

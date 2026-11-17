@@ -571,6 +571,18 @@ modification acceptée va **dans le brouillon** : vérifiez l'aperçu, puis publ
 - Les IA ne reçoivent que les **contenus publics** du site : jamais les secrets, les messages des clientes ni la compta.
 - **Ce qui s'est passé** (sous chaque demande) détaille chaque étape : quel modèle, pourquoi le relais, le coût.
 
+**Le panneau Assistant** reste ouvert sur toutes les pages (à droite sur ordinateur, en bas sur téléphone). Le bouton
+**−** dans l'angle le réduit complètement, **+** l'agrandit ; vous pouvez aussi tirer son bord. La taille choisie est
+retenue sur chaque appareil.
+
+**Plusieurs modèles locaux** : dans les réglages, « Ajouter un modèle local » (par exemple GLM, Qwen3-Coder, Kimi,
+DeepSeek). Chacun a son interrupteur, un bouton « Essayer » et peut être monté ou descendu dans la liste.
+
+**Salle de réunion** (à activer dans les réglages) : chaque IA propose une fois, puis la plus forte dans le domaine de la
+demande (*Textes* ou *Données*) relit toutes les propositions et rend la version finale. Vous pouvez choisir le domaine
+au moment de la demande et désigner vous-même le vérificateur de chaque domaine. Sous la proposition, « Propositions des
+autres IA » montre ce que chacune avait proposé. Vos « Accepter » et « Refuser » améliorent les notes des IA.
+
 ---
 
 ## 21. Ce qui n'est pas encore disponible

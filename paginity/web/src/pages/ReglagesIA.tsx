@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Divider, Group, NumberInput, PasswordInput, SegmentedControl, Select, Stack, Switch, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Button, Card, Divider, Group, NumberInput, PasswordInput, SegmentedControl, Select, Stack, Switch, Table, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useQuery } from '@tanstack/react-query';
 import { IconRobot } from '@tabler/icons-react';
@@ -34,12 +34,16 @@ interface EtatIA {
     locaux: Local[];
     claude: Service;
     chatgpt: Service;
+    reunion: { active: boolean; maxParticipants: number; payantVerificateur: boolean; verificateurs: Partial<Record<string, string>> };
   };
   cles: Record<Externe, boolean>;
   depenseDuMoisCentimes: number;
   depenseParService: Record<Externe, number>;
   enService: Record<string, boolean>;
   tarifsClaude: Record<string, { entree: number; sortie: number; libelle: string }>;
+  domaines: Record<string, string>;
+  notes: Record<string, Record<string, { note: number | null; banc?: number | null; acceptes?: number; refuses?: number }>>;
+  libelles: Record<string, string>;
 }
 
 /** Montants en dollars US (devise de facturation d'Anthropic et d'OpenAI), saisis et affichés en dollars, stockés en centimes. */
@@ -60,7 +64,8 @@ export function ReglagesIA() {
   const enregistrer = async (changement?: Partial<EtatIA['reglages']>) => {
     setBusy(true);
     try {
-      await put('/api/reglages/ia', changement ?? r);
+      const corps = changement ?? { ...r, reunion: { ...r.reunion, verificateurs: Object.fromEntries(Object.keys(e.domaines).map((d) => [d, r.reunion.verificateurs[d] ?? 'auto'])) } };
+      await put('/api/reglages/ia', corps);
       notifications.show({ color: 'green', message: 'Réglages de l’assistant enregistrés.' });
       void q.refetch();
     } catch (err) {
@@ -313,6 +318,85 @@ export function ReglagesIA() {
         </Text>
         {carteService('claude', 'Claude (Anthropic)', <>Clé à créer sur console.anthropic.com. Tarifs pré-remplis d’après la liste officielle du 03/11/2026 : vérifiez-les.</>)}
         {carteService('chatgpt', 'ChatGPT (OpenAI)', <>Clé à créer sur platform.openai.com. Recopiez le nom du modèle et ses prix depuis la page des tarifs d’OpenAI.</>)}
+        <Divider label="Salle de réunion (les IA travaillent ensemble)" labelPosition="left" />
+        <Card withBorder radius="md" padding="md" data-section="reunion">
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text fw={600}>Réunion des IA</Text>
+              <Switch label="Activer" checked={r.reunion.active} onChange={(ev) => setR({ ...r, reunion: { ...r.reunion, active: ev.currentTarget.checked } })} />
+            </Group>
+            <Text size="sm" c="dimmed">
+              Chaque IA propose une fois ; la plus forte dans le domaine de la demande vérifie toutes les propositions en dernier et rend la version finale.
+              Plus d’IA, c’est plus d’attente : limitez le nombre de participants.
+            </Text>
+            <Group grow align="flex-start">
+              <NumberInput
+                label="IA qui proposent (en plus du vérificateur)"
+                min={1}
+                max={7}
+                value={r.reunion.maxParticipants}
+                onChange={(v) => setR({ ...r, reunion: { ...r.reunion, maxParticipants: Number(v) || 1 } })}
+              />
+              <Switch
+                mt={28}
+                label="Une IA payante peut être le vérificateur final"
+                checked={r.reunion.payantVerificateur}
+                onChange={(ev) => setR({ ...r, reunion: { ...r.reunion, payantVerificateur: ev.currentTarget.checked } })}
+              />
+            </Group>
+            <Text size="xs" c="dimmed">
+              Les IA payantes ne participent que si « Passer le relais seul » est choisi plus haut, et toujours dans les plafonds.
+            </Text>
+            <Table.ScrollContainer minWidth={420}>
+              <Table withTableBorder fz="sm">
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>IA</Table.Th>
+                    {Object.entries(e.domaines).map(([d, lib]) => (
+                      <Table.Th key={d}>{lib.split(' (')[0]}</Table.Th>
+                    ))}
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {Object.entries(e.libelles).map(([cle, nom]) => (
+                    <Table.Tr key={cle}>
+                      <Table.Td>{nom}</Table.Td>
+                      {Object.keys(e.domaines).map((d) => {
+                        const n = e.notes[d]?.[cle];
+                        return (
+                          <Table.Td key={d}>
+                            {n?.note ?? '—'}
+                            {n && (n.acceptes || n.refuses) ? (
+                              <Text span size="xs" c="dimmed">
+                                {' '}
+                                ({n.acceptes ?? 0} acceptée(s), {n.refuses ?? 0} refusée(s))
+                              </Text>
+                            ) : null}
+                          </Table.Td>
+                        );
+                      })}
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Table.ScrollContainer>
+            <Text size="xs" c="dimmed">
+              Notes sur 100 : banc d’essai, puis corrigées par vos décisions (à partir de 5). « — » = pas encore mesuré.
+            </Text>
+            <Group grow align="flex-start">
+              {Object.entries(e.domaines).map(([d, lib]) => (
+                <Select
+                  key={d}
+                  label={`Vérificateur final — ${lib.split(' (')[0]}`}
+                  data={[{ value: 'auto', label: 'Automatique (meilleure note)' }, ...Object.entries(e.libelles).map(([value, label]) => ({ value, label }))]}
+                  value={r.reunion.verificateurs[d] ?? 'auto'}
+                  allowDeselect={false}
+                  onChange={(v) => setR({ ...r, reunion: { ...r.reunion, verificateurs: { ...r.reunion.verificateurs, [d]: v === 'auto' ? undefined : v ?? undefined } } })}
+                />
+              ))}
+            </Group>
+          </Stack>
+        </Card>
         <Group>
           <Button loading={busy} onClick={() => void enregistrer()}>
             Enregistrer les réglages de l’assistant

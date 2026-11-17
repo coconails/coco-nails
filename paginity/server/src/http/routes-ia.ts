@@ -58,13 +58,14 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.get('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
-    return { etat: { active: ctx.ia.reglages().active }, propositions: ctx.ia.liste(site) };
+    const r = ctx.ia.reglages();
+    return { etat: { active: r.active, reunion: r.reunion.active }, propositions: ctx.ia.liste(site) };
   });
   app.post('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'contenus');
-    const b = body<{ demande?: string; cerveau?: string }>(req);
-    return ctx.ia.demander(site, user, b.demande, { forcer: b.cerveau === 'claude' || b.cerveau === 'chatgpt' ? b.cerveau : undefined });
+    const b = body<{ demande?: string; cerveau?: string; domaine?: string }>(req);
+    return ctx.ia.demander(site, user, b.demande, { forcer: b.cerveau === 'claude' || b.cerveau === 'chatgpt' ? b.cerveau : undefined, domaine: b.domaine });
   });
   // Accepter de passer à Claude (payant, contenus publics envoyés à Anthropic) : à partir du rôle Éditeur.
   app.post('/api/sites/:id/assistant/:pid/relais', async (req) => {
