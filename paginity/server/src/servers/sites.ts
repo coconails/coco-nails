@@ -72,23 +72,23 @@ const ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
  * Pas de cookie (les navigateurs les bloquent de plus en plus dans les cadres) : c'est l'adresse elle-même qui donne l'accès,
  * pendant 2 heures, et seulement tant que la personne a toujours accès au site.
  */
-export function createPreviewLink(ctx: Ctx, siteId: string, slug: string, userId: string): string {
+export function createPreviewLink(ctx: Ctx, siteId: string, slug: string, userId: string, racine?: string): string {
   const bytes = crypto.randomBytes(16);
   let code = '';
   for (const b of bytes) code += ALPHABET[b % 32];
   const label = `${slug}--${code}`.slice(0, 63);
   ctx.db.prepare('DELETE FROM preview_links WHERE expires_at < ?').run(now());
-  ctx.db.prepare('INSERT INTO preview_links (label, site_id, user_id, expires_at) VALUES (?, ?, ?, ?)').run(label, siteId, userId, now() + LINK_MS);
+  ctx.db.prepare('INSERT INTO preview_links (label, site_id, user_id, expires_at, racine) VALUES (?, ?, ?, ?, ?)').run(label, siteId, userId, now() + LINK_MS, racine ?? null);
   return label;
 }
 
 function resolvePreview(ctx: Ctx, label: string) {
-  const row = ctx.db.prepare('SELECT * FROM preview_links WHERE label = ?').get(label) as { site_id: string; user_id: string; expires_at: number } | undefined;
+  const row = ctx.db.prepare('SELECT * FROM preview_links WHERE label = ?').get(label) as { site_id: string; user_id: string; expires_at: number; racine: string | null } | undefined;
   if (!row || row.expires_at < now()) return null;
   const site = ctx.sites.get(row.site_id);
   const user = getUser(ctx, row.user_id);
   if (!site || !user || user.disabled || !ctx.sites.role(user, site.id)) return null;
-  return site;
+  return Object.assign(site, { racineApercu: row.racine });
 }
 
 /**
@@ -104,7 +104,7 @@ export function createPreviewServer(ctx: Ctx): http.Server {
     if (!site) return simplePage(res, 404, 'Aperçu expiré ou introuvable', 'Ouvrez un nouvel aperçu depuis PAGINITY.');
     let root: string;
     try {
-      root = fs.realpathSync(ctx.sites.previewLink(site));
+      root = fs.realpathSync(site.racineApercu ?? ctx.sites.previewLink(site));
     } catch {
       return simplePage(res, 404, 'Aperçu non préparé', 'Demandez un aperçu depuis PAGINITY.');
     }

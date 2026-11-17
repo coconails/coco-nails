@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Ctx } from '../context.js';
 import type { UserRow } from '../auth/service.js';
 import type { SiteRow } from '../sites/service.js';
@@ -7,7 +9,10 @@ import { audit } from '../lib/audit.js';
 import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import { validateEntryValue, type Field } from '../content/schema.js';
-import { isServerCode } from '../sites/server-code.js';
+import { assertMayWrite, isServerCode } from '../sites/server-code.js';
+import { contexteFichiers, estFichier, PREFIXE, verifierFichier } from './pages.js';
+import { writeChecked } from '../sites/files.js';
+import { authorOf } from '../sites/service.js';
 import { juger, MAX_REELLES, noteDomaine, salonFictif, TACHES_BANC, tacheReelle, type DemandeReelle, type ResultatTache, type TacheBanc } from './banc.js';
 import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
 
@@ -68,6 +73,8 @@ export interface Cerveau {
   libelle?: string;
   /** Coût maximal (centimes) d'un appel, pour ne jamais dépasser un plafond. Absent = gratuit. */
   estimer?(d: DemandeCerveau): number;
+  /** Explication en texte libre (diagnostic) : seulement pour les modèles locaux. */
+  expliquer?(consignes: string, texte: string, signal: AbortSignal): Promise<string>;
 }
 
 export type ModeRelais = 'jamais' | 'demander' | 'auto';
@@ -470,6 +477,7 @@ export class Assistant {
     const info = p.reunion ? JSON.parse(p.reunion) : {};
     return this.demander(site, user, `${p.demande}\nPrécision demandée : ${p.raison ?? ''}\nRéponse : ${r}`.slice(0, 2000), {
       domaine: info.choixDomaine === 'vous' ? info.domaine : undefined,
+      portee: info.portee,
     });
   }
 
@@ -479,12 +487,12 @@ export class Assistant {
     if (p.statut !== 'acceptee' || !p.versions_apres) throw new UserError(409, 'Seule une proposition acceptée peut être annulée.');
     const versionsApres = JSON.parse(p.versions_apres) as Record<string, string>;
     const changements = JSON.parse(p.changements!) as Changement[];
-    const { versions } = this.contexte(site);
+    const { versions } = this.contexteDe(site, id);
     const touchees = changements.filter((c) => (versions[c.rubrique] ?? null) !== versionsApres[c.rubrique]);
     if (touchees.length) {
       throw new UserError(409, `Impossible d’annuler : « ${touchees.map((c) => c.libelle).join(' », « ')} » a été modifié depuis. Faites la correction dans « Contenus » (ou retrouvez l’ancienne version dans « Versions »).`);
     }
-    for (const c of changements) await saveEntry(this.ctx, site, user, c.rubrique, c.avant, versions[c.rubrique]);
+    for (const c of changements) await this.ecrire(site, user, c.rubrique, c.avant, versions[c.rubrique] ?? null);
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'annulee', decide_le = ? WHERE id = ?").run(now(), id);
     this.noter(id, `Annulée par ${user.name} : les contenus sont revenus comme avant dans le brouillon.`);
     this.oublierReelle(id);
@@ -637,8 +645,32 @@ export class Assistant {
     return { rubriques, versions };
   }
 
+  /** Contexte selon la portée de la demande : contenus (formulaires) ou pages et styles (fichiers HTML/CSS). */
+  private contexteDe(site: SiteRow, id: string) {
+    return this.portee(id) === 'pages' ? contexteFichiers(this.ctx, site) : this.contexte(site);
+  }
+  private portee(id: string): 'contenus' | 'pages' {
+    const r = this.ctx.db.prepare('SELECT reunion FROM ia_propositions WHERE id = ?').get(id) as { reunion: string | null } | undefined;
+    try {
+      return r?.reunion && JSON.parse(r.reunion).portee === 'pages' ? 'pages' : 'contenus';
+    } catch {
+      return 'contenus';
+    }
+  }
+  /** Écrit une valeur (rubrique de contenu ou fichier) dans le brouillon ; renvoie la nouvelle version. */
+  private async ecrire(site: SiteRow, user: UserRow, rubrique: string, valeur: unknown, version: string | null): Promise<string> {
+    if (!estFichier(rubrique)) return (await saveEntry(this.ctx, site, user, rubrique, valeur, version)).version;
+    const rel = rubrique.slice(PREFIXE.length);
+    assertMayWrite(this.ctx, site, user, [rel]);
+    return this.ctx.sites.lock(site.id, async () => {
+      const w = writeChecked(this.ctx.sites.repoDir(site), rel, String(valeur), version);
+      await this.ctx.sites.repo(site).commitPaths([w.rel], `Assistant : ${w.rel}`, authorOf(user));
+      return w.version;
+    });
+  }
+
   // ------------------------------------------------------------------ demande
-  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcer?: NomExterne; domaine?: unknown } = {}) {
+  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcer?: NomExterne; domaine?: unknown; portee?: unknown } = {}) {
     const reg = this.reglages();
     if (!reg.active) throw new UserError(409, 'L’assistant est désactivé. Le propriétaire peut l’activer dans les Réglages de la plateforme.');
     const demande = typeof texte === 'string' ? texte.trim() : '';
@@ -647,7 +679,7 @@ export class Assistant {
     const domaine: Domaine = opts.domaine === 'textes' || opts.domaine === 'donnees' ? opts.domaine : domaineDe(demande);
     this.ctx.db
       .prepare("INSERT INTO ia_propositions (id, site_id, user_id, demande, statut, journal, cree_le, reunion) VALUES (?, ?, ?, ?, 'en_cours', '[]', ?, ?)")
-      .run(id, site.id, user.id, demande, now(), JSON.stringify({ domaine, choixDomaine: opts.domaine === 'textes' || opts.domaine === 'donnees' ? 'vous' : 'automatique' }));
+      .run(id, site.id, user.id, demande, now(), JSON.stringify({ domaine, choixDomaine: opts.domaine === 'textes' || opts.domaine === 'donnees' ? 'vous' : 'automatique', ...(opts.portee === 'pages' ? { portee: 'pages' } : {}) }));
     audit(this.ctx.db, { userId: user.id, action: 'ia_demande', siteId: site.id, details: { id } });
     await this.traiter(id, site, opts.forcer ?? 'local');
     return this.lire(site, id);
@@ -666,8 +698,11 @@ export class Assistant {
   }
 
   private async traiter(id: string, site: SiteRow, depart: NomCerveau | 'externe', relaisAccepte = false): Promise<void> {
-    const { rubriques, versions } = this.contexte(site);
-    if (!rubriques.length) return this.finir(id, 'impossible', { raison: 'Ce site n’a pas de contenus modifiables par formulaire : l’assistant n’a rien sur quoi travailler.' });
+    const { rubriques, versions } = this.contexteDe(site, id);
+    if (!rubriques.length)
+      return this.finir(id, 'impossible', {
+        raison: this.portee(id) === 'pages' ? 'Ce site n’a pas de fichier HTML ou CSS modifiable par l’assistant.' : 'Ce site n’a pas de contenus modifiables par formulaire : l’assistant n’a rien sur quoi travailler.',
+      });
     const demande = (this.ctx.db.prepare('SELECT demande FROM ia_propositions WHERE id = ?').get(id) as { demande: string }).demande;
     const taille = JSON.stringify(rubriques).length + demande.length;
     const cerveaux = this.cerveauxActifs();
@@ -1008,9 +1043,12 @@ export class Assistant {
         continue;
       }
       vues.add(r.nom);
-      const errs = validateEntryValue({ name: r.nom, label: r.libelle, type: 'file', path: '', format: 'json', list: r.liste, fields: r.champs }, c.valeur);
-      for (const e of errs) erreurs.push(`${r.libelle} : ${e.message}`);
-      if (JSON.stringify(c.valeur) === JSON.stringify(r.valeur)) erreurs.push(`« ${r.libelle} » : rien ne change`);
+      if (estFichier(r.nom)) erreurs.push(...verifierFichier(r.libelle, String(r.valeur), c.valeur));
+      else {
+        const errs = validateEntryValue({ name: r.nom, label: r.libelle, type: 'file', path: '', format: 'json', list: r.liste, fields: r.champs }, c.valeur);
+        for (const e of errs) erreurs.push(`${r.libelle} : ${e.message}`);
+        if (JSON.stringify(c.valeur) === JSON.stringify(r.valeur)) erreurs.push(`« ${r.libelle} » : rien ne change`);
+      }
       changements.push({ rubrique: r.nom, libelle: r.libelle, versionBase: versions[r.nom] ?? null, avant: r.valeur, apres: c.valeur });
     }
     return erreurs.length ? { ok: false as const, erreurs: erreurs.slice(0, 10) } : { ok: true as const, changements };
@@ -1051,18 +1089,20 @@ export class Assistant {
     if (typeof empreinte !== 'string' || empreinte !== p.empreinte) throw new UserError(409, 'Cette validation ne correspond pas à la proposition affichée. Rechargez-la.');
     const changements = JSON.parse(p.changements!) as Changement[];
     // Si une rubrique a changé depuis la proposition, l'accord ne vaut plus.
-    const { versions } = this.contexte(site);
+    const { versions } = this.contexteDe(site, id);
     if (changements.some((c) => (versions[c.rubrique] ?? null) !== c.versionBase)) {
       this.finir(id, 'perimee', { raison: 'Les contenus ont été modifiés depuis la proposition : elle n’est plus valable. Refaites la demande.' });
       throw new UserError(409, 'Les contenus ont été modifiés depuis la proposition : elle n’est plus valable. Refaites la demande.');
     }
-    const instantane = this.contexte(site).rubriques;
+    const pages = this.portee(id) === 'pages';
+    const instantane = pages ? [] : this.contexte(site).rubriques;
     const versionsApres: Record<string, string> = {};
-    for (const c of changements) versionsApres[c.rubrique] = (await saveEntry(this.ctx, site, user, c.rubrique, c.apres, c.versionBase)).version;
+    for (const c of changements) versionsApres[c.rubrique] = await this.ecrire(site, user, c.rubrique, c.apres, c.versionBase);
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'acceptee', decide_le = ?, versions_apres = ? WHERE id = ?").run(now(), JSON.stringify(versionsApres), id);
-    this.retenirPourBanc(p, instantane, changements);
+    if (!pages) this.retenirPourBanc(p, instantane, changements);
     this.compterDecision(p.cerveau, p.reunion ? JSON.parse(p.reunion).domaine ?? null : null, true);
     this.noter(id, `Acceptée par ${user.name} : enregistrée dans le brouillon (pas encore publiée).`);
+    this.nettoyerApercu(site, id);
     audit(this.ctx.db, { userId: user.id, action: 'ia_acceptee', siteId: site.id, details: { id, cerveau: p.cerveau, rubriques: changements.map((c) => c.rubrique) } });
     return this.lire(site, id);
   }
@@ -1073,11 +1113,17 @@ export class Assistant {
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'refusee', decide_le = ? WHERE id = ?").run(now(), id);
     if (p.statut === 'proposee') this.compterDecision(p.cerveau, p.reunion ? JSON.parse(p.reunion).domaine ?? null : null, false);
     this.noter(id, `Refusée par ${user.name}. Rien n’a été modifié.`);
+    this.nettoyerApercu(site, id);
     audit(this.ctx.db, { userId: user.id, action: 'ia_refusee', siteId: site.id, details: { id } });
     return this.lire(site, id);
   }
 
   // ------------------------------------------------------------------ lecture
+  /** L'aperçu « après » d'une proposition ne sert plus une fois décidée. */
+  private nettoyerApercu(site: SiteRow, id: string) {
+    fs.rmSync(path.join(this.ctx.sites.dir(site), 'apercus-propositions', id.replace(/[^\w-]/g, '')), { recursive: true, force: true });
+  }
+
   private ligne(site: SiteRow, id: string): LigneProposition {
     const p = this.ctx.db.prepare('SELECT * FROM ia_propositions WHERE id = ? AND site_id = ?').get(id, site.id) as LigneProposition | undefined;
     if (!p) throw new UserError(404, 'Proposition introuvable.');
@@ -1099,6 +1145,7 @@ export class Assistant {
       coutCentimes: p.cout_centimes,
       journal: JSON.parse(p.journal) as { le: number; texte: string }[],
       reunion: this.reunionLisible(p.reunion),
+      portee: p.reunion && JSON.parse(p.reunion).portee === 'pages' ? 'pages' : 'contenus',
       annulable: p.statut === 'acceptee' && !!(p as { versions_apres?: string | null }).versions_apres,
       creeLe: p.cree_le,
     };
@@ -1136,4 +1183,24 @@ function euros(c: number): string {
 
 function capitale(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Fichiers proposés (chemin dans le dépôt → contenu) d'une proposition « pages », pour l'aperçu. */
+export function fichiersProposes(p: { changements: { rubrique: string; apres: unknown }[] }): Record<string, string> {
+  return Object.fromEntries(p.changements.filter((c) => estFichier(c.rubrique)).map((c) => [c.rubrique.slice(PREFIXE.length), String(c.apres)]));
+}
+
+/** Diagnostic : explication en français simple par le premier modèle LOCAL qui répond (rien ne sort de la machine). */
+export async function expliquerDiagnostic(a: Assistant, consignes: string, rapport: string): Promise<{ texte: string; par: string } | null> {
+  if (!a.reglages().active) return null;
+  for (const [cle, c] of Object.entries(a.cerveauxActifs())) {
+    if (!estLocal(cle) || !c.expliquer || !(await c.disponible().catch(() => false))) continue;
+    try {
+      const texte = (await c.expliquer(consignes, rapport, AbortSignal.timeout(c.delaiMs))).trim();
+      if (texte) return { texte: texte.slice(0, 3000), par: capitale(a.libelle(cle)) };
+    } catch {
+      /* modèle suivant */
+    }
+  }
+  return null;
 }

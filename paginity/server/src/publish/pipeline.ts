@@ -245,7 +245,11 @@ export async function runRestore(ctx: Ctx, run: JobRun): Promise<unknown> {
 }
 
 /** Fabrique l'aperçu privé du brouillon (sans fonctions serveur réelles). */
-export async function buildPreview(ctx: Ctx, site: SiteRow): Promise<{ duree: number; avertissements: string[] }> {
+export async function buildPreview(
+  ctx: Ctx,
+  site: SiteRow,
+  opts: { surcouche?: Record<string, string>; sortie?: string } = {},
+): Promise<{ duree: number; avertissements: string[]; dossier: string }> {
   const started = now();
   return ctx.sites.lock(site.id, async () => {
     const repo = ctx.sites.repo(site);
@@ -254,19 +258,28 @@ export async function buildPreview(ctx: Ctx, site: SiteRow): Promise<{ duree: nu
     const srcDir = tmpDir(ctx, `apercu-src-${site.id}`);
     const base = path.join(ctx.sites.dir(site), 'apercus');
     fs.mkdirSync(base, { recursive: true });
-    const outDir = path.join(base, `a${Date.now()}`);
+    const outDir = opts.sortie ?? path.join(base, `a${Date.now()}`);
+    if (opts.sortie) removeTree(opts.sortie);
     try {
       await repo.extract(head, '', srcDir);
+      // Aperçu d'une proposition : les fichiers proposés remplacent ceux du brouillon (rien n'est écrit dans le dépôt).
+      for (const [rel, contenu] of Object.entries(opts.surcouche ?? {})) {
+        const abs = path.join(srcDir, rel);
+        if (!abs.startsWith(srcDir + path.sep)) throw new UserError(400, 'Chemin de fichier invalide.');
+        fs.writeFileSync(abs, contenu);
+      }
       const manifest = readManifest(srcDir);
       const pub = path.join(srcDir, manifest.publishDir === '.' ? '' : manifest.publishDir);
       if (!fs.existsSync(pub)) throw new UserError(422, `Le dossier publié « ${manifest.publishDir} » n'existe pas.`);
       await fabricate(ctx, site, srcDir, outDir, 'apercu', manifest, 'test');
       const warnings = fs.existsSync(path.join(outDir, 'index.html')) ? checkLinks(outDir) : ["Il manque la page d'accueil index.html."];
-      const link = ctx.sites.previewLink(site);
-      const old = readLink(link);
-      swapSymlink(link, outDir);
-      if (old && path.resolve(old) !== path.resolve(outDir)) setTimeout(() => removeTree(old), 30_000).unref();
-      return { duree: now() - started, avertissements: warnings };
+      if (!opts.sortie) {
+        const link = ctx.sites.previewLink(site);
+        const old = readLink(link);
+        swapSymlink(link, outDir);
+        if (old && path.resolve(old) !== path.resolve(outDir)) setTimeout(() => removeTree(old), 30_000).unref();
+      }
+      return { duree: now() - started, avertissements: warnings, dossier: outDir };
     } catch (e) {
       removeTree(outDir);
       throw e;

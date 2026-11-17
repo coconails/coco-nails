@@ -1,3 +1,4 @@
+import { CONSIGNES_PAGES } from './pages.js';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Cerveau, DemandeCerveau, ReponseCerveau } from './assistant.js';
 
@@ -83,6 +84,7 @@ export function messageUtilisateur(d: DemandeCerveau): string {
   const contenus = d.rubriques.map((r) => ({ rubrique: r.nom, libelle: r.libelle, liste: r.liste, champs: r.champs, valeur: r.valeur }));
   return [
     `Demande : ${d.demande}`,
+    d.rubriques.some((r) => r.nom.startsWith('fichier:')) ? CONSIGNES_PAGES : '',
     `<contenus>\n${JSON.stringify(contenus)}\n</contenus>`,
     d.corrections?.length ? `Ta proposition précédente a été refusée par les vérifications de PAGINITY : ${d.corrections.join(' ; ')}. Corrige-la.` : '',
     d.propositionsAutres
@@ -175,6 +177,10 @@ export function cerveauLocal(cfg: ConfigLocalNomme): Cerveau {
         signal,
       );
       return lireReponse(String(j?.choices?.[0]?.message?.content ?? ''), 0);
+    },
+    async expliquer(consignes, texte, signal) {
+      const j = await postJson(`${base}/chat/completions`, { model: cfg.modele, max_tokens: 800, temperature: 0.2, messages: [{ role: 'system', content: consignes }, { role: 'user', content: texte }] }, {}, signal);
+      return String(j?.choices?.[0]?.message?.content ?? '');
     },
   };
 }

@@ -1,3 +1,9 @@
+import path from 'node:path';
+import { buildPreview } from '../publish/pipeline.js';
+import { createPreviewLink } from '../servers/sites.js';
+import { previewOrigin } from '../config.js';
+import { expliquerDiagnostic, fichiersProposes } from '../ia/assistant.js';
+import { CONSIGNES_DIAGNOSTIC, diagnostiquer } from '../ia/diagnostic.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
@@ -101,14 +107,36 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'contenus');
-    const b = body<{ demande?: string; cerveau?: string; domaine?: string }>(req);
-    return ctx.ia.demander(site, user, b.demande, { forcer: b.cerveau === 'claude' || b.cerveau === 'chatgpt' ? b.cerveau : undefined, domaine: b.domaine });
+    const b = body<{ demande?: string; cerveau?: string; domaine?: string; portee?: string }>(req);
+    // Pages et styles (fichiers HTML/CSS) : même droit que le mode code.
+    if (b.portee === 'pages') ctx.sites.require(user, siteParam(req), 'code');
+    return ctx.ia.demander(site, user, b.demande, { forcer: b.cerveau === 'claude' || b.cerveau === 'chatgpt' ? b.cerveau : undefined, domaine: b.domaine, portee: b.portee });
   });
   // Accepter de passer à Claude (payant, contenus publics envoyés à Anthropic) : à partir du rôle Éditeur.
   app.post('/api/sites/:id/assistant/:pid/relais', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'publier');
     return ctx.ia.relayer(site, user, pid(req));
+  });
+  // Avant / après en images : aperçu du brouillon et aperçu de la proposition (rien n'est écrit dans le site).
+  app.post('/api/sites/:id/assistant/:pid/apercu', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    const p = ctx.ia.lire(site, pid(req));
+    if (p.portee !== 'pages' || p.statut !== 'proposee') throw new UserError(409, 'L’aperçu avant / après concerne les propositions « pages et styles » à valider.');
+    await buildPreview(ctx, site);
+    const dossier = path.join(ctx.sites.dir(site), 'apercus-propositions', p.id.replace(/[^\w-]/g, ''));
+    await buildPreview(ctx, site, { surcouche: fichiersProposes(p), sortie: dossier });
+    const lien = (racine?: string) => `${previewOrigin(ctx.config, createPreviewLink(ctx, site.id, site.slug, user.id, racine))}/`;
+    return { avant: lien(), apres: lien(dossier) };
+  });
+  // Diagnostic du site (lecture seule), avec explication par un modèle local si l'assistant est actif.
+  app.post('/api/sites/:id/diagnostic', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    const d = await diagnostiquer(ctx, site);
+    const explication = body<{ ia?: boolean }>(req).ia === false ? null : await expliquerDiagnostic(ctx.ia, CONSIGNES_DIAGNOSTIC, d.rapport);
+    return { ...d, explication };
   });
   app.post('/api/sites/:id/assistant/:pid/repondre', async (req) => {
     const { user } = requireUser(req);

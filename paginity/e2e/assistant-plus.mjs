@@ -31,7 +31,16 @@ const modele = http.createServer((req, res) => {
   req.on('data', (d) => (b += d));
   req.on('end', () => {
     if (req.url.endsWith('/models')) return res.writeHead(200, { 'content-type': 'application/json' }).end('{"data":[]}');
-    const u = JSON.parse(b).messages[1].content;
+    const msgs = JSON.parse(b).messages;
+    if (msgs[0].content.includes('pas informaticienne')) {
+      return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: 'Votre site n’a pas encore été publié. Les liens sont en ordre : vérifiez l’aperçu, puis publiez.' } }] }));
+    }
+    const u = msgs[1].content;
+    if (u.includes('MODE PAGES ET STYLES')) {
+      const css = JSON.parse(u.split('<contenus>\n')[1].split('\n</contenus>')[0]).find((r) => r.rubrique === 'fichier:public/style.css').valeur;
+      const rep = { statut: 'proposition', changements: [{ rubrique: 'fichier:public/style.css', valeur_json: JSON.stringify(css.replace('--accent: #b7791f', '--accent: #2f9e44')) }], explication: 'Couleur d’accent passée au vert (boutons, titres).', raison: '' };
+      return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(rep) } }] }));
+    }
     const site = JSON.parse(u.split('<contenus>\n')[1].split('\n</contenus>')[0]).find((r) => r.rubrique === 'site').valeur;
     const reponse = /Réponse : (.*)/.exec(u)?.[1];
     const rep = reponse
@@ -132,6 +141,37 @@ try {
   ok(await banc.getByText(/Dont 1 de vos vraies demandes acceptées/).isVisible(), 'Banc d’essai : 1 vraie demande retenue (l’annulée a été oubliée)');
   await banc.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 76));
   await capture('E5-4-banc-reelles.png');
+
+  // 5. Pages et styles : avant / après.
+  await page.goto(`${ADMIN}/sites/${site.id}/assistant`);
+  await main.getByText('Pages et styles (HTML, CSS)').click();
+  await main.getByLabel('Votre demande').fill('Mets les boutons en vert');
+  await main.getByRole('button', { name: 'Envoyer à l’assistant' }).click();
+  await main.getByText('Couleur d’accent passée au vert (boutons, titres).').waitFor();
+  ok(await main.locator('[data-diff]').first().getByText('--accent: #2f9e44').isVisible(), 'Pages et styles : différence ligne à ligne affichée (ancienne ligne / nouvelle ligne)');
+  await capture('E6-1-pages-diff.png');
+  await main.getByRole('button', { name: 'Voir avant / après' }).click();
+  const avantF = page.frameLocator('iframe[title="Aperçu avant"]');
+  const apresF = page.frameLocator('iframe[title="Aperçu après"]');
+  await avantF.locator('.bouton').first().waitFor({ timeout: 30000 });
+  await apresF.locator('.bouton').first().waitFor({ timeout: 30000 });
+  const couleur = async (f) => f.locator('.bouton').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+  const ca = await couleur(avantF);
+  const cb = await couleur(apresF);
+  ok(ca === 'rgb(183, 121, 31)' && cb === 'rgb(47, 158, 68)', `Avant / après : bouton doré avant, vert après (${ca} → ${cb})`);
+  await page.waitForTimeout(500);
+  await capture('E6-2-avant-apres.png');
+  await page.keyboard.press('Escape');
+  const cssBrouillon = await (await ctx.request.get(`${ADMIN}/api/sites/${site.id}/fichier?chemin=public/style.css`)).json();
+  ok(cssBrouillon.contenu.includes('--accent: #b7791f'), 'Rien n’est écrit tant que la proposition n’est pas acceptée');
+  // 6. Diagnostic.
+  const diag = main.locator('[data-section="diagnostic"]');
+  await diag.getByRole('button', { name: 'Lancer le diagnostic' }).click();
+  await diag.getByText('En bref (Qwen3)').waitFor({ timeout: 30000 });
+  ok(await diag.getByText('Jamais publié').isVisible(), 'Diagnostic : constats en français (ex. « Jamais publié ») et explication par le modèle local');
+  await diag.evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 76));
+  await capture('E6-3-diagnostic.png');
+
   ok(erreurs.length === 0, `Aucune erreur JavaScript (${erreurs.join(' | ')})`);
 } catch (e) {
   console.log('✘ Parcours interrompu :', e.message);

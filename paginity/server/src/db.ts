@@ -248,6 +248,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE ia_propositions ADD COLUMN versions_apres TEXT;
   `,
+  // 8 — Aperçu d'une proposition de l'assistant : lien vers un dossier d'aperçu particulier.
+  `
+  ALTER TABLE preview_links ADD COLUMN racine TEXT;
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

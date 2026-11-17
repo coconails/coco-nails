@@ -1,5 +1,6 @@
+import { Diagnostic } from './Diagnostic';
 import { useState } from 'react';
-import { Accordion, Alert, Badge, Button, Card, Group, Select, Stack, Table, Text, TextInput, Textarea } from '@mantine/core';
+import { Accordion, Alert, Badge, Button, Card, Group, Modal, SegmentedControl, Select, SimpleGrid, Stack, Table, Text, TextInput, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconArrowBackUp, IconHelpCircle, IconMicrophone, IconRobot, IconSend, IconUsersGroup } from '@tabler/icons-react';
@@ -15,6 +16,7 @@ interface Proposition {
   demande: string;
   statut: 'en_cours' | 'proposee' | 'accord_requis' | 'question' | 'repondue' | 'annulee' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
   annulable?: boolean;
+  portee?: 'contenus' | 'pages';
   cerveau: string | null;
   cerveauLibelle: string | null;
   explication: string | null;
@@ -68,11 +70,14 @@ export function AssistantPage() {
   return (
     <Page
       titre="Assistant"
-      sousTitre="Décrivez une modification de contenu : l’assistant prépare une proposition, vous la vérifiez avant qu’elle n’entre dans le brouillon."
+      sousTitre="Décrivez une modification (contenus, ou pages et styles) : l’assistant prépare une proposition, vous la vérifiez avant qu’elle n’entre dans le brouillon."
       fil={[{ label: 'Tableau de bord', to: '/' }, { label: site.data?.nom ?? 'Site', to: `/sites/${id}` }, { label: 'Assistant' }]}
       largeur={900}
     >
-      <FilAssistant siteId={id!} />
+      <Stack gap="lg">
+        <FilAssistant siteId={id!} />
+        <Diagnostic siteId={id!} />
+      </Stack>
     </Page>
   );
 }
@@ -85,6 +90,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
   const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean; reunion: boolean; dictee?: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
   const [demande, setDemande] = useState('');
   const [domaine, setDomaine] = useState('auto');
+  const [portee, setPortee] = useState<'contenus' | 'pages'>('contenus');
   const [busy, setBusy] = useState<string | null>(null);
   if (q.isLoading || site.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorBox error={q.error} />;
@@ -114,6 +120,17 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
       ) : (
         <Card withBorder radius="lg" padding={pad}>
           <Stack gap="sm">
+            {site.data?.droits.code && (
+              <SegmentedControl
+                size="xs"
+                value={portee}
+                onChange={(v) => setPortee(v as 'contenus' | 'pages')}
+                data={[
+                  { value: 'contenus', label: 'Contenus (textes, tarifs…)' },
+                  { value: 'pages', label: 'Pages et styles (HTML, CSS)' },
+                ]}
+              />
+            )}
             <Textarea
               label="Votre demande"
               placeholder="Exemple : ajoute la pose gel à 45 € dans les tarifs, ou : nous sommes fermés du 24 au 26 décembre."
@@ -146,7 +163,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 disabled={!demande.trim()}
                 onClick={() =>
                   agir('demande', async () => {
-                    await post(`/api/sites/${id}/assistant`, { demande, domaine: domaine === 'auto' ? undefined : domaine });
+                    await post(`/api/sites/${id}/assistant`, { demande, domaine: domaine === 'auto' ? undefined : domaine, portee });
                     setDemande('');
                   })
                 }
@@ -200,7 +217,9 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 <Text size="sm" fw={500}>
                   {c.libelle}
                 </Text>
-                {compact ? (
+                {c.rubrique.startsWith('fichier:') ? (
+                  <DiffLignes avant={String(c.avant)} apres={String(c.apres)} />
+                ) : compact ? (
                   // Panneau étroit : un bloc par champ, « avant » au-dessus, « après » en dessous.
                   <Stack gap={6}>
                     {differences(c.avant, c.apres).map((d) => (
@@ -244,6 +263,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
               </Stack>
             ))}
             <Group gap="xs">
+              {p.statut === 'proposee' && p.portee === 'pages' && <AvantApres siteId={id} pid={p.id} />}
               {p.statut === 'proposee' && (
                 <>
                   <Button
@@ -416,5 +436,87 @@ function BoutonDictee({ onTexte }: { onTexte: (t: string) => void }) {
         La voix est transcrite par le service du navigateur (Google ou Apple).
       </Text>
     </Group>
+  );
+}
+
+/** Différences ligne à ligne d'un fichier (zone modifiée, avec 2 lignes de contexte). */
+function DiffLignes({ avant, apres }: { avant: string; apres: string }) {
+  const a = avant.split('\n');
+  const b = apres.split('\n');
+  let debut = 0;
+  while (debut < a.length && debut < b.length && a[debut] === b[debut]) debut++;
+  let fa = a.length - 1;
+  let fb = b.length - 1;
+  while (fa >= debut && fb >= debut && a[fa] === b[fb]) {
+    fa--;
+    fb--;
+  }
+  const ctx = 2;
+  const lignes: { t: ' ' | '-' | '+'; n: number; l: string }[] = [];
+  for (let i = Math.max(0, debut - ctx); i < debut; i++) lignes.push({ t: ' ', n: i + 1, l: a[i] });
+  for (let i = debut; i <= fa; i++) lignes.push({ t: '-', n: i + 1, l: a[i] });
+  for (let i = debut; i <= fb; i++) lignes.push({ t: '+', n: i + 1, l: b[i] });
+  for (let i = fb + 1; i < Math.min(b.length, fb + 1 + ctx); i++) lignes.push({ t: ' ', n: i + 1, l: b[i] });
+  const montrees = lignes.slice(0, 80);
+  return (
+    <Card withBorder radius="md" padding={0} data-diff style={{ overflowX: 'auto' }}>
+      <pre style={{ margin: 0, fontSize: 12, lineHeight: 1.5 }}>
+        {montrees.map((x, i) => (
+          <div
+            key={i}
+            style={{
+              padding: '0 8px',
+              background: x.t === '-' ? 'rgba(250,82,82,.15)' : x.t === '+' ? 'rgba(64,192,87,.15)' : undefined,
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}
+          >
+            <span style={{ opacity: 0.5, userSelect: 'none' }}>
+              {x.t === ' ' ? ' ' : x.t} {String(x.n).padStart(4)}{' '}
+            </span>
+            {x.l}
+          </div>
+        ))}
+        {lignes.length > montrees.length && <div style={{ padding: '0 8px', opacity: 0.6 }}>… {lignes.length - montrees.length} autres lignes modifiées</div>}
+      </pre>
+    </Card>
+  );
+}
+
+/** Avant / après en images : deux aperçus côte à côte (brouillon actuel, et brouillon avec la proposition). */
+function AvantApres({ siteId, pid }: { siteId: string; pid: string }) {
+  const [liens, setLiens] = useState<{ avant: string; apres: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <Button
+        variant="light"
+        loading={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            setLiens(await post<{ avant: string; apres: string }>(`/api/sites/${siteId}/assistant/${pid}/apercu`));
+          } catch (e) {
+            notifications.show({ color: 'red', message: errorMessage(e) });
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Voir avant / après
+      </Button>
+      <Modal opened={!!liens} onClose={() => setLiens(null)} title="Avant / après (aperçus privés, rien n’est publié)" size="95%">
+        {liens && (
+          <SimpleGrid cols={{ base: 1, md: 2 }}>
+            {(['avant', 'apres'] as const).map((k) => (
+              <Stack key={k} gap={4}>
+                <Text fw={600}>{k === 'avant' ? 'Avant (brouillon actuel)' : 'Après (avec la proposition)'}</Text>
+                <iframe title={k === 'avant' ? 'Aperçu avant' : 'Aperçu après'} src={liens[k]} style={{ width: '100%', height: '70vh', border: '1px solid var(--mantine-color-default-border)', borderRadius: 12, background: '#fff' }} />
+              </Stack>
+            ))}
+          </SimpleGrid>
+        )}
+      </Modal>
+    </>
   );
 }
