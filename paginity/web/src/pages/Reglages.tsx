@@ -8,6 +8,7 @@ import { api, del, errorMessage, get, patch, post, put } from '../api';
 import { useEtat } from '../App';
 import { Page } from '../components/Page';
 import { useSite } from './Site';
+import { PageSecours } from './PageSecours';
 
 const ROLES = [
   { value: 'contributeur', label: 'Contributeur — prépare des brouillons' },
@@ -191,6 +192,7 @@ export function ReglagesPage() {
         </Stack>
       </Card>
 
+      <PageSecours siteId={id!} peutModifier={!!site.data.droits.publier} />
       {site.data.droits.supprimer && (
         <Card withBorder radius="lg" padding="lg" style={{ borderColor: 'var(--mantine-color-red-7)' }}>
           <Stack>

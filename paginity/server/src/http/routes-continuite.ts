@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
-import { body, ipOf, requireOwner, requireSudo } from './helpers.js';
+import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
+import { enregistrerFiche, lireFiche, pageSecours } from '../sites/secours.js';
 
 /** Continuité de service : sauvegarde automatique hors machine (propriétaire seulement). */
 export function registerContinuiteRoutes(app: FastifyInstance, ctx: Ctx): void {
@@ -52,5 +53,27 @@ export function registerContinuiteRoutes(app: FastifyInstance, ctx: Ctx): void {
     requireOwner(req);
     await ctx.battement.envoyer();
     return { ...ctx.battement.resume(), panne: ctx.battement.panne() };
+  });
+
+  // Page de secours d'un site : fiche (pré-remplie depuis les contenus) et page HTML à déposer chez un hébergeur gratuit.
+  const siteParam = (req: { params: unknown }) => (req.params as { id: string }).id;
+  app.get('/api/sites/:id/secours', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    const r = lireFiche(ctx, site);
+    return { ...r, page: pageSecours(r.fiche) };
+  });
+  app.put('/api/sites/:id/secours', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'publier');
+    const fiche = enregistrerFiche(ctx, site, body<Record<string, unknown>>(req));
+    audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'secours_fiche', siteId: site.id });
+    return { fiche, enregistree: true, page: pageSecours(fiche) };
+  });
+  app.get('/api/sites/:id/secours/index.html', async (req, reply) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    reply.header('content-type', 'text/html; charset=utf-8').header('content-disposition', 'attachment; filename="index.html"');
+    return pageSecours(lireFiche(ctx, site).fiche);
   });
 }

@@ -113,6 +113,29 @@ try {
   ok(await bt.getByText('tout va bien').isVisible() && await bt.getByText('Surveillé', { exact: true }).isVisible(), 'État du serveur et surveillance affichés');
   await capture(bt, 'E2-alerte-panne.png');
 
+  // ---- 3. Page de secours
+  await page.goto(`${ADMIN}/sites/${site.id}/reglages`);
+  const sc = main.locator('[data-section="secours"]');
+  await sc.waitFor();
+  ok((await sc.getByLabel('Téléphone').inputValue()) === '01 23 45 67 89', 'Page de secours pré-remplie depuis les contenus (téléphone, e-mail)');
+  await sc.getByLabel('Lien de contact (facultatif)').fill('https://wa.me/33600000000');
+  await sc.getByLabel('Horaires').fill('Lun, mar, jeu, ven 9 h–19 h · mer, sam 9 h–12 h');
+  await sc.getByRole('button', { name: 'Enregistrer' }).click();
+  await page.getByText('Page de secours enregistrée.').first().waitFor();
+  const cadre = page.frameLocator('iframe[title="Aperçu de la page de secours"]');
+  await cadre.getByText('Lun, mar, jeu, ven 9 h–19 h').waitFor();
+  ok(await cadre.getByRole('link', { name: 'Appeler le 01 23 45 67 89' }).isVisible(), 'Aperçu : bouton « Appeler » et horaires');
+  const [dl] = await Promise.all([page.waitForEvent('download'), sc.getByRole('button', { name: 'Télécharger la page (index.html)' }).click()]);
+  const html = fs.readFileSync(await dl.path(), 'utf8');
+  ok(dl.suggestedFilename() === 'index.html' && html.includes('wa.me/33600000000') && !/<script|<link/.test(html), 'Page téléchargée : un seul fichier autonome');
+  await capture(sc, 'E3-page-secours.png');
+  // La page seule, telle que les clientes la verraient sur téléphone.
+  const tel = await browser.newContext({ ...require('playwright').devices['iPhone 13'] });
+  const pt = await tel.newPage();
+  await pt.setContent(html);
+  await pt.screenshot({ path: path.join(OUT, 'E3b-page-secours-telephone.png') });
+  await tel.close();
+
   ok(erreurs.length === 0, `Aucune erreur JavaScript (${erreurs.join(' | ')})`);
 } catch (e) {
   console.log('✘ Parcours interrompu :', e.message);
