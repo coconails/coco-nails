@@ -18,6 +18,11 @@ export interface ConfigLocal {
   tailleMax: number;
   delaiS: number;
 }
+export interface ConfigLocalNomme extends ConfigLocal {
+  id: string;
+  /** Nom affiché (« Qwen3-Coder », « GLM »…). */
+  nom: string;
+}
 export interface ConfigExterne {
   actif: boolean;
   modele: string;
@@ -143,10 +148,10 @@ async function postJson(url: string, corps: unknown, entetes: Record<string, str
 const sansBarre = (u: string) => u.replace(/\/+$/, '');
 
 // ---------------------------------------------------------------------------- local
-export function cerveauLocal(cfg: ConfigLocal): Cerveau {
+export function cerveauLocal(cfg: ConfigLocalNomme): Cerveau {
   const base = sansBarre(cfg.url);
   return {
-    nom: 'local',
+    nom: `local:${cfg.id}`,
     tailleMax: cfg.tailleMax,
     delaiMs: cfg.delaiS * 1000,
     async disponible() {

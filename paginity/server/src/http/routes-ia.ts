@@ -47,7 +47,10 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   // Essai du modèle local (gratuit) : répond-il ?
   app.post('/api/reglages/ia/essai-local', async (req) => {
     requireOwner(req);
-    const local = ctx.ia.cerveauxActifs().local;
+    const id = body<{ id?: string }>(req).id;
+    const actifs = ctx.ia.cerveauxActifs();
+    const cle = id ? `local:${id}` : Object.keys(actifs).find((k) => k.startsWith('local'));
+    const local = cle ? actifs[cle] : undefined;
     return { repond: local ? await local.disponible() : false, enService: !!local };
   });
 

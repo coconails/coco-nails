@@ -7,6 +7,15 @@ import { del, errorMessage, get, post, put } from '../api';
 import { Loading } from '../components/Page';
 
 type Externe = 'claude' | 'chatgpt';
+interface Local {
+  id?: string;
+  nom: string;
+  actif: boolean;
+  url: string;
+  modele: string;
+  tailleMax?: number;
+  delaiS?: number;
+}
 interface Service {
   actif: boolean;
   modele: string;
@@ -22,14 +31,14 @@ interface EtatIA {
     relaisExterne: 'jamais' | 'demander' | 'auto';
     plafondMensuelCentimes: number;
     ordre: Externe[];
-    local: { actif: boolean; url: string; modele: string; tailleMax: number; delaiS: number };
+    locaux: Local[];
     claude: Service;
     chatgpt: Service;
   };
   cles: Record<Externe, boolean>;
   depenseDuMoisCentimes: number;
   depenseParService: Record<Externe, number>;
-  enService: Partial<Record<'local' | Externe, boolean>>;
+  enService: Record<string, boolean>;
   tarifsClaude: Record<string, { entree: number; sortie: number; libelle: string }>;
 }
 
@@ -179,33 +188,82 @@ export function ReglagesIA() {
           l’assistant arrête immédiatement tout ce qui est en cours (arrêt d’urgence).
         </Text>
 
-        <Divider label="Modèle local (gratuit, rien ne sort de chez vous)" labelPosition="left" />
-        <Group justify="space-between">
-          {e.enService.local ? <Badge color="green" variant="light">En service</Badge> : <Badge color="gray" variant="light">Hors service</Badge>}
-          <Switch label="Autoriser" checked={r.local.actif} onChange={(ev) => setR({ ...r, local: { ...r.local, actif: ev.currentTarget.checked } })} />
-        </Group>
-        <Group grow align="flex-start">
-          <TextInput label="Adresse du modèle" placeholder="http://127.0.0.1:11434/v1" description="Protocole « compatible OpenAI » (Ollama, llama.cpp, LM Studio…)" value={r.local.url} onChange={(ev) => setR({ ...r, local: { ...r.local, url: ev.currentTarget.value } })} />
-          <TextInput label="Nom du modèle" placeholder="nom du modèle installé" value={r.local.modele} onChange={(ev) => setR({ ...r, local: { ...r.local, modele: ev.currentTarget.value } })} />
-        </Group>
+        <Divider label="Modèles locaux (gratuits, rien ne sort de chez vous)" labelPosition="left" />
+        <Text size="sm" c="dimmed">
+          Modèles installés sur votre machine (Qwen3-Coder, GLM, Kimi, DeepSeek…), joints par le protocole « compatible OpenAI » (Ollama, llama.cpp,
+          LM Studio…). Ils sont essayés dans l’ordre de la liste.
+        </Text>
+        {r.locaux.map((l, i) => {
+          const maj = (v: Partial<Local>) => setR({ ...r, locaux: r.locaux.map((x, j) => (j === i ? { ...x, ...v } : x)) });
+          const deplacer = (sens: -1 | 1) => {
+            const t = [...r.locaux];
+            [t[i], t[i + sens]] = [t[i + sens], t[i]];
+            setR({ ...r, locaux: t });
+          };
+          return (
+            <Card key={l.id ?? `nouveau-${i}`} withBorder radius="md" padding="md" data-modele-local={l.nom}>
+              <Stack gap="sm">
+                <Group justify="space-between">
+                  <Group gap="xs">
+                    <Text fw={600}>
+                      {i + 1}. {l.nom || 'Nouveau modèle'}
+                    </Text>
+                    {l.id && e.enService[`local:${l.id}`] ? <Badge color="green" variant="light">En service</Badge> : <Badge color="gray" variant="light">Hors service</Badge>}
+                  </Group>
+                  <Switch label="Autoriser" checked={l.actif} onChange={(ev) => maj({ actif: ev.currentTarget.checked })} />
+                </Group>
+                <Group grow align="flex-start">
+                  <TextInput label="Nom affiché" placeholder="Qwen3-Coder" value={l.nom} onChange={(ev) => maj({ nom: ev.currentTarget.value })} />
+                  <TextInput label="Nom du modèle installé" placeholder="nom du modèle installé" value={l.modele} onChange={(ev) => maj({ modele: ev.currentTarget.value })} />
+                </Group>
+                <TextInput label="Adresse du modèle" placeholder="http://127.0.0.1:11434/v1" value={l.url} onChange={(ev) => maj({ url: ev.currentTarget.value })} />
+                <Group gap="xs">
+                  <Button
+                    variant="light"
+                    size="xs"
+                    disabled={!l.id}
+                    onClick={async () => {
+                      try {
+                        const t = await post<{ repond: boolean; enService: boolean }>('/api/reglages/ia/essai-local', { id: l.id });
+                        notifications.show(
+                          t.repond
+                            ? { color: 'green', message: `${l.nom} répond.` }
+                            : { color: 'red', message: t.enService ? `${l.nom} ne répond pas à cette adresse.` : 'Enregistrez d’abord ce modèle et autorisez-le.' },
+                        );
+                      } catch (err) {
+                        notifications.show({ color: 'red', message: errorMessage(err) });
+                      }
+                    }}
+                  >
+                    Essayer
+                  </Button>
+                  <Button variant="subtle" size="xs" disabled={i === 0} onClick={() => deplacer(-1)} aria-label={`Monter ${l.nom}`}>
+                    Monter
+                  </Button>
+                  <Button variant="subtle" size="xs" disabled={i === r.locaux.length - 1} onClick={() => deplacer(1)} aria-label={`Descendre ${l.nom}`}>
+                    Descendre
+                  </Button>
+                  <Button variant="subtle" size="xs" color="red" onClick={() => window.confirm(`Retirer ${l.nom || 'ce modèle'} de la liste ?`) && setR({ ...r, locaux: r.locaux.filter((_, j) => j !== i) })}>
+                    Retirer
+                  </Button>
+                </Group>
+              </Stack>
+            </Card>
+          );
+        })}
         <Group>
           <Button
             variant="light"
-            onClick={async () => {
-              try {
-                const t = await post<{ repond: boolean; enService: boolean }>('/api/reglages/ia/essai-local');
-                notifications.show(
-                  t.repond
-                    ? { color: 'green', message: 'Le modèle local répond.' }
-                    : { color: 'red', message: t.enService ? 'Le modèle local ne répond pas à cette adresse.' : 'Enregistrez d’abord l’adresse et le nom du modèle, et autorisez-le.' },
-                );
-              } catch (err) {
-                notifications.show({ color: 'red', message: errorMessage(err) });
-              }
-            }}
+            disabled={r.locaux.length >= 8}
+            onClick={() => setR({ ...r, locaux: [...r.locaux, { nom: '', actif: true, url: r.locaux[0]?.url ?? '', modele: '' }] })}
           >
-            Essayer le modèle local
+            Ajouter un modèle local
           </Button>
+          {r.locaux.length > 0 && (
+            <Text size="xs" c="dimmed">
+              Pensez à « Enregistrer les réglages de l’assistant » en bas.
+            </Text>
+          )}
         </Group>
 
         <Divider label="IA extérieures (payantes, contenus publics du site uniquement)" labelPosition="left" />

@@ -8,7 +8,7 @@ import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import { validateEntryValue, type Field } from '../content/schema.js';
 import { isServerCode } from '../sites/server-code.js';
-import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal } from './fournisseurs.js';
+import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
 
 /**
  * PAGINITY AI — étape 1 : le cœur de l'agent et l'aiguilleur (« assistant contenus »).
@@ -24,10 +24,13 @@ import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type Config
  *    il est soumis au réglage du propriétaire (jamais / sur accord / automatique) et à un plafond mensuel.
  */
 
-export type NomCerveau = 'local' | 'claude' | 'chatgpt';
+/** « local:<identifiant> » pour un modèle installé, « claude », « chatgpt » pour les IA extérieures. */
+export type NomCerveau = string;
 export type NomExterne = 'claude' | 'chatgpt';
 export const NOMS_EXTERNES: NomExterne[] = ['claude', 'chatgpt'];
-export const LIBELLE: Record<NomCerveau, string> = { local: 'le modèle local', claude: 'Claude', chatgpt: 'ChatGPT' };
+export const LIBELLE: Record<string, string> = { local: 'le modèle local', claude: 'Claude', chatgpt: 'ChatGPT' };
+export const estLocal = (cle: string) => cle === 'local' || cle.startsWith('local:');
+export const MAX_LOCAUX = 8;
 
 export interface RubriqueContexte {
   nom: string;
@@ -69,7 +72,8 @@ export interface ReglagesIA {
   plafondMensuelCentimes: number;
   /** Ordre d'essai des IA extérieures. */
   ordre: NomExterne[];
-  local: ConfigLocal;
+  /** Modèles installés, dans l'ordre d'essai. */
+  locaux: ConfigLocalNomme[];
   claude: ConfigExterne;
   chatgpt: ConfigExterne;
 }
@@ -78,7 +82,7 @@ const REGLAGES_DEFAUT: ReglagesIA = {
   relaisExterne: 'demander',
   plafondMensuelCentimes: 0,
   ordre: ['claude', 'chatgpt'],
-  local: { actif: false, url: '', modele: '', tailleMax: 60_000, delaiS: 120 },
+  locaux: [],
   claude: { actif: false, modele: 'claude-opus-5-5', prixEntree: TARIFS_CLAUDE['claude-opus-5-5'].entree, prixSortie: TARIFS_CLAUDE['claude-opus-5-5'].sortie, plafondCentimes: null, delaiS: 180, url: '' },
   chatgpt: { actif: false, modele: '', prixEntree: null, prixSortie: null, plafondCentimes: null, delaiS: 180, url: '' },
 };
@@ -116,7 +120,7 @@ const mois = (t = now()) => new Date(t).toISOString().slice(0, 7);
 
 export class Assistant {
   /** Cerveaux imposés (tests uniquement). */
-  cerveaux: Partial<Record<NomCerveau, Cerveau>> = {};
+  cerveaux: Record<string, Cerveau> = {};
   surcharge = false;
   private enVol = new Set<AbortController>();
 
@@ -133,7 +137,12 @@ export class Assistant {
     return {
       ...REGLAGES_DEFAUT,
       ...r,
-      local: { ...REGLAGES_DEFAUT.local, ...r.local },
+      // Anciennes données (un seul modèle local) : reprises comme premier modèle de la liste.
+      locaux: Array.isArray(r.locaux)
+        ? r.locaux
+        : (r as { local?: ConfigLocal }).local?.url
+          ? [{ id: 'principal', nom: 'Modèle local', ...(r as { local: ConfigLocal }).local }]
+          : [],
       claude: { ...REGLAGES_DEFAUT.claude, ...r.claude },
       chatgpt: { ...REGLAGES_DEFAUT.chatgpt, ...r.chatgpt },
     };
@@ -173,17 +182,41 @@ export class Assistant {
       if (!Array.isArray(input.ordre) || input.ordre.length !== 2 || !NOMS_EXTERNES.every((n) => input.ordre.includes(n))) throw new UserError(400, 'Ordre invalide.');
       r.ordre = input.ordre;
     }
-    if (input.local) {
-      const l = input.local;
-      if (typeof l.actif === 'boolean') r.local.actif = l.actif;
-      if (l.url !== undefined) r.local.url = adresse(l.url);
-      if (l.modele !== undefined) r.local.modele = String(l.modele).trim().slice(0, 200);
-      if (l.delaiS !== undefined) r.local.delaiS = duree(l.delaiS);
+    const local = (l: any, existant?: ConfigLocalNomme): ConfigLocalNomme => {
+      const m: ConfigLocalNomme = existant ? { ...existant } : { id: '', nom: 'Modèle local', actif: false, url: '', modele: '', tailleMax: 60_000, delaiS: 120 };
+      if (l.id !== undefined) {
+        if (typeof l.id !== 'string' || !/^[a-z0-9-]{1,20}$/.test(l.id)) throw new UserError(400, 'Identifiant de modèle invalide.');
+        m.id = l.id;
+      }
+      if (l.nom !== undefined) {
+        const n = String(l.nom).trim().slice(0, 60);
+        if (!n) throw new UserError(400, 'Donnez un nom au modèle (par exemple « Qwen3-Coder »).');
+        m.nom = n;
+      }
+      if (typeof l.actif === 'boolean') m.actif = l.actif;
+      if (l.url !== undefined) m.url = adresse(l.url);
+      if (l.modele !== undefined) m.modele = String(l.modele).trim().slice(0, 200);
+      if (l.delaiS !== undefined) m.delaiS = duree(l.delaiS);
       if (l.tailleMax !== undefined) {
         const n = Number(l.tailleMax);
         if (!Number.isInteger(n) || n < 1000 || n > 10_000_000) throw new UserError(400, 'Taille maximale invalide.');
-        r.local.tailleMax = n;
+        m.tailleMax = n;
       }
+      if (!m.id) m.id = randomId().slice(0, 10);
+      return m;
+    };
+    if (Array.isArray(input.locaux)) {
+      if (input.locaux.length > MAX_LOCAUX) throw new UserError(400, `${MAX_LOCAUX} modèles locaux au plus.`);
+      const liste = input.locaux.map((l: any) => local(l, r.locaux.find((x) => x.id === l?.id)));
+      if (new Set(liste.map((l: ConfigLocalNomme) => l.id)).size !== liste.length) throw new UserError(400, 'Deux modèles ont le même identifiant.');
+      r.locaux = liste;
+    }
+    // Ancienne forme (un seul modèle) : met à jour ou crée le modèle « principal ».
+    if (input.local && typeof input.local === 'object') {
+      const i = r.locaux.findIndex((x) => x.id === 'principal');
+      const m = local({ id: 'principal', ...input.local }, i >= 0 ? r.locaux[i] : undefined);
+      if (i >= 0) r.locaux[i] = m;
+      else r.locaux.unshift(m);
     }
     for (const nom of NOMS_EXTERNES) {
       const e = input[nom];
@@ -221,16 +254,24 @@ export class Assistant {
   }
 
   /** Cerveaux en service : ceux fournis par les tests, sinon construits d'après les réglages. */
-  cerveauxActifs(): Partial<Record<NomCerveau, Cerveau>> {
+  cerveauxActifs(): Record<string, Cerveau> {
     if (this.surcharge) return this.cerveaux;
     const r = this.reglages();
-    const out: Partial<Record<NomCerveau, Cerveau>> = {};
-    if (r.local.actif && r.local.url && r.local.modele) out.local = cerveauLocal(r.local);
+    const out: Record<string, Cerveau> = {};
+    for (const l of r.locaux) if (l.actif && l.url && l.modele) out[`local:${l.id}`] = cerveauLocal(l);
     const cc = this.cle('claude');
     if (r.claude.actif && cc && r.claude.modele && r.claude.prixEntree !== null && r.claude.prixSortie !== null) out.claude = cerveauClaude(r.claude, cc);
     const co = this.cle('chatgpt');
     if (r.chatgpt.actif && co && r.chatgpt.modele && r.chatgpt.prixEntree !== null && r.chatgpt.prixSortie !== null) out.chatgpt = cerveauChatGPT(r.chatgpt, co);
     return out;
+  }
+
+  /** Nom lisible d'un cerveau (« Qwen3-Coder », « Claude »…). */
+  libelle(cle: string | null): string {
+    if (!cle) return '';
+    if (LIBELLE[cle]) return LIBELLE[cle];
+    if (cle.startsWith('local:')) return this.reglages().locaux.find((l) => `local:${l.id}` === cle)?.nom ?? 'un modèle local';
+    return cle;
   }
 
   etat() {
@@ -299,31 +340,57 @@ export class Assistant {
     const cerveaux = this.cerveauxActifs();
     let raisonRelais: string | null = null;
 
-    // 1. Modèle local, sauf si la tâche lui échappe d'emblée.
+    // 1. Modèles locaux, dans l'ordre choisi, sauf si la tâche leur échappe d'emblée.
     if (depart === 'local') {
-      const local = cerveaux.local;
-      if (!local) raisonRelais = 'aucun modèle local n’est en service';
-      else if (taille > local.tailleMax) raisonRelais = 'la demande est trop volumineuse pour le modèle local';
-      else if (!(await local.disponible().catch(() => false))) raisonRelais = 'le modèle local ne répond pas';
-      else {
+      const locaux = Object.keys(cerveaux).filter(estLocal);
+      if (!locaux.length) raisonRelais = 'aucun modèle local n’est en service';
+      const raisons: string[] = [];
+      for (const cle of locaux) {
+        const local = cerveaux[cle];
+        const nomL = capitale(this.libelle(cle));
+        if (taille > local.tailleMax) {
+          this.noter(id, `${nomL} : demande trop volumineuse pour ce modèle.`);
+          raisons.push('demande trop volumineuse');
+          continue;
+        }
+        if (!(await local.disponible().catch(() => false))) {
+          this.noter(id, `${nomL} ne répond pas.`);
+          raisons.push('modèle qui ne répond pas');
+          continue;
+        }
         let corrections: string[] | undefined;
         for (let essai = 1; essai <= ESSAIS_LOCAUX; essai++) {
           const r = await this.appeler(local, { demande, rubriques, corrections });
           if (r.erreur) {
-            this.noter(id, `Modèle local : ${r.erreur}.`);
-            raisonRelais = `le modèle local a échoué (${r.erreur})`;
+            this.noter(id, `${nomL} : ${r.erreur}.`);
+            raisons.push(r.erreur);
             break;
           }
           if (r.reponse!.statut === 'impossible') {
-            this.noter(id, `Modèle local : « je ne sais pas faire » (${r.reponse!.raison}).`);
-            raisonRelais = 'le modèle local ne sait pas faire cette demande';
+            this.noter(id, `${nomL} : « je ne sais pas faire » (${r.reponse!.raison}).`);
+            raisons.push('« je ne sais pas faire »');
             break;
           }
           const v = this.verifier(r.reponse!.changements, rubriques, versions);
-          if (v.ok) return this.finir(id, 'proposee', { cerveau: 'local', explication: r.reponse!.explication, changements: v.changements, site });
-          this.noter(id, `Modèle local, essai ${essai} : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
+          if (v.ok) return this.finir(id, 'proposee', { cerveau: cle, explication: r.reponse!.explication, changements: v.changements, site });
+          this.noter(id, `${nomL}, essai ${essai} : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
           corrections = v.erreurs;
-          raisonRelais = 'les propositions du modèle local ne passent pas les vérifications';
+          if (essai === ESSAIS_LOCAUX) raisons.push('propositions refusées par les vérifications');
+        }
+      }
+      if (locaux.length) {
+        const unique = [...new Set(raisons)];
+        raisonRelais =
+          locaux.length === 1
+            ? `le modèle local n’a pas abouti (${unique.join(', ')})`
+            : `aucun des ${locaux.length} modèles locaux n’a abouti (${unique.join(', ')})`;
+        // Formulations historiques, gardées pour les cas simples.
+        if (locaux.length === 1 && unique.length === 1) {
+          if (unique[0] === 'demande trop volumineuse') raisonRelais = 'la demande est trop volumineuse pour le modèle local';
+          else if (unique[0] === 'modèle qui ne répond pas') raisonRelais = 'le modèle local ne répond pas';
+          else if (unique[0] === '« je ne sais pas faire »') raisonRelais = 'le modèle local ne sait pas faire cette demande';
+          else if (unique[0] === 'propositions refusées par les vérifications') raisonRelais = 'les propositions du modèle local ne passent pas les vérifications';
+          else raisonRelais = `le modèle local a échoué (${unique[0]})`;
         }
       }
       this.noter(id, `Relais envisagé vers une IA extérieure : ${raisonRelais}.`);
@@ -516,6 +583,7 @@ export class Assistant {
       demande: p.demande,
       statut: p.statut,
       cerveau: p.cerveau,
+      cerveauLibelle: p.cerveau ? capitale(this.libelle(p.cerveau)) : null,
       explication: p.explication,
       raison: p.raison,
       changements: p.changements ? (JSON.parse(p.changements) as Changement[]).map(({ versionBase: _v, ...c }) => c) : [],

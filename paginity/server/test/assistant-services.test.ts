@@ -88,7 +88,7 @@ describe('PAGINITY AI — connecteurs réels vers de faux services', () => {
     expect((await c.call('POST', '/api/reglages/ia/essai-local', {})).json).toEqual({ repond: true, enService: true });
     local.repondre = (r) => openai(propositionAccroche(r.corps.messages[1].content, 'Accroche du modèle local'));
     const r = await demander('Change l’accroche');
-    expect(r.json, JSON.stringify(r.json.journal)).toMatchObject({ statut: 'proposee', cerveau: 'local', coutCentimes: 0 });
+    expect(r.json, JSON.stringify(r.json.journal)).toMatchObject({ statut: 'proposee', cerveau: 'local:principal', cerveauLibelle: 'Modèle local', coutCentimes: 0 });
     const envoi = local.recus.find((x) => x.chemin.endsWith('/chat/completions'))!;
     expect(envoi.corps.model).toBe('modele-test');
     expect(envoi.corps.messages[0].content).toMatch(/Tu es l'assistant de PAGINITY/);
@@ -131,7 +131,7 @@ describe('PAGINITY AI — connecteurs réels vers de faux services', () => {
 
   it('ChatGPT sans prix renseignés : jamais utilisé (le coût ne pourrait pas être compté)', async () => {
     await reglages({ ordre: ['chatgpt', 'claude'], chatgpt: { actif: true, modele: 'modele-openai-test', url: `http://127.0.0.1:${chatgpt.port}/v1` } });
-    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ local: true, claude: true });
+    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ 'local:principal': true, claude: true });
     const avant = chatgpt.recus.length;
     await demander('Accroche élégante');
     expect(chatgpt.recus.length).toBe(avant);
@@ -187,9 +187,62 @@ describe('PAGINITY AI — connecteurs réels vers de faux services', () => {
 
   it('chaque service peut être désactivé à tout moment ; la clé peut être effacée', async () => {
     await reglages({ claude: { actif: false } });
-    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ local: true });
+    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ 'local:principal': true });
     await reglages({ claude: { actif: true } });
     expect((await c.call('DELETE', '/api/reglages/ia/cle/claude')).json.cles.claude).toBe(false);
-    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ local: true });
+    expect((await c.call('GET', '/api/reglages/ia')).json.enService).toEqual({ 'local:principal': true });
+  });
+
+  it('plusieurs modèles locaux : essayés dans l’ordre, un modèle désactivé est ignoré, le premier qui réussit l’emporte', async () => {
+    const second = fauxServeur();
+    const troisieme = fauxServeur();
+    for (const x of [second, troisieme]) {
+      await new Promise<void>((r) => x.serveur.listen(0, '127.0.0.1', () => r()));
+      x.port = (x.serveur.address() as AddressInfo).port;
+    }
+    try {
+      await reglages({
+        relaisExterne: 'jamais',
+        locaux: [
+          { id: 'principal', nom: 'Qwen3-Coder', actif: true, url: `http://127.0.0.1:${local.port}/v1`, modele: 'qwen' },
+          { id: 'glm', nom: 'GLM', actif: false, url: `http://127.0.0.1:${troisieme.port}/v1`, modele: 'glm' },
+          { nom: 'Kimi', actif: true, url: `http://127.0.0.1:${second.port}/v1`, modele: 'kimi' },
+        ],
+      });
+      const etat = (await c.call('GET', '/api/reglages/ia')).json;
+      expect(etat.reglages.locaux.map((l: any) => l.nom)).toEqual(['Qwen3-Coder', 'GLM', 'Kimi']);
+      const kimi = etat.reglages.locaux[2].id;
+      expect(kimi).toMatch(/^[a-z0-9-]{1,20}$/);
+      expect(Object.keys(etat.enService)).toEqual(['local:principal', `local:${kimi}`]);
+      local.repondre = () => openai(impossible);
+      second.repondre = (r) => openai(propositionAccroche(r.corps.messages[1].content, 'Accroche de Kimi'));
+      troisieme.repondre = () => openai(impossible);
+      const r = await demander('Change l’accroche');
+      expect(r.json, JSON.stringify(r.json.journal)).toMatchObject({ statut: 'proposee', cerveau: `local:${kimi}`, cerveauLibelle: 'Kimi', coutCentimes: 0 });
+      expect(r.json.journal.map((j: any) => j.texte).join(' ')).toMatch(/Qwen3-Coder : « je ne sais pas faire »/);
+      expect(troisieme.recus.filter((x) => x.chemin.endsWith('/chat/completions'))).toHaveLength(0); // désactivé : jamais appelé
+      // Essai d'un modèle précis.
+      expect((await c.call('POST', '/api/reglages/ia/essai-local', { id: kimi })).json).toEqual({ repond: true, enService: true });
+      expect((await c.call('POST', '/api/reglages/ia/essai-local', { id: 'glm' })).json).toEqual({ repond: false, enService: false });
+      // Aucun ne réussit : explication claire.
+      second.repondre = () => openai(impossible);
+      const r2 = await demander('Change l’accroche');
+      expect(r2.json.statut).toBe('impossible');
+      expect(r2.json.raison).toMatch(/Aucun des 2 modèles locaux n’a abouti/);
+      // Limites et contrôles.
+      const trop = Array.from({ length: 9 }, (_, i) => ({ nom: `M${i}`, url: 'http://127.0.0.1:1/v1', modele: 'x' }));
+      expect((await reglages({ locaux: trop })).status).toBe(400);
+      expect((await reglages({ locaux: [{ nom: '', url: 'http://127.0.0.1:1/v1', modele: 'x' }] })).status).toBe(400);
+      expect((await reglages({ locaux: [{ nom: 'X', url: 'ftp://exemple', modele: 'x' }] })).status).toBe(400);
+    } finally {
+      second.serveur.close();
+      troisieme.serveur.close();
+    }
+  });
+
+  it('les anciens réglages (un seul modèle local) sont repris automatiquement', async () => {
+    p.ctx.db.prepare("UPDATE settings SET value = ? WHERE key = 'ia'").run(JSON.stringify({ active: true, local: { actif: true, url: 'http://127.0.0.1:9/v1', modele: 'ancien', tailleMax: 60000, delaiS: 120 } }));
+    const r = (await c.call('GET', '/api/reglages/ia')).json.reglages;
+    expect(r.locaux).toEqual([{ id: 'principal', nom: 'Modèle local', actif: true, url: 'http://127.0.0.1:9/v1', modele: 'ancien', tailleMax: 60000, delaiS: 120 }]);
   });
 });

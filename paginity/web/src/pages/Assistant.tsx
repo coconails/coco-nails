@@ -14,7 +14,8 @@ interface Proposition {
   id: string;
   demande: string;
   statut: 'en_cours' | 'proposee' | 'accord_requis' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
-  cerveau: 'local' | 'claude' | 'chatgpt' | null;
+  cerveau: string | null;
+  cerveauLibelle: string | null;
   explication: string | null;
   raison: string | null;
   changements: { rubrique: string; libelle: string; avant: unknown; apres: unknown }[];
@@ -34,7 +35,6 @@ const STATUT: Record<Proposition['statut'], { libelle: string; couleur: string }
   perimee: { libelle: 'Périmée', couleur: 'gray' },
   interrompue: { libelle: 'Interrompue', couleur: 'gray' },
 };
-const CERVEAU = { local: 'Modèle local', claude: 'Claude', chatgpt: 'ChatGPT' } as const;
 
 /** Différences champ par champ (premier niveau), lisibles par tout le monde. */
 function differences(avant: unknown, apres: unknown): { champ: string; avant: string; apres: string }[] {
@@ -137,8 +137,8 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 <Text fw={600}>« {p.demande} »</Text>
                 <Text size="xs" c="dimmed">
                   {dateHeure(p.creeLe)}
-                  {p.cerveau ? ` · préparée par ${CERVEAU[p.cerveau]}` : ''}
-                  {p.coutCentimes > 0 ? ` · coût ${(p.coutCentimes / 100).toFixed(2).replace('.', ',')} $` : p.cerveau === 'local' ? ' · gratuit' : ''}
+                  {p.cerveauLibelle ? ` · préparée par ${p.cerveauLibelle}` : ''}
+                  {p.coutCentimes > 0 ? ` · coût ${(p.coutCentimes / 100).toFixed(2).replace('.', ',')} $` : p.cerveau?.startsWith('local') ? ' · gratuit' : ''}
                 </Text>
               </Stack>
               <Badge color={STATUT[p.statut].couleur} variant="light">

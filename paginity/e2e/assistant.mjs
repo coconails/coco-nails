@@ -43,6 +43,18 @@ const local = http.createServer((req, res) => {
 });
 await new Promise((r) => local.listen(0, '127.0.0.1', r));
 const portLocal = local.address().port;
+// Premier modèle de la liste : répond « je ne sais pas faire » (pour montrer le passage au suivant).
+const prudent = http.createServer((req, res) => {
+  let b = '';
+  req.on('data', (d) => (b += d));
+  req.on('end', () => {
+    if (req.url.endsWith('/models')) return res.writeHead(200, { 'content-type': 'application/json' }).end('{"data":[]}');
+    const rep = { statut: 'impossible', changements: [], explication: '', raison: 'je ne suis pas sûr de la formulation' };
+    res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(rep) } }] }));
+  });
+});
+await new Promise((r) => prudent.listen(0, '127.0.0.1', r));
+const portPrudent = prudent.address().port;
 
 const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(root, '..', 'server', 'dist', 'index.js')], {
   env: { ...process.env, PAGINITY_DATA_DIR: path.join(tmp, 'donnees'), PAGINITY_ADMIN_PORT: String(P.admin), PAGINITY_PREVIEW_PORT: String(P.preview), PAGINITY_SITES_PORT: String(P.sites), PAGINITY_PUBLIC_URL: ADMIN, PAGINITY_ISOLATION: 'processus' },
@@ -88,10 +100,15 @@ try {
   await onglet.getByRole('button', { name: 'Réduire le panneau de l’assistant' }).click();
   await onglet.waitForTimeout(400);
   ok(await page.getByText('Désactivé').isVisible(), 'Assistant désactivé par défaut');
-  await page.getByPlaceholder('http://127.0.0.1:11434/v1').fill(`http://127.0.0.1:${portLocal}/v1`);
-  await page.getByPlaceholder('nom du modèle installé').fill('modele-demo');
-  // Interrupteur « Autoriser » du modèle local (le premier de la page).
-  await page.getByLabel('Autoriser').first().check({ force: true });
+  // Deux modèles locaux ajoutés depuis l'écran.
+  for (const [nom, port] of [['GLM', portPrudent], ['Qwen3-Coder', portLocal]]) {
+    await page.getByRole('button', { name: 'Ajouter un modèle local' }).click();
+    const carte = onglet.locator('main [data-modele-local=""]').last();
+    await carte.getByLabel('Nom affiché').fill(nom);
+    const c2 = onglet.locator(`main [data-modele-local="${nom}"]`);
+    await c2.getByLabel('Nom du modèle installé').fill(nom.toLowerCase());
+    await c2.getByLabel('Adresse du modèle').fill(`http://127.0.0.1:${port}/v1`);
+  }
   await page.getByRole('button', { name: 'Enregistrer les réglages de l’assistant' }).click();
   // Action sensible : confirmation d'identité.
   const dlg = onglet.getByRole('dialog', { name: /Confirmez/ });
@@ -103,17 +120,26 @@ try {
   await page.getByLabel('Désactivé').check({ force: true });
   await page.getByText('Activé', { exact: true }).waitFor();
   ok(true, 'Assistant activé depuis les réglages (avec confirmation d’identité)');
-  await page.getByRole('button', { name: 'Essayer le modèle local' }).click();
-  ok(await onglet.getByText('Le modèle local répond.').waitFor().then(() => true), 'Essai du modèle local : il répond');
+  await onglet.locator('main [data-modele-local="Qwen3-Coder"]').getByRole('button', { name: 'Essayer' }).click();
+  ok(await onglet.getByText('Qwen3-Coder répond.').waitFor().then(() => true), 'Essai d’un modèle local précis : il répond');
+  ok((await page.getByText('En service').count()) >= 2, 'Deux modèles locaux en service');
   ok(await page.getByText(/Dépensé ce mois-ci : 0,00 \$ sur 0,00 \$/).isVisible(), 'Plafond global et dépense du mois affichés (0 $ par défaut)');
   await page.screenshot({ path: path.join(OUT, 'ia-01-reglages.png'), fullPage: true });
+  await onglet.locator('main [data-modele-local="GLM"]').scrollIntoViewIfNeeded();
+  await onglet.mouse.wheel(0, -220);
+  await onglet.waitForTimeout(300);
+  await onglet.screenshot({ path: path.join(OUT, 'ia-01b-modeles-locaux.png') });
 
   // 2. Page Assistant du site : demande, proposition avant/après, acceptation.
   await page.goto(`${ADMIN}/sites/${site.id}/assistant`);
   await page.getByLabel('Votre demande').fill('Remplace la phrase d’accroche par : Votre pause beauté, sur rendez-vous');
   await page.getByRole('button', { name: 'Envoyer à l’assistant' }).click();
   await page.getByText('À valider').waitFor();
-  ok(await page.getByText(/préparée par Modèle local · gratuit/).first().isVisible(), 'Proposition préparée par le modèle local (gratuit)');
+  ok(await page.getByText(/préparée par Qwen3-Coder · gratuit/).first().isVisible(), 'Le 1er modèle ne sait pas faire : le 2e (Qwen3-Coder) prépare la proposition, gratuitement');
+  await page.getByText('Ce qui s’est passé').first().click();
+  ok(await page.getByText(/GLM : « je ne sais pas faire »/).first().waitFor({ timeout: 5000 }).then(() => true, () => false), 'Le détail montre le passage d’un modèle à l’autre');
+  await onglet.waitForTimeout(500);
+  await page.screenshot({ path: path.join(OUT, 'ia-02b-detail.png'), fullPage: true });
   ok(await page.getByRole('cell', { name: 'Votre pause beauté, sur rendez-vous' }).isVisible(), 'Avant / après affiché champ par champ');
   await page.screenshot({ path: path.join(OUT, 'ia-02-proposition.png'), fullPage: true });
   await page.getByRole('button', { name: 'Accepter (brouillon)' }).click();
