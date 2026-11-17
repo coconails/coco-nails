@@ -399,6 +399,59 @@ export class Assistant {
     };
   }
 
+  // ------------------------------------------------------------------ kit de démarrage : modèles installés
+  /** Nom affiché à partir du nom Ollama : « qwen3-coder:30b » → « Qwen3-Coder 30b ». */
+  static joliNom(id: string): string {
+    const [base, taille] = id.split(':');
+    const nom = base
+      .split('/')
+      .pop()!
+      .split('-')
+      .map((m) => (/^(glm|gpt|llm)\d*$/i.test(m) ? m.toUpperCase() : m.charAt(0).toUpperCase() + m.slice(1)))
+      .join('-');
+    return taille && taille !== 'latest' ? `${nom} ${taille}` : nom;
+  }
+
+  /** Liste les modèles d'un serveur Ollama (ou compatible) : adresse de base sans « /v1 ». */
+  async detecter(adresse: unknown): Promise<{ url: string; modeles: { id: string; nom: string; deja: boolean }[] }> {
+    let base = typeof adresse === 'string' && adresse.trim() ? adresse.trim() : 'http://127.0.0.1:11434';
+    base = base.replace(/\/+$/, '').replace(/\/v1$/, '');
+    let u: URL;
+    try {
+      u = new URL(base);
+    } catch {
+      throw new UserError(400, 'Adresse invalide (exemple : http://127.0.0.1:11434).');
+    }
+    if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password) throw new UserError(400, 'Adresse invalide (exemple : http://127.0.0.1:11434).');
+    let donnees: { data?: { id?: unknown }[] };
+    try {
+      const r = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(5000), redirect: 'error' });
+      if (!r.ok) throw new Error(String(r.status));
+      donnees = (await r.json()) as typeof donnees;
+    } catch {
+      throw new UserError(502, 'Aucun serveur de modèles ne répond à cette adresse. Ollama est-il démarré ?');
+    }
+    const url = `${base}/v1`;
+    const deja = new Set(this.reglages().locaux.filter((l) => l.url.replace(/\/+$/, '') === url).map((l) => l.modele));
+    const modeles = (Array.isArray(donnees.data) ? donnees.data : [])
+      .map((m) => String(m?.id ?? ''))
+      .filter((id) => id && id.length < 200 && !/embed/i.test(id))
+      .slice(0, 50)
+      .map((id) => ({ id, nom: Assistant.joliNom(id), deja: deja.has(id) }));
+    return { url, modeles };
+  }
+
+  /** Ajoute (autorisés) les modèles choisis parmi ceux détectés. */
+  async ajouterDetectes(adresse: unknown, ids: unknown): Promise<ReglagesIA> {
+    const d = await this.detecter(adresse);
+    const choisis = Array.isArray(ids) ? ids.map(String) : [];
+    const r = this.reglages();
+    const nouveaux = d.modeles.filter((m) => choisis.includes(m.id) && !m.deja);
+    if (!nouveaux.length) throw new UserError(400, 'Aucun nouveau modèle choisi.');
+    if (r.locaux.length + nouveaux.length > MAX_LOCAUX) throw new UserError(400, `${MAX_LOCAUX} modèles locaux au plus.`);
+    return this.modifierReglages({ locaux: [...r.locaux, ...nouveaux.map((m) => ({ nom: m.nom, actif: true, url: d.url, modele: m.id }))] });
+  }
+
   // ------------------------------------------------------------------ banc d'essai (étape D)
   /** Derniers résultats, demandes types, essai en cours. */
   bancEtat() {

@@ -72,6 +72,20 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { arrete: ctx.ia.arreterBanc() };
   });
 
+  // Kit de démarrage : modèles installés sur la machine (Ollama), ajoutés en un clic.
+  app.post('/api/reglages/ia/detecter', async (req) => {
+    requireOwner(req);
+    return ctx.ia.detecter(body<{ url?: string }>(req).url);
+  });
+  app.post('/api/reglages/ia/ajouter-detectes', async (req) => {
+    const { user } = requireSudo(req);
+    if (!user.is_owner) requireOwner(req);
+    const b = body<{ url?: string; ids?: string[] }>(req);
+    await ctx.ia.ajouterDetectes(b.url, b.ids);
+    audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_modeles_detectes', details: { ids: b.ids } });
+    return ctx.ia.etat();
+  });
+
   // Demandes : même droit que modifier les contenus à la main.
   app.get('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);

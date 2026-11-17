@@ -34,6 +34,13 @@ const surveillance = http.createServer((req, res) => {
 });
 await new Promise((r) => surveillance.listen(0, '127.0.0.1', r));
 
+// Faux Ollama : la liste des modèles « installés ».
+const ollama = http.createServer((req, res) => {
+  if (req.url === '/v1/models') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: [{ id: 'qwen3:8b' }, { id: 'glm4:9b' }, { id: 'nomic-embed-text:latest' }] }));
+  res.writeHead(404).end();
+});
+await new Promise((r) => ollama.listen(0, '127.0.0.1', r));
+
 const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(root, '..', 'server', 'dist', 'index.js')], {
   env: { ...process.env, PAGINITY_DATA_DIR: path.join(tmp, 'donnees'), PAGINITY_ADMIN_PORT: String(P.admin), PAGINITY_PREVIEW_PORT: String(P.preview), PAGINITY_SITES_PORT: String(P.sites), PAGINITY_PUBLIC_URL: ADMIN, PAGINITY_ISOLATION: 'processus' },
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -136,6 +143,21 @@ try {
   await pt.screenshot({ path: path.join(OUT, 'E3b-page-secours-telephone.png') });
   await tel.close();
 
+  // ---- 4. Kit de démarrage de l'IA
+  await page.goto(`${ADMIN}/reglages`);
+  const kit = main.locator('[data-section="detecter"]');
+  await kit.waitFor();
+  await kit.getByLabel('Adresse d’Ollama').fill(`http://127.0.0.1:${ollama.address().port}`);
+  await kit.getByRole('button', { name: 'Détecter les modèles installés' }).click();
+  await kit.getByText('Qwen3 8b').waitFor();
+  ok((await kit.getByRole('checkbox').count()) === 2, 'Deux modèles d’écriture détectés (le modèle « embed » est ignoré)');
+  await capture(kit, 'E4-1-modeles-detectes.png');
+  await kit.getByRole('button', { name: 'Ajouter les modèles choisis' }).click();
+  await page.getByText(/2 modèle\(s\) ajouté\(s\)/).first().waitFor();
+  await main.locator('[data-modele-local]').nth(1).waitFor();
+  ok((await main.locator('[data-modele-local]').count()) === 2, 'Les deux modèles apparaissent dans la liste, autorisés');
+  await capture(main.locator('[data-modele-local]').first(), 'E4-2-modeles-ajoutes.png');
+
   ok(erreurs.length === 0, `Aucune erreur JavaScript (${erreurs.join(' | ')})`);
 } catch (e) {
   console.log('✘ Parcours interrompu :', e.message);
@@ -144,6 +166,7 @@ try {
   await browser.close();
   server.kill('SIGTERM');
   surveillance.close();
+  ollama.close();
   await new Promise((r) => setTimeout(r, 500));
   fs.rmSync(tmp, { recursive: true, force: true });
 }

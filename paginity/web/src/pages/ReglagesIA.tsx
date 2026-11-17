@@ -6,6 +6,7 @@ import { IconRobot } from '@tabler/icons-react';
 import { del, errorMessage, get, post, put } from '../api';
 import { Loading } from '../components/Page';
 import { BancEssai } from './BancEssai';
+import { DetecterModeles } from './DetecterModeles';
 
 type Externe = 'claude' | 'chatgpt';
 interface Local {
@@ -199,6 +200,7 @@ export function ReglagesIA() {
           Modèles installés sur votre machine (Qwen3-Coder, GLM, Kimi, DeepSeek…), joints par le protocole « compatible OpenAI » (Ollama, llama.cpp,
           LM Studio…). Ils sont essayés dans l’ordre de la liste.
         </Text>
+        <DetecterModeles onAjoute={() => void q.refetch()} />
         {r.locaux.map((l, i) => {
           const maj = (v: Partial<Local>) => setR({ ...r, locaux: r.locaux.map((x, j) => (j === i ? { ...x, ...v } : x)) });
           const deplacer = (sens: -1 | 1) => {
