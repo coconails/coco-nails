@@ -24,6 +24,7 @@
     "e2e:ia": "node e2e/assistant.mjs",
     "e2e:panneau": "node e2e/panneau.mjs",
     "e2e:reunion": "node e2e/reunion.mjs",
-    "e2e:banc": "node e2e/banc.mjs"
+    "e2e:banc": "node e2e/banc.mjs",
+    "e2e:continuite": "node e2e/continuite.mjs"
   }
 }

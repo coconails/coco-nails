@@ -8,6 +8,8 @@ import type { FunctionService } from './functions/service.js';
 import type { Scheduler } from './functions/scheduler.js';
 import type { Mailer } from './lib/mail.js';
 import type { Assistant } from './ia/assistant.js';
+import type { SauvegardeAuto } from './lib/sauvegarde-auto.js';
+import type { Battement } from './lib/battement.js';
 
 /** Tout ce dont les différentes parties de PAGINITY ont besoin, regroupé en un seul objet. */
 export interface Ctx {
@@ -21,4 +23,6 @@ export interface Ctx {
   scheduler: Scheduler;
   mailer: Mailer;
   ia: Assistant;
+  sauvegardeAuto: SauvegardeAuto;
+  battement: Battement;
 }

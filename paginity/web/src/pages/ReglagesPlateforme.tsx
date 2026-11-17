@@ -6,6 +6,8 @@ import { IconMail } from '@tabler/icons-react';
 import { errorMessage, get, post, put } from '../api';
 import { Loading, Page } from '../components/Page';
 import { ReglagesIA } from './ReglagesIA';
+import { ReglagesSauvegarde } from './ReglagesSauvegarde';
+import { ReglagesAlerte } from './ReglagesAlerte';
 
 interface Messagerie {
   hote: string;
@@ -97,6 +99,8 @@ export function ReglagesPlateformePage() {
           </Text>
         </Stack>
       </Card>
+      <ReglagesSauvegarde />
+      <ReglagesAlerte />
       <ReglagesIA />
     </Page>
   );

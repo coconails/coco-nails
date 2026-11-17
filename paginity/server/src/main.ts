@@ -1,3 +1,5 @@
+import { SauvegardeAuto } from './lib/sauvegarde-auto.js';
+import { Battement } from './lib/battement.js';
 import fs from 'node:fs';
 import type http from 'node:http';
 import type { FastifyInstance } from 'fastify';
@@ -61,6 +63,7 @@ export async function createPaginity(
   ctx.scheduler = new Scheduler(ctx);
   // PAGINITY AI : aucun cerveau branché par défaut (les tests en fournissent des simulés).
   ctx.ia = new Assistant(ctx);
+  ctx.sauvegardeAuto = new SauvegardeAuto(ctx);
   if (overrides.cerveaux) {
     ctx.ia.cerveaux = overrides.cerveaux;
     ctx.ia.surcharge = true;
@@ -76,6 +79,8 @@ export async function createPaginity(
   ctx.jobs.define('import', { steps: IMPORT_STEPS, run: (r) => runImport(ctx, r) });
   const admin = await createAdminApp(ctx);
   const sitesServer = createSitesServer(ctx);
+  ctx.battement = new Battement(ctx, () => sitesServer.listening);
+  if (overrides.scheduler !== false) ctx.battement.demarrer();
   const previewServer = createPreviewServer(ctx);
   const setupCode = ensureSetupCode(ctx);
   let lastDigest = '';
@@ -85,6 +90,7 @@ export async function createPaginity(
     pruneAlerts(ctx);
     pruneSubmissions(ctx);
     ctx.functions.prune();
+    void ctx.sauvegardeAuto.tic().catch((e) => console.error('[sauvegarde] ', (e as Error).message));
     // Récapitulatif quotidien des alertes, vers 6 h UTC.
     const d = new Date();
     const day = d.toISOString().slice(0, 10);
@@ -102,6 +108,7 @@ export async function createPaginity(
     setupCode,
     async close() {
       clearInterval(timer);
+      ctx.battement.arreter();
       ctx.scheduler.stop();
       await ctx.functions.stopAll();
       await admin.close();

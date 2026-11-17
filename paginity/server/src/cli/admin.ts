@@ -9,6 +9,7 @@ import { checkPasswordPolicy, hashPassword } from '../auth/passwords.js';
 import { UserError } from '../lib/util.js';
 import { restaurer, sauvegarder } from './sauvegarde.js';
 import { changerCle, enMarche } from './rotation.js';
+import { ouvrirSauvegarde } from '../lib/sauvegarde-auto.js';
 
 /**
  * paginity-admin : outil de secours, à lancer sur la machine elle-même (clavier/écran ou SSH).
@@ -39,6 +40,10 @@ Utilisation : paginity-admin <commande> [options]
   restaurer <archive> --cle <fichier>
                                 Restaure une sauvegarde dans PAGINITY_DATA_DIR, qui doit être vide (PAGINITY
                                 arrêté). Tout est vérifié avant de finir (empreintes, clé, base).
+  ouvrir-sauvegarde <fichier.paginity> <dossier>
+                                Ouvre une sauvegarde AUTOMATIQUE (chiffrée) avec la phrase de sauvegarde
+                                (demandée au clavier) : le dossier reçoit l'archive et le fichier de clé,
+                                à donner ensuite à « restaurer ».
   changer-cle --confirmer       Change la clé du coffre (PAGINITY ARRÊTÉ) et rechiffre toutes les données
                                 chiffrées. Termine aussi un changement interrompu. Faites ensuite une sauvegarde.
   aide                          Affiche cette aide.
@@ -69,6 +74,23 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
       db.close();
       out.log(`Restauration terminée dans ${config.dataDir} : ${r.sites} site(s), ${r.fichiers} fichiers vérifiés (sauvegarde du ${r.fiche.creeLe}).`);
       out.log('Lancez « paginity-admin verifier », puis démarrez PAGINITY.');
+      return 0;
+    } catch (e) {
+      out.err(e instanceof UserError ? e.message : `Erreur : ${(e as Error).message}`);
+      return 1;
+    }
+  }
+  if (cmd === 'ouvrir-sauvegarde') {
+    try {
+      const [fichier, dossier] = args;
+      if (!fichier || !dossier) throw new UserError(400, 'Utilisation : paginity-admin ouvrir-sauvegarde <fichier.paginity> <dossier>');
+      if (!fs.existsSync(fichier)) throw new UserError(404, `Fichier introuvable : ${fichier}`);
+      if (fs.existsSync(dossier) && fs.readdirSync(dossier).length) throw new UserError(400, `Le dossier ${dossier} n’est pas vide.`);
+      const phrase = await (askLine ?? ((q: string) => askHidden(q)))('Phrase de sauvegarde : ');
+      const o = await ouvrirSauvegarde(fichier, phrase, dossier);
+      out.log(`Sauvegarde du ${o.creeLe} ouverte.`);
+      out.log(`Pour tout remettre en place (PAGINITY arrêté, dossier de données vide) :`);
+      out.log(`  paginity-admin restaurer ${o.archive} --cle ${o.cle}`);
       return 0;
     } catch (e) {
       out.err(e instanceof UserError ? e.message : `Erreur : ${(e as Error).message}`);
