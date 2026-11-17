@@ -28,7 +28,8 @@ interface Resultat {
 interface EtatBanc {
   enCours: null | { total: number; fait: number; actuel: string; arret: boolean };
   dernier: null | { le: number; resultats: Record<string, Resultat> };
-  taches: { id: string; titre: string; domaine: string; demande: string }[];
+  taches: { id: string; titre: string; domaine: string; demande: string; reelle?: boolean }[];
+  reelles: number;
   libelles: Record<string, string>;
 }
 
@@ -90,10 +91,22 @@ export function BancEssai() {
           )}
         </Group>
         <Text size="sm" c="dimmed">
-          {d.taches.length} demandes types (prix, horaires, fermetures, textes, FAQ, une demande impossible et une consigne piégée) posées à chaque IA sur un
+          {d.taches.length - d.reelles} demandes types (prix, horaires, fermetures, textes, FAQ, une demande impossible et une consigne piégée) posées à chaque IA sur un
           salon fictif : aucun de vos sites n’est lu ni modifié. Chaque réponse est contrôlée automatiquement. Les notes servent à choisir le vérificateur
           final de la salle de réunion.
         </Text>
+        <Group gap="xs" data-banc-reelles>
+          <Text size="sm">
+            {d.reelles > 0
+              ? `Dont ${d.reelles} de vos vraies demandes acceptées : chaque IA doit retrouver le résultat que vous aviez validé.`
+              : 'Chaque proposition que vous acceptez deviendra aussi une demande type (20 au plus, les plus récentes).'}
+          </Text>
+          {d.reelles > 0 && !enCours && (
+            <Button size="compact-xs" variant="subtle" color="gray" onClick={() => window.confirm('Oublier vos demandes réelles retenues par le banc ?') && void del('/api/reglages/ia/banc/reelles').then(() => q.refetch())}>
+              Les oublier
+            </Button>
+          )}
+        </Group>
         {enCours ? (
           <Stack gap={6}>
             <Group justify="space-between">

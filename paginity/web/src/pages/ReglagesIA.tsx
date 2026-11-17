@@ -30,6 +30,7 @@ interface Service {
 interface EtatIA {
   reglages: {
     active: boolean;
+    dictee: boolean;
     relaisExterne: 'jamais' | 'demander' | 'auto';
     plafondMensuelCentimes: number;
     ordre: Externe[];
@@ -194,6 +195,12 @@ export function ReglagesIA() {
           L’assistant propose des modifications de contenus ; rien n’est enregistré sans votre accord, et seulement dans le brouillon. Désactiver
           l’assistant arrête immédiatement tout ce qui est en cours (arrêt d’urgence).
         </Text>
+        <Switch
+          label="Bouton « Dicter » (dictée vocale)"
+          description="Pratique sur téléphone. Attention : la voix est envoyée au service de reconnaissance du navigateur (Google pour Chrome, Apple pour Safari) pour être transcrite."
+          checked={r.dictee}
+          onChange={(ev) => setR({ ...r, dictee: ev.currentTarget.checked })}
+        />
 
         <Divider label="Modèles locaux (gratuits, rien ne sort de chez vous)" labelPosition="left" />
         <Text size="sm" c="dimmed">

@@ -244,6 +244,10 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE ia_propositions ADD COLUMN reunion TEXT;
   `,
+  // 7 — PAGINITY AI : versions écrites à l'acceptation (pour pouvoir annuler sans écraser autre chose).
+  `
+  ALTER TABLE ia_propositions ADD COLUMN versions_apres TEXT;
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

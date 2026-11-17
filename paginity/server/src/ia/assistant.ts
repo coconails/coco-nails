@@ -8,7 +8,7 @@ import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import { validateEntryValue, type Field } from '../content/schema.js';
 import { isServerCode } from '../sites/server-code.js';
-import { juger, noteDomaine, salonFictif, TACHES_BANC, type ResultatTache } from './banc.js';
+import { juger, MAX_REELLES, noteDomaine, salonFictif, TACHES_BANC, tacheReelle, type DemandeReelle, type ResultatTache, type TacheBanc } from './banc.js';
 import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
 
 /**
@@ -52,7 +52,9 @@ export interface DemandeCerveau {
 
 export type ReponseCerveau =
   | { statut: 'proposition'; changements: { rubrique: string; valeur: unknown }[]; explication: string; coutCentimes?: number }
-  | { statut: 'impossible'; raison: string; coutCentimes?: number };
+  | { statut: 'impossible'; raison: string; coutCentimes?: number }
+  /** Il manque une information : l'IA pose UNE question, la personne répond, la demande repart complétée. */
+  | { statut: 'question'; question: string; coutCentimes?: number };
 
 export interface Cerveau {
   nom: NomCerveau;
@@ -82,9 +84,12 @@ export interface ReglagesIA {
   claude: ConfigExterne;
   chatgpt: ConfigExterne;
   reunion: ReglagesReunion;
+  /** Bouton « Dicter » (reconnaissance vocale du navigateur : la voix part chez Google ou Apple). */
+  dictee: boolean;
 }
 const REGLAGES_DEFAUT: ReglagesIA = {
   active: false,
+  dictee: false,
   relaisExterne: 'demander',
   plafondMensuelCentimes: 0,
   ordre: ['claude', 'chatgpt'],
@@ -120,7 +125,7 @@ interface Note {
 
 const CLE: Record<NomExterne, string> = { claude: 'ia_cle_claude', chatgpt: 'ia_cle_chatgpt' };
 
-export type StatutProposition = 'en_cours' | 'proposee' | 'accord_requis' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
+export type StatutProposition = 'en_cours' | 'proposee' | 'accord_requis' | 'question' | 'repondue' | 'annulee' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
 
 interface Changement {
   rubrique: string;
@@ -208,6 +213,7 @@ export class Assistant {
       return n;
     };
     if (typeof input.active === 'boolean') r.active = input.active;
+    if (typeof input.dictee === 'boolean') r.dictee = input.dictee;
     if (input.relaisExterne !== undefined) {
       if (!['jamais', 'demander', 'auto'].includes(input.relaisExterne)) throw new UserError(400, 'Mode de relais inconnu.');
       r.relaisExterne = input.relaisExterne;
@@ -452,6 +458,64 @@ export class Assistant {
     return this.modifierReglages({ locaux: [...r.locaux, ...nouveaux.map((m) => ({ nom: m.nom, actif: true, url: d.url, modele: m.id }))] });
   }
 
+  // ------------------------------------------------------------------ précision, annulation, demandes réelles
+  /** L'IA a posé une question : la réponse complète la demande, qui repart (nouvelle proposition). */
+  async repondre(site: SiteRow, user: UserRow, id: string, reponse: unknown) {
+    const p = this.ligne(site, id);
+    if (p.statut !== 'question') throw new UserError(409, 'Cette demande n’attend pas de réponse.');
+    const r = typeof reponse === 'string' ? reponse.trim() : '';
+    if (!r || r.length > 500) throw new UserError(400, 'Écrivez votre réponse (500 caractères au plus).');
+    this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'repondue', decide_le = ? WHERE id = ?").run(now(), id);
+    this.noter(id, `Réponse de ${user.name} : « ${r} ». La demande repart, complétée.`);
+    const info = p.reunion ? JSON.parse(p.reunion) : {};
+    return this.demander(site, user, `${p.demande}\nPrécision demandée : ${p.raison ?? ''}\nRéponse : ${r}`.slice(0, 2000), {
+      domaine: info.choixDomaine === 'vous' ? info.domaine : undefined,
+    });
+  }
+
+  /** Annule une proposition acceptée : remet les rubriques comme avant, si personne n'y a touché depuis. */
+  async annuler(site: SiteRow, user: UserRow, id: string) {
+    const p = this.ligne(site, id) as LigneProposition & { versions_apres?: string | null };
+    if (p.statut !== 'acceptee' || !p.versions_apres) throw new UserError(409, 'Seule une proposition acceptée peut être annulée.');
+    const versionsApres = JSON.parse(p.versions_apres) as Record<string, string>;
+    const changements = JSON.parse(p.changements!) as Changement[];
+    const { versions } = this.contexte(site);
+    const touchees = changements.filter((c) => (versions[c.rubrique] ?? null) !== versionsApres[c.rubrique]);
+    if (touchees.length) {
+      throw new UserError(409, `Impossible d’annuler : « ${touchees.map((c) => c.libelle).join(' », « ')} » a été modifié depuis. Faites la correction dans « Contenus » (ou retrouvez l’ancienne version dans « Versions »).`);
+    }
+    for (const c of changements) await saveEntry(this.ctx, site, user, c.rubrique, c.avant, versions[c.rubrique]);
+    this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'annulee', decide_le = ? WHERE id = ?").run(now(), id);
+    this.noter(id, `Annulée par ${user.name} : les contenus sont revenus comme avant dans le brouillon.`);
+    this.oublierReelle(id);
+    audit(this.ctx.db, { userId: user.id, action: 'ia_annulee', siteId: site.id, details: { id } });
+    return this.lire(site, id);
+  }
+
+  private reelles(): DemandeReelle[] {
+    try {
+      return JSON.parse(getSetting(this.ctx.db, 'ia_banc_reelles') ?? '[]');
+    } catch {
+      return [];
+    }
+  }
+  private retenirPourBanc(p: LigneProposition, rubriques: RubriqueContexte[], changements: Changement[]) {
+    if (JSON.stringify(rubriques).length > 60_000) return; // site trop gros pour en faire une demande type
+    const domaine: Domaine = (p.reunion ? JSON.parse(p.reunion).domaine : null) ?? domaineDe(p.demande);
+    const d: DemandeReelle = { id: p.id, le: now(), demande: p.demande, domaine, rubriques, attendu: changements.map((c) => ({ rubrique: c.rubrique, valeur: c.apres })) };
+    setSetting(this.ctx.db, 'ia_banc_reelles', JSON.stringify([...this.reelles().filter((x) => x.id !== p.id), d].slice(-MAX_REELLES)));
+  }
+  private oublierReelle(id: string) {
+    setSetting(this.ctx.db, 'ia_banc_reelles', JSON.stringify(this.reelles().filter((x) => x.id !== id)));
+  }
+  /** Efface les demandes réelles retenues par le banc. */
+  oublierReelles(): void {
+    setSetting(this.ctx.db, 'ia_banc_reelles', '[]');
+  }
+  private tachesBanc(): { t: TacheBanc; rubriques: RubriqueContexte[] }[] {
+    return [...TACHES_BANC.map((t) => ({ t, rubriques: salonFictif(t.piege) })), ...this.reelles().map((r) => ({ t: tacheReelle(r), rubriques: structuredClone(r.rubriques) }))];
+  }
+
   // ------------------------------------------------------------------ banc d'essai (étape D)
   /** Derniers résultats, demandes types, essai en cours. */
   bancEtat() {
@@ -465,7 +529,8 @@ export class Assistant {
     return {
       enCours: e && { debut: e.debut, total: e.total, fait: e.fait, actuel: this.libelle(e.actuel), arret: e.arret },
       dernier,
-      taches: TACHES_BANC.map((t) => ({ id: t.id, titre: t.titre, domaine: t.domaine, demande: t.demande })),
+      reelles: this.reelles().length,
+      taches: this.tachesBanc().map(({ t }) => ({ id: t.id, titre: t.titre, domaine: t.domaine, demande: t.demande, reelle: t.id.startsWith('reel:') })),
       libelles: this.toutesCles(),
     };
   }
@@ -487,7 +552,7 @@ export class Assistant {
       }
     } else choix = Object.keys(actifs).filter((k) => estLocal(k) || payants);
     if (!choix.length) throw new UserError(400, 'Aucune IA en service à essayer. Ajoutez et autorisez au moins un modèle local.');
-    const total = choix.length * TACHES_BANC.length;
+    const total = choix.length * this.tachesBanc().length;
     this.bancEnCours = { debut: now(), total, fait: 0, actuel: choix[0], arret: false };
     void this.executerBanc(choix, actifs).finally(() => (this.bancEnCours = null));
     return { total, cles: choix };
@@ -510,9 +575,10 @@ export class Assistant {
       e.actuel = cle;
       const details: ResultatTache[] = [];
       let plafond = false;
-      for (const t of TACHES_BANC) {
+      const taches = this.tachesBanc();
+      for (const { t, rubriques: rubT } of taches) {
         if (e.arret) break;
-        const d: DemandeCerveau = { demande: t.demande, rubriques: salonFictif(t.piege) };
+        const d: DemandeCerveau = { demande: t.demande, rubriques: structuredClone(rubT) };
         let res: ResultatTache;
         if (!estLocal(cle) && (plafond || !this.budgetPermet(cle, c, d))) {
           plafond = true;
@@ -522,13 +588,13 @@ export class Assistant {
           const r = await this.appeler(c, d);
           const centimes = !estLocal(cle) ? (r.cout ?? 0) : 0;
           if (centimes > 0) this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes, fournisseur) VALUES (?, ?, ?, ?, ?)').run(mois(), now(), 'banc', centimes, cle);
-          const j = juger(t, (r.reponse as Parameters<typeof juger>[1]) ?? null, r.erreur ?? null, verif);
+          const j = juger(t, (r.reponse as Parameters<typeof juger>[1]) ?? null, r.erreur ?? null, verif, structuredClone(rubT));
           res = { tache: t.id, titre: t.titre, domaine: t.domaine, ...j, ms: Date.now() - t0, centimes };
         }
         details.push(res);
         e.fait++;
       }
-      if (details.length < TACHES_BANC.length) break; // arrêté : on ne note pas un essai incomplet
+      if (details.length < taches.length) break; // arrêté : on ne note pas un essai incomplet
       const notes = { textes: noteDomaine(details, 'textes'), donnees: noteDomaine(details, 'donnees') };
       for (const dom of ['textes', 'donnees'] as const) if (notes[dom] !== null && !plafond) this.noterBanc(cle, dom, notes[dom]!);
       let tout: { resultats: Record<string, unknown> } = { resultats: {} };
@@ -641,6 +707,7 @@ export class Assistant {
             raisons.push(r.erreur);
             break;
           }
+          if (r.reponse!.statut === 'question') return this.finir(id, 'question', { cerveau: cle, raison: r.reponse!.question.slice(0, 300) });
           if (r.reponse!.statut === 'impossible') {
             this.noter(id, `${nomL} : « je ne sais pas faire » (${r.reponse!.raison}).`);
             raisons.push('« je ne sais pas faire »');
@@ -720,6 +787,7 @@ export class Assistant {
         derniere = `${nomL} n’a pas pu répondre (${r.erreur})`;
         continue;
       }
+      if (r.reponse!.statut === 'question') return this.finir(id, 'question', { cerveau: nom, raison: r.reponse!.question.slice(0, 300) });
       if (r.reponse!.statut === 'impossible') {
         this.noter(id, `${nomL} : « je ne sais pas faire » (${r.reponse!.raison}).`);
         derniere = `${nomL} ne sait pas faire cette demande : ${r.reponse!.raison}`;
@@ -805,6 +873,7 @@ export class Assistant {
 
     // Tour unique des proposants.
     const lettres = 'ABCDEFG';
+    let question: { cle: string; texte: string } | null = null;
     const tour: { cle: string; auteur: string; statut: string; explication: string; changements?: Changement[]; brut?: { rubrique: string; valeur: unknown }[]; remarques: string[] }[] = [];
     for (const [i, cle] of proposants.entries()) {
       const c = cerveaux[cle];
@@ -817,6 +886,11 @@ export class Assistant {
       if (r.cout && !estLocal(cle)) this.compter(id, cle as NomExterne, r.cout);
       if (r.erreur) {
         tour.push({ cle, auteur, statut: `erreur (${r.erreur})`, explication: '', remarques: [] });
+        continue;
+      }
+      if (r.reponse!.statut === 'question') {
+        question ??= { cle, texte: r.reponse!.question };
+        tour.push({ cle, auteur, statut: 'demande une précision', explication: r.reponse!.question, remarques: [] });
         continue;
       }
       if (r.reponse!.statut === 'impossible') {
@@ -849,6 +923,10 @@ export class Assistant {
       if (r.cout && !estLocal(verificateur)) this.compter(id, verificateur as NomExterne, r.cout);
       if (r.erreur) statutVerif = `erreur (${r.erreur})`;
       else if (r.reponse!.statut === 'impossible') statutVerif = `« je ne sais pas faire » (${r.reponse!.raison})`;
+      else if (r.reponse!.statut === 'question') {
+        question = { cle: verificateur, texte: r.reponse!.question };
+        statutVerif = `demande une précision (${r.reponse!.question})`;
+      }
       else {
         const v = this.verifier(r.reponse!.changements, rubriques, versions);
         if (v.ok) {
@@ -878,6 +956,10 @@ export class Assistant {
       this.finir(id, 'proposee', { cerveau: t.cle, explication: t.explication, changements: t.changements!, site });
       return { fini: true };
     }
+    if (question) {
+      this.finir(id, 'question', { cerveau: question.cle, raison: question.texte.slice(0, 300) });
+      return { fini: true };
+    }
     return { fini: false, raisonRelais: 'la réunion n’a produit aucune proposition valable' };
   }
 
@@ -896,7 +978,8 @@ export class Assistant {
       const arret = new Promise<never>((_, rej) => ctl.signal.addEventListener('abort', () => rej(new Error(this.reglages().active ? 'temps de réponse dépassé' : 'arrêt d’urgence'))));
       const reponse = await Promise.race([c.proposer(structuredClone(d), ctl.signal), delai, arret]);
       const cout = Math.max(0, Math.round(Number((reponse as { coutCentimes?: number })?.coutCentimes) || 0));
-      if (!reponse || (reponse.statut !== 'proposition' && reponse.statut !== 'impossible')) return { erreur: 'réponse illisible', cout };
+      if (!reponse || !['proposition', 'impossible', 'question'].includes(reponse.statut)) return { erreur: 'réponse illisible', cout };
+      if (reponse.statut === 'question' && !String(reponse.question ?? '').trim()) return { erreur: 'réponse illisible', cout };
       if (reponse.statut === 'proposition' && !Array.isArray(reponse.changements)) return { erreur: 'réponse illisible', cout };
       return { reponse, cout };
     } catch (e) {
@@ -973,8 +1056,11 @@ export class Assistant {
       this.finir(id, 'perimee', { raison: 'Les contenus ont été modifiés depuis la proposition : elle n’est plus valable. Refaites la demande.' });
       throw new UserError(409, 'Les contenus ont été modifiés depuis la proposition : elle n’est plus valable. Refaites la demande.');
     }
-    for (const c of changements) await saveEntry(this.ctx, site, user, c.rubrique, c.apres, c.versionBase);
-    this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'acceptee', decide_le = ? WHERE id = ?").run(now(), id);
+    const instantane = this.contexte(site).rubriques;
+    const versionsApres: Record<string, string> = {};
+    for (const c of changements) versionsApres[c.rubrique] = (await saveEntry(this.ctx, site, user, c.rubrique, c.apres, c.versionBase)).version;
+    this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'acceptee', decide_le = ?, versions_apres = ? WHERE id = ?").run(now(), JSON.stringify(versionsApres), id);
+    this.retenirPourBanc(p, instantane, changements);
     this.compterDecision(p.cerveau, p.reunion ? JSON.parse(p.reunion).domaine ?? null : null, true);
     this.noter(id, `Acceptée par ${user.name} : enregistrée dans le brouillon (pas encore publiée).`);
     audit(this.ctx.db, { userId: user.id, action: 'ia_acceptee', siteId: site.id, details: { id, cerveau: p.cerveau, rubriques: changements.map((c) => c.rubrique) } });
@@ -1013,6 +1099,7 @@ export class Assistant {
       coutCentimes: p.cout_centimes,
       journal: JSON.parse(p.journal) as { le: number; texte: string }[],
       reunion: this.reunionLisible(p.reunion),
+      annulable: p.statut === 'acceptee' && !!(p as { versions_apres?: string | null }).versions_apres,
       creeLe: p.cree_le,
     };
   }

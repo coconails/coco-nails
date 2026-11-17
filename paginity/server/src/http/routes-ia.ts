@@ -67,6 +67,11 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_banc', details: { cles: r.cles, payants: b.payants === true } });
     return { ...r, ...ctx.ia.bancEtat() };
   });
+  app.delete('/api/reglages/ia/banc/reelles', async (req) => {
+    requireOwner(req);
+    ctx.ia.oublierReelles();
+    return ctx.ia.bancEtat();
+  });
   app.delete('/api/reglages/ia/banc', async (req) => {
     requireOwner(req);
     return { arrete: ctx.ia.arreterBanc() };
@@ -91,7 +96,7 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
     const r = ctx.ia.reglages();
-    return { etat: { active: r.active, reunion: r.reunion.active }, propositions: ctx.ia.liste(site) };
+    return { etat: { active: r.active, reunion: r.reunion.active, dictee: r.dictee }, propositions: ctx.ia.liste(site) };
   });
   app.post('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);
@@ -104,6 +109,16 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'publier');
     return ctx.ia.relayer(site, user, pid(req));
+  });
+  app.post('/api/sites/:id/assistant/:pid/repondre', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'contenus');
+    return ctx.ia.repondre(site, user, pid(req), body<{ reponse?: string }>(req).reponse);
+  });
+  app.post('/api/sites/:id/assistant/:pid/annuler', async (req) => {
+    const { user } = requireUser(req);
+    const { site } = ctx.sites.require(user, siteParam(req), 'contenus');
+    return ctx.ia.annuler(site, user, pid(req));
   });
   app.post('/api/sites/:id/assistant/:pid/accepter', async (req) => {
     const { user } = requireUser(req);

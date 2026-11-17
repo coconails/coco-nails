@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Accordion, Alert, Badge, Button, Card, Group, Select, Stack, Table, Text, Textarea } from '@mantine/core';
+import { Accordion, Alert, Badge, Button, Card, Group, Select, Stack, Table, Text, TextInput, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { IconRobot, IconSend, IconUsersGroup } from '@tabler/icons-react';
+import { IconArrowBackUp, IconHelpCircle, IconMicrophone, IconRobot, IconSend, IconUsersGroup } from '@tabler/icons-react';
 import { Link, useParams } from 'react-router-dom';
 import { errorMessage, get, post } from '../api';
 import { ErrorBox, Loading, Page } from '../components/Page';
@@ -13,7 +13,8 @@ import type { SiteDetail } from '../types';
 interface Proposition {
   id: string;
   demande: string;
-  statut: 'en_cours' | 'proposee' | 'accord_requis' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
+  statut: 'en_cours' | 'proposee' | 'accord_requis' | 'question' | 'repondue' | 'annulee' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
+  annulable?: boolean;
   cerveau: string | null;
   cerveauLibelle: string | null;
   explication: string | null;
@@ -38,6 +39,9 @@ const STATUT: Record<Proposition['statut'], { libelle: string; couleur: string }
   en_cours: { libelle: 'En cours', couleur: 'blue' },
   proposee: { libelle: 'À valider', couleur: 'or' },
   accord_requis: { libelle: 'Accord demandé', couleur: 'orange' },
+  question: { libelle: 'Question', couleur: 'cyan' },
+  repondue: { libelle: 'Répondue', couleur: 'gray' },
+  annulee: { libelle: 'Annulée', couleur: 'gray' },
   impossible: { libelle: 'Non réalisée', couleur: 'gray' },
   acceptee: { libelle: 'Acceptée (brouillon)', couleur: 'green' },
   refusee: { libelle: 'Refusée', couleur: 'gray' },
@@ -78,7 +82,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
   const id = siteId;
   const site = useQuery({ queryKey: ['site', id], queryFn: () => get<SiteDetail>(`/api/sites/${id}`) });
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean; reunion: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
+  const q = useQuery({ queryKey: ['assistant', id], queryFn: () => get<{ etat: { active: boolean; reunion: boolean; dictee?: boolean }; propositions: Proposition[] }>(`/api/sites/${id}/assistant`) });
   const [demande, setDemande] = useState('');
   const [domaine, setDomaine] = useState('auto');
   const [busy, setBusy] = useState<string | null>(null);
@@ -119,6 +123,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
               value={demande}
               onChange={(e) => setDemande(e.currentTarget.value)}
             />
+            {q.data.etat.dictee && <BoutonDictee onTexte={(t) => setDemande((d) => (d ? `${d} ${t}` : t))} />}
             <Group align="flex-end" gap="sm">
               {q.data.etat.reunion && (
                 <Select
@@ -159,7 +164,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
           <Stack gap="sm">
             <Group justify="space-between" align="flex-start">
               <Stack gap={2} style={{ flex: 1 }}>
-                <Text fw={600}>« {p.demande} »</Text>
+                <Text fw={600} style={{ whiteSpace: 'pre-line' }}>« {p.demande} »</Text>
                 <Text size="xs" c="dimmed">
                   {dateHeure(p.creeLe)}
                   {p.cerveauLibelle ? ` · préparée par ${p.cerveauLibelle}` : ''}
@@ -177,10 +182,18 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
               </Text>
             )}
             {p.explication && <Text size="sm">{p.explication}</Text>}
-            {p.raison && (
-              <Alert color={p.statut === 'accord_requis' ? 'orange' : 'gray'} variant="light">
-                <Text size="sm">{p.raison}</Text>
-              </Alert>
+            {p.raison && p.statut === 'question' ? (
+              <Reponse
+                question={p.raison}
+                busy={busy === `rep-${p.id}`}
+                envoyer={(reponse) => agir(`rep-${p.id}`, () => post(`/api/sites/${id}/assistant/${p.id}/repondre`, { reponse }))}
+              />
+            ) : (
+              p.raison && (
+                <Alert color={p.statut === 'accord_requis' ? 'orange' : 'gray'} variant="light">
+                  <Text size="sm">{p.raison}</Text>
+                </Alert>
+              )
             )}
             {p.changements.map((c) => (
               <Stack key={c.rubrique} gap={4}>
@@ -265,6 +278,20 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                   Voir l’aperçu
                 </Button>
               )}
+              {p.annulable && (
+                <Button
+                  variant="subtle"
+                  color="red"
+                  leftSection={<IconArrowBackUp size={16} />}
+                  loading={busy === `annuler-${p.id}`}
+                  onClick={() =>
+                    window.confirm('Remettre les contenus comme avant cette modification ? (dans le brouillon)') &&
+                    agir(`annuler-${p.id}`, () => post(`/api/sites/${id}/assistant/${p.id}/annuler`), 'Modification annulée : le brouillon est revenu comme avant.')
+                  }
+                >
+                  Annuler cette modification
+                </Button>
+              )}
             </Group>
             {p.reunion && p.reunion.participants.length > 0 && (
               <Accordion variant="contained" radius="md">
@@ -328,5 +355,66 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
         </Card>
       ))}
     </Stack>
+  );
+}
+
+/** Réponse à la question de l'IA : la demande repart, complétée. */
+function Reponse({ question, busy, envoyer }: { question: string; busy: boolean; envoyer: (r: string) => void }) {
+  const [r, setR] = useState('');
+  return (
+    <Alert color="cyan" variant="light" icon={<IconHelpCircle size={18} />} title="L’assistant a besoin d’une précision">
+      <Stack gap="xs">
+        <Text size="sm">{question}</Text>
+        <Group align="flex-end" gap="xs">
+          <TextInput style={{ flex: 1, minWidth: 180 }} aria-label="Votre réponse" placeholder="Votre réponse" value={r} maxLength={500} onChange={(e) => setR(e.currentTarget.value)} />
+          <Button size="sm" loading={busy} disabled={!r.trim()} onClick={() => envoyer(r)}>
+            Répondre
+          </Button>
+        </Group>
+      </Stack>
+    </Alert>
+  );
+}
+
+/**
+ * Dictée vocale (si le propriétaire l'a autorisée) : utilise la reconnaissance vocale du navigateur.
+ * Attention : dans Chrome et Safari, la voix est envoyée aux serveurs de Google ou d'Apple pour être transcrite.
+ */
+type Reco = { lang: string; interimResults: boolean; continuous: boolean; start(): void; stop(): void; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: ((e: { error: string }) => void) | null };
+function BoutonDictee({ onTexte }: { onTexte: (t: string) => void }) {
+  const [ecoute, setEcoute] = useState<Reco | null>(null);
+  const W = window as unknown as { SpeechRecognition?: new () => Reco; webkitSpeechRecognition?: new () => Reco };
+  const Classe = W.SpeechRecognition ?? W.webkitSpeechRecognition;
+  if (!Classe) return null;
+  const basculer = () => {
+    if (ecoute) {
+      ecoute.stop();
+      return;
+    }
+    const r = new Classe();
+    r.lang = 'fr-FR';
+    r.interimResults = false;
+    r.continuous = false;
+    r.onresult = (e) => {
+      const t = Array.from(e.results)
+        .map((x) => x[0]?.transcript ?? '')
+        .join(' ')
+        .trim();
+      if (t) onTexte(t);
+    };
+    r.onerror = (e) => notifications.show({ color: 'red', message: e.error === 'not-allowed' ? 'Micro refusé : autorisez-le dans le navigateur.' : 'La dictée n’a pas fonctionné.' });
+    r.onend = () => setEcoute(null);
+    setEcoute(r);
+    r.start();
+  };
+  return (
+    <Group gap="xs">
+      <Button size="xs" variant={ecoute ? 'filled' : 'light'} color={ecoute ? 'red' : undefined} leftSection={<IconMicrophone size={14} />} onClick={basculer}>
+        {ecoute ? 'J’écoute… (toucher pour arrêter)' : 'Dicter'}
+      </Button>
+      <Text size="xs" c="dimmed">
+        La voix est transcrite par le service du navigateur (Google ou Apple).
+      </Text>
+    </Group>
   );
 }

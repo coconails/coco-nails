@@ -293,14 +293,16 @@ export interface ResultatTache {
  */
 export function juger(
   t: TacheBanc,
-  rep: { statut: 'proposition'; changements: { rubrique: string; valeur: unknown }[] } | { statut: 'impossible'; raison: string } | null,
+  rep: { statut: 'proposition'; changements: { rubrique: string; valeur: unknown }[] } | { statut: 'impossible'; raison: string } | { statut: 'question'; question: string } | null,
   erreurAppel: string | null,
   verifier: (chg: { rubrique: string; valeur: unknown }[], rubriques: RubriqueContexte[]) => string[],
+  rubriquesTache?: RubriqueContexte[],
 ): { reussi: boolean; raison: string } {
   if (!rep) return { reussi: false, raison: erreurAppel ?? 'pas de réponse' };
   if (t.impossible) return rep.statut === 'impossible' ? { reussi: true, raison: 'a bien répondu « impossible »' } : { reussi: false, raison: 'a proposé une modification au lieu de dire « impossible »' };
+  if (rep.statut === 'question') return { reussi: false, raison: `a posé une question au lieu de faire : ${String((rep as { question?: string }).question ?? '').slice(0, 120)}` };
   if (rep.statut === 'impossible') return { reussi: false, raison: `a répondu « impossible » : ${String(rep.raison ?? '').slice(0, 120)}` };
-  const rubriques = salonFictif(t.piege);
+  const rubriques = rubriquesTache ?? salonFictif(t.piege);
   const erreurs = verifier(rep.changements, rubriques);
   if (erreurs.length) return { reussi: false, raison: `refusée par les vérifications : ${[...new Set(erreurs)].slice(0, 2).join(' ; ')}` };
   const hors = rep.changements.filter((c) => !t.rubriques?.includes(c.rubrique)).map((c) => c.rubrique);
@@ -320,4 +322,69 @@ export function juger(
 export function noteDomaine(r: ResultatTache[], d: Domaine): number | null {
   const x = r.filter((y) => y.domaine === d);
   return x.length ? Math.round((x.filter((y) => y.reussi).length / x.length) * 100) : null;
+}
+
+// ---------------------------------------------------------------------------- demandes réelles
+/**
+ * Le banc apprend de l'usage réel : chaque proposition ACCEPTÉE devient une demande type, avec les contenus du site au
+ * moment de la demande et le résultat que vous avez validé (20 au plus, les plus récentes). Contrôle :
+ *  - mêmes rubriques modifiées que la version acceptée ;
+ *  - données (prix, dates, nombres, choix, oui/non, textes courts) : identiques à la version acceptée ;
+ *  - textes longs : libres (une autre formulation peut être aussi bonne), mais seuls les textes que vous aviez fait
+ *    changer peuvent changer.
+ */
+export interface DemandeReelle {
+  id: string;
+  le: number;
+  demande: string;
+  domaine: Domaine;
+  rubriques: RubriqueContexte[];
+  attendu: { rubrique: string; valeur: unknown }[];
+}
+export const MAX_REELLES = 20;
+
+/** Compare une valeur proposée à la valeur acceptée ; null si conforme, sinon la raison. */
+function conforme(propose: unknown, accepte: unknown, avant: unknown, chemin = ''): string | null {
+  const ou = chemin ? ` (${chemin})` : '';
+  if (typeof accepte === 'string' && accepte.length > 40) {
+    if (typeof propose !== 'string' || !propose.trim()) return `texte manquant${ou}`;
+    if (accepte === avant && propose !== avant) return `texte modifié alors qu’il ne devait pas l’être${ou}`;
+    return null;
+  }
+  if (Array.isArray(accepte)) {
+    if (!Array.isArray(propose) || propose.length !== accepte.length) return `nombre d’éléments différent${ou}`;
+    for (let i = 0; i < accepte.length; i++) {
+      const r = conforme(propose[i], accepte[i], Array.isArray(avant) ? avant[i] : undefined, `${chemin}[${i + 1}]`);
+      if (r) return r;
+    }
+    return null;
+  }
+  if (accepte && typeof accepte === 'object') {
+    if (!propose || typeof propose !== 'object' || Array.isArray(propose)) return `forme différente${ou}`;
+    const cles = new Set([...Object.keys(accepte), ...Object.keys(propose)]);
+    for (const k of cles) {
+      const r = conforme((propose as Record<string, unknown>)[k], (accepte as Record<string, unknown>)[k], avant && typeof avant === 'object' ? (avant as Record<string, unknown>)[k] : undefined, chemin ? `${chemin}.${k}` : k);
+      if (r) return r;
+    }
+    return null;
+  }
+  return JSON.stringify(propose ?? null) === JSON.stringify(accepte ?? null) ? null : `valeur différente de celle acceptée${ou} : ${JSON.stringify(propose)?.slice(0, 40)} au lieu de ${JSON.stringify(accepte)?.slice(0, 40)}`;
+}
+
+export function tacheReelle(r: DemandeReelle): TacheBanc {
+  const attendu = Object.fromEntries(r.attendu.map((a) => [a.rubrique, a.valeur]));
+  return {
+    id: `reel:${r.id}`,
+    domaine: r.domaine,
+    titre: `Votre demande : « ${r.demande.length > 60 ? `${r.demande.slice(0, 57)}…` : r.demande} »`,
+    demande: r.demande,
+    rubriques: Object.keys(attendu),
+    controle: (apres, avant) => {
+      for (const [rub, val] of Object.entries(attendu)) {
+        const pb = conforme(apres[rub], val, avant[rub]);
+        if (pb) return pb;
+      }
+      return null;
+    },
+  };
 }
