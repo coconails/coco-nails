@@ -3,6 +3,7 @@ import { Battement } from './lib/battement.js';
 import { purgerVisites } from './sites/visites.js';
 import { MisesAJour } from './lib/mises-a-jour.js';
 import { Push } from './lib/push.js';
+import { Referencement } from './marketing/service.js';
 import fs from 'node:fs';
 import type http from 'node:http';
 import type { FastifyInstance } from 'fastify';
@@ -69,6 +70,7 @@ export async function createPaginity(
   ctx.sauvegardeAuto = new SauvegardeAuto(ctx);
   ctx.misesAJour = new MisesAJour(ctx);
   ctx.push = new Push(ctx);
+  ctx.referencement = new Referencement(ctx);
   if (overrides.cerveaux) {
     ctx.ia.cerveaux = overrides.cerveaux;
     ctx.ia.surcharge = true;
@@ -97,6 +99,7 @@ export async function createPaginity(
     ctx.functions.prune();
     purgerVisites(ctx);
     void ctx.misesAJour.tic().catch(() => {});
+    void ctx.referencement.tic().catch(() => {});
     void ctx.sauvegardeAuto.tic().catch((e) => console.error('[sauvegarde] ', (e as Error).message));
     // Récapitulatif quotidien des alertes, vers 6 h UTC.
     const d = new Date();

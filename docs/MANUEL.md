@@ -648,6 +648,29 @@ Squarespace, cette bascule est **manuelle** (quelques minutes à quelques heures
   avis à chaque nouveau message d'un formulaire (le contenu du message n'est pas dans la notification). Sur iPhone,
   ajoutez d'abord PAGINITY à l'écran d'accueil.
 
+## 20 quinquies. Référencement (audit)
+
+*Chaque site › **Référencement**. Lecture seule : rien n'est jamais modifié. Aucun compte Google n'est nécessaire.*
+
+« **Lancer l'audit** » lit le site tel que les moteurs de recherche le reçoivent : le **brouillon** (fabriqué pour
+l'occasion, sans toucher à votre aperçu) ou le **site en ligne**. Il vérifie notamment : titres et descriptions de
+chaque page, titre principal, langue, affichage sur téléphone, plan du site (`sitemap.xml`) et `robots.txt`, pages
+exclues des moteurs (« noindex »), adresse « canonical », aperçu de partage (Facebook, WhatsApp), données pour Google
+(fiche d'entreprise, FAQ), **téléphone identique** sur le site et dans ces données, liens cassés, images lourdes ou
+sans texte alternatif.
+
+Les constats sont classés en **Problèmes** (gênent nettement l'affichage dans les moteurs), **À améliorer** et **À
+savoir** (souvent volontaire, comme une page de remerciement exclue des moteurs). Chacun indique la page concernée et
+quoi faire. Il n'y a **pas de note** : seulement des constats vérifiables. « **Vérifié et correct** » liste ce qui va
+bien. Après un nouvel audit, PAGINITY signale les constats **nouveaux** et ceux **corrigés**.
+
+L'audit lit le HTML avant l'exécution du JavaScript : un texte affiché uniquement par JavaScript n'est pas vu (c'est
+aussi ce que reçoivent d'abord les moteurs). Les repères de longueur (titre, description) sont des usages courants,
+pas des règles officielles de Google.
+
+**Chaque semaine** (case à cocher, Administrateur du site) : PAGINITY refait l'audit du site en ligne et crée une
+alerte uniquement s'il apparaît un **nouveau** problème.
+
 ## 21. Ce qui n'est pas encore disponible
 
 | Fonction | Prévue |

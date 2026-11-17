@@ -273,6 +273,18 @@ const MIGRATIONS: string[] = [
     cree_le INTEGER NOT NULL
   );
   `,
+  // 11 — Référencement (M1) : résultats des audits locaux, en lecture seule.
+  `
+  CREATE TABLE seo_audits (
+    id TEXT PRIMARY KEY,
+    site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    le INTEGER NOT NULL,
+    cible TEXT NOT NULL,
+    par TEXT,
+    resultat TEXT NOT NULL
+  );
+  CREATE INDEX seo_audits_site ON seo_audits(site_id, le);
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

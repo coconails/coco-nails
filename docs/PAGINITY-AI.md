@@ -162,6 +162,16 @@ seules les rubriques concernées touchées, résultat attendu présent, rien d'a
 - Tests : `assistant-plus` (5), `assistant-pages` (3), `diagnostic` (2), `kit-demarrage` (3) ; parcours
   `npm run e2e:assistant-plus` (12).
 
+## Marketing — M1 : audit de référencement local (17/11/2026)
+
+Module séparé de l'assistant : `server/src/marketing/audit.ts` (règles déterministes, sans IA ni réseau),
+`marketing/service.ts` (historique de 30 audits par site, comparaison, audit hebdomadaire facultatif avec alerte sur
+les NOUVEAUX problèmes seulement), `http/routes-marketing.ts` (`GET /api/sites/:id/referencement`,
+`POST …/referencement/audit { cible: "brouillon" | "en-ligne" }` rôle Voir, `PUT …/referencement/reglages { hebdo }`
+rôle Administrateur du site), migration 11 (`seo_audits`). Le brouillon est fabriqué dans `apercu-referencement`
+(l'aperçu habituel n'est pas touché). Écran `web/src/pages/Referencement.tsx`. Tests : `test/referencement.test.ts` (8) ;
+parcours `npm run e2e:referencement` (7, dont l'audit d'une copie de Coco Nail's importée en ZIP).
+
 ## API
 
 | Adresse | Rôle |

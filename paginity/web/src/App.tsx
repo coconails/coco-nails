@@ -31,6 +31,7 @@ const ProfilPage = lazy(() => import('./pages/Profil').then((m) => ({ default: m
 const FonctionsPage = lazy(() => import('./pages/Fonctions').then((m) => ({ default: m.FonctionsPage })));
 const SecretsPage = lazy(() => import('./pages/Secrets').then((m) => ({ default: m.SecretsPage })));
 const FormulairesPage = lazy(() => import('./pages/Formulaires').then((m) => ({ default: m.FormulairesPage })));
+const ReferencementPage = lazy(() => import('./pages/Referencement').then((m) => ({ default: m.ReferencementPage })));
 const AssistantPage = lazy(() => import('./pages/Assistant').then((m) => ({ default: m.AssistantPage })));
 const ReglagesPlateformePage = lazy(() => import('./pages/ReglagesPlateforme').then((m) => ({ default: m.ReglagesPlateformePage })));
 const EtatContext = createContext<Etat | null>(null);
@@ -111,6 +112,7 @@ export function App() {
           <Route path="/sites/:id/secrets" element={<SecretsPage />} />
           <Route path="/sites/:id/formulaires" element={<FormulairesPage />} />
           <Route path="/sites/:id/assistant" element={<AssistantPage />} />
+          <Route path="/sites/:id/referencement" element={<ReferencementPage />} />
           <Route path="/reglages" element={<ReglagesPlateformePage />} />
           <Route path="/activites" element={<ActivitesPage />} />
           <Route path="/utilisateurs" element={<UtilisateursPage />} />
