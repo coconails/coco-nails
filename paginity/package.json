@@ -23,6 +23,7 @@
     "verifier": "tsc --noEmit -p server && tsc -p server/tsconfig.test.json && tsc --noEmit -p web && bash -n scripts/paginity-maj && bash -n scripts/paginity-admin && bash -n scripts/paginity-installer && node --check server/runtime/worker.mjs && node --check server/test/simulation/services-simules.mjs",
     "e2e:ia": "node e2e/assistant.mjs",
     "e2e:panneau": "node e2e/panneau.mjs",
-    "e2e:reunion": "node e2e/reunion.mjs"
+    "e2e:reunion": "node e2e/reunion.mjs",
+    "e2e:banc": "node e2e/banc.mjs"
   }
 }

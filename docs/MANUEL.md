@@ -583,6 +583,12 @@ demande (*Textes* ou *Données*) relit toutes les propositions et rend la versio
 au moment de la demande et désigner vous-même le vérificateur de chaque domaine. Sous la proposition, « Propositions des
 autres IA » montre ce que chacune avait proposé. Vos « Accepter » et « Refuser » améliorent les notes des IA.
 
+**Banc d'essai** (en bas des réglages de l'assistant) : « Lancer le banc d'essai » pose 12 demandes types à chaque modèle
+local sur un salon imaginaire (vos sites ne sont pas touchés) et affiche une note sur 100 pour les *Textes* et les
+*Données*, le nombre de réussites, le temps moyen et le coût. « Détail » explique chaque échec. Ces notes servent à choisir
+le vérificateur final de la salle de réunion. Les IA payantes ne passent le banc que si vous cochez « Inclure les IA
+payantes », toujours dans vos plafonds.
+
 ---
 
 ## 21. Ce qui n'est pas encore disponible

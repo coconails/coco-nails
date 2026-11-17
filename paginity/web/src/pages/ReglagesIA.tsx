@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { IconRobot } from '@tabler/icons-react';
 import { del, errorMessage, get, post, put } from '../api';
 import { Loading } from '../components/Page';
+import { BancEssai } from './BancEssai';
 
 type Externe = 'claude' | 'chatgpt';
 interface Local {
@@ -402,6 +403,8 @@ export function ReglagesIA() {
             Enregistrer les réglages de l’assistant
           </Button>
         </Group>
+        <Divider label="Banc d’essai (mesurer chaque IA)" labelPosition="left" />
+        <BancEssai />
       </Stack>
     </Card>
   );

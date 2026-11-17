@@ -119,6 +119,25 @@ version finale. Écran : carte « Salle de réunion » des réglages (tableau de
 proposition, la ligne « Réunion · domaine … · vérificateur final … » et « Propositions des autres IA ».
 Tests : `test/reunion.test.ts` (9) ; parcours `npm run e2e:reunion` (10, trois faux modèles locaux).
 
+## Banc d'essai (étape D)
+
+**12 demandes types** posées à chaque IA sur un **salon fictif construit en mémoire** (aucun site lu ni modifié) :
+7 « données » (ajouter / changer / retirer un tarif, fermeture, horaire, téléphone, demande impossible) et 5 « textes »
+(raccourcir une accroche, corriger les fautes, ajouter une question à la FAQ, compléter un texte, consigne piégée cachée
+dans la FAQ). Chaque réponse est jugée **automatiquement, sans l'avis d'une autre IA** : vérifications de PAGINITY,
+seules les rubriques concernées touchées, résultat attendu présent, rien d'autre abîmé (`server/src/ia/banc.ts`).
+
+- Note par domaine = part des demandes réussies (sur 100) → `noterBanc`, reprise par la salle de réunion.
+- Par défaut seuls les modèles locaux passent le banc. Les IA payantes : case « Inclure les IA payantes », confirmation
+  d'identité, plafonds vérifiés avant chaque appel ; coût compté (`ia_usage`, proposition `banc`). Un essai coupé par le
+  plafond est marqué « incomplet » et ne donne pas de note.
+- Un seul banc à la fois ; bouton « Arrêter » ; l'arrêt d'urgence (désactiver l'assistant) l'arrête aussi.
+- API : `GET` / `POST { cles?, payants? }` / `DELETE /api/reglages/ia/banc` (propriétaire).
+- Tests : `test/banc.test.ts` (3 ; une IA simulée aux réponses justes doit avoir 12/12, ce qui prouve que les contrôles
+  du banc acceptent les bonnes réponses) ; parcours `npm run e2e:banc` (13, trois faux modèles locaux).
+- **Limite actuelle** : seuls des modèles **simulés** ont passé le banc. Un vrai modèle (Ollama…) n'a pas pu être
+  téléchargé dans l'environnement de développement (sites de modèles bloqués) : le premier vrai essai se fera sur votre ordinateur.
+
 ## API
 
 | Adresse | Rôle |
@@ -140,5 +159,5 @@ Code : `server/src/ia/assistant.ts`, `server/src/ia/fournisseurs.ts`, `server/sr
 
 2. ~~Brancher les connecteurs, écran « Assistant », réglages~~ (fait). **Reste à faire sur une vraie machine** : installer
    un modèle local et l'essayer ; si vous le souhaitez, créer les comptes API Claude / ChatGPT et saisir les clés.
-3. **Banc d'essai** : une vingtaine de demandes types pour comparer les modèles et mesurer le coût réel de Claude.
+3. ~~Banc d'essai~~ (fait, étape D). **Reste** : le lancer avec de vrais modèles sur votre machine.
 4. **Pages et styles** (modification de fichiers, avant/après, aperçu), puis **diagnostic** des pannes (lecture seule).

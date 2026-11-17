@@ -54,6 +54,24 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     return { repond: local ? await local.disponible() : false, enService: !!local };
   });
 
+  // Banc d'essai : demandes types sur un salon fictif (aucun site touché). Propriétaire ; IA payantes = confirmation d'identité.
+  app.get('/api/reglages/ia/banc', async (req) => {
+    requireOwner(req);
+    return ctx.ia.bancEtat();
+  });
+  app.post('/api/reglages/ia/banc', async (req) => {
+    const b = body<{ cles?: unknown; payants?: boolean }>(req);
+    const { user } = b.payants === true ? requireSudo(req) : requireOwner(req);
+    if (!user.is_owner) requireOwner(req);
+    const r = ctx.ia.lancerBanc(b.cles, b.payants === true);
+    audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_banc', details: { cles: r.cles, payants: b.payants === true } });
+    return { ...r, ...ctx.ia.bancEtat() };
+  });
+  app.delete('/api/reglages/ia/banc', async (req) => {
+    requireOwner(req);
+    return { arrete: ctx.ia.arreterBanc() };
+  });
+
   // Demandes : même droit que modifier les contenus à la main.
   app.get('/api/sites/:id/assistant', async (req) => {
     const { user } = requireUser(req);

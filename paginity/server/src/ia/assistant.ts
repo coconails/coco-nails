@@ -8,6 +8,7 @@ import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
 import { validateEntryValue, type Field } from '../content/schema.js';
 import { isServerCode } from '../sites/server-code.js';
+import { juger, noteDomaine, salonFictif, TACHES_BANC, type ResultatTache } from './banc.js';
 import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
 
 /**
@@ -155,6 +156,7 @@ export class Assistant {
   cerveaux: Record<string, Cerveau> = {};
   surcharge = false;
   private enVol = new Set<AbortController>();
+  private bancEnCours: null | { debut: number; total: number; fait: number; actuel: string; arret: boolean } = null;
 
   constructor(private ctx: Ctx) {}
 
@@ -283,7 +285,10 @@ export class Assistant {
     }
     setSetting(this.ctx.db, 'ia', JSON.stringify(r));
     // Arrêt d'urgence : tout ce qui tourne est coupé, rien ne pourra plus être accepté.
-    if (!r.active) for (const c of this.enVol) c.abort();
+    if (!r.active) {
+      for (const c of this.enVol) c.abort();
+      if (this.bancEnCours) this.bancEnCours.arret = true;
+    }
     return r;
   }
 
@@ -392,6 +397,106 @@ export class Assistant {
       ),
       libelles: this.toutesCles(),
     };
+  }
+
+  // ------------------------------------------------------------------ banc d'essai (étape D)
+  /** Derniers résultats, demandes types, essai en cours. */
+  bancEtat() {
+    let dernier: unknown = null;
+    try {
+      dernier = JSON.parse(getSetting(this.ctx.db, 'ia_banc') ?? 'null');
+    } catch {
+      /* résultats illisibles : comme s'il n'y en avait pas */
+    }
+    const e = this.bancEnCours;
+    return {
+      enCours: e && { debut: e.debut, total: e.total, fait: e.fait, actuel: this.libelle(e.actuel), arret: e.arret },
+      dernier,
+      taches: TACHES_BANC.map((t) => ({ id: t.id, titre: t.titre, domaine: t.domaine, demande: t.demande })),
+      libelles: this.toutesCles(),
+    };
+  }
+
+  /**
+   * Lance le banc d'essai en arrière-plan sur les IA choisies (par défaut : tous les modèles locaux en service).
+   * Les IA payantes ne passent le banc que si `payants` est demandé, et toujours dans les plafonds.
+   * Aucun site n'est lu ni modifié : les demandes portent sur un salon fictif en mémoire.
+   */
+  lancerBanc(cles: unknown, payants: boolean): { total: number; cles: string[] } {
+    if (this.bancEnCours) throw new UserError(409, 'Un banc d’essai est déjà en cours.');
+    const actifs = this.cerveauxActifs();
+    let choix: string[];
+    if (Array.isArray(cles) && cles.length) {
+      choix = [...new Set(cles.map(String))];
+      for (const k of choix) {
+        if (!actifs[k]) throw new UserError(400, `« ${this.libelle(k) || k} » n’est pas en service.`);
+        if (!estLocal(k) && !payants) throw new UserError(400, `${this.libelle(k)} est payante : cochez « inclure les IA payantes ».`);
+      }
+    } else choix = Object.keys(actifs).filter((k) => estLocal(k) || payants);
+    if (!choix.length) throw new UserError(400, 'Aucune IA en service à essayer. Ajoutez et autorisez au moins un modèle local.');
+    const total = choix.length * TACHES_BANC.length;
+    this.bancEnCours = { debut: now(), total, fait: 0, actuel: choix[0], arret: false };
+    void this.executerBanc(choix, actifs).finally(() => (this.bancEnCours = null));
+    return { total, cles: choix };
+  }
+
+  arreterBanc(): boolean {
+    if (!this.bancEnCours) return false;
+    this.bancEnCours.arret = true;
+    return true;
+  }
+
+  private async executerBanc(choix: string[], actifs: Record<string, Cerveau>) {
+    const e = this.bancEnCours!;
+    const verif = (chg: { rubrique: string; valeur: unknown }[], rub: RubriqueContexte[]) => {
+      const v = this.verifier(chg, rub, {});
+      return v.ok ? [] : v.erreurs;
+    };
+    for (const cle of choix) {
+      const c = actifs[cle];
+      e.actuel = cle;
+      const details: ResultatTache[] = [];
+      let plafond = false;
+      for (const t of TACHES_BANC) {
+        if (e.arret) break;
+        const d: DemandeCerveau = { demande: t.demande, rubriques: salonFictif(t.piege) };
+        let res: ResultatTache;
+        if (!estLocal(cle) && (plafond || !this.budgetPermet(cle, c, d))) {
+          plafond = true;
+          res = { tache: t.id, titre: t.titre, domaine: t.domaine, reussi: false, raison: 'non essayée : plafond de dépense atteint', ms: 0, centimes: 0 };
+        } else {
+          const t0 = Date.now();
+          const r = await this.appeler(c, d);
+          const centimes = !estLocal(cle) ? (r.cout ?? 0) : 0;
+          if (centimes > 0) this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes, fournisseur) VALUES (?, ?, ?, ?, ?)').run(mois(), now(), 'banc', centimes, cle);
+          const j = juger(t, (r.reponse as Parameters<typeof juger>[1]) ?? null, r.erreur ?? null, verif);
+          res = { tache: t.id, titre: t.titre, domaine: t.domaine, ...j, ms: Date.now() - t0, centimes };
+        }
+        details.push(res);
+        e.fait++;
+      }
+      if (details.length < TACHES_BANC.length) break; // arrêté : on ne note pas un essai incomplet
+      const notes = { textes: noteDomaine(details, 'textes'), donnees: noteDomaine(details, 'donnees') };
+      for (const dom of ['textes', 'donnees'] as const) if (notes[dom] !== null && !plafond) this.noterBanc(cle, dom, notes[dom]!);
+      let tout: { resultats: Record<string, unknown> } = { resultats: {} };
+      try {
+        tout = JSON.parse(getSetting(this.ctx.db, 'ia_banc') ?? '{"resultats":{}}');
+      } catch {
+        /* on repart de zéro */
+      }
+      tout.resultats[cle] = {
+        le: now(),
+        libelle: this.libelle(cle),
+        notes,
+        complet: !plafond,
+        reussies: details.filter((x) => x.reussi).length,
+        total: details.length,
+        msMoyen: Math.round(details.reduce((a, x) => a + x.ms, 0) / details.length),
+        centimes: details.reduce((a, x) => a + x.centimes, 0),
+        details,
+      };
+      setSetting(this.ctx.db, 'ia_banc', JSON.stringify({ le: now(), resultats: tout.resultats }));
+    }
   }
 
   // ------------------------------------------------------------------ contexte transmis au cerveau
