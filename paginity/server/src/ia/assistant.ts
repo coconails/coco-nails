@@ -8,13 +8,14 @@ import { getSetting, setSetting } from '../db.js';
 import { audit } from '../lib/audit.js';
 import { now, randomId, UserError } from '../lib/util.js';
 import { loadSchema, readEntry, saveEntry } from '../content/service.js';
-import { validateEntryValue, type Field } from '../content/schema.js';
+import { validateEntryValue } from '../content/schema.js';
 import { assertMayWrite, isServerCode } from '../sites/server-code.js';
 import { contexteFichiers, estFichier, PREFIXE, verifierFichier } from './pages.js';
 import { writeChecked } from '../sites/files.js';
 import { authorOf } from '../sites/service.js';
-import { juger, MAX_REELLES, noteDomaine, salonFictif, TACHES_BANC, tacheReelle, type DemandeReelle, type ResultatTache, type TacheBanc } from './banc.js';
-import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigExterne, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
+import { tenirReunion } from './reunion.js';
+import { GestionBanc } from './banc-execution.js';
+import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type ConfigLocal, type ConfigLocalNomme } from './fournisseurs.js';
 
 /**
  * PAGINITY AI — étape 1 : le cœur de l'agent et l'aiguilleur (« assistant contenus »).
@@ -30,147 +31,21 @@ import { cerveauChatGPT, cerveauClaude, cerveauLocal, TARIFS_CLAUDE, type Config
  *    il est soumis au réglage du propriétaire (jamais / sur accord / automatique) et à un plafond mensuel.
  */
 
-/** « local:<identifiant> » pour un modèle installé, « claude », « chatgpt » pour les IA extérieures. */
-export type NomCerveau = string;
-export type NomExterne = 'claude' | 'chatgpt';
-export const NOMS_EXTERNES: NomExterne[] = ['claude', 'chatgpt'];
-export const LIBELLE: Record<string, string> = { local: 'le modèle local', claude: 'Claude', chatgpt: 'ChatGPT' };
-export const estLocal = (cle: string) => cle === 'local' || cle.startsWith('local:');
-export const MAX_LOCAUX = 8;
-
-export interface RubriqueContexte {
-  nom: string;
-  libelle: string;
-  champs: Field[];
-  liste: boolean;
-  valeur: unknown;
-}
-
-export interface DemandeCerveau {
-  demande: string;
-  rubriques: RubriqueContexte[];
-  /** Remarques de PAGINITY sur l'essai précédent (champs refusés), pour corriger. */
-  corrections?: string[];
-  /** Salle de réunion : propositions des autres IA (anonymes), à vérifier par le vérificateur final. */
-  propositionsAutres?: { auteur: string; valide: boolean; remarques: string[]; explication: string; changements: { rubrique: string; valeur: unknown }[] }[];
-}
-
-export type ReponseCerveau =
-  | { statut: 'proposition'; changements: { rubrique: string; valeur: unknown }[]; explication: string; coutCentimes?: number }
-  | { statut: 'impossible'; raison: string; coutCentimes?: number }
-  /** Il manque une information : l'IA pose UNE question, la personne répond, la demande repart complétée. */
-  | { statut: 'question'; question: string; coutCentimes?: number };
-
-export interface Cerveau {
-  nom: NomCerveau;
-  /** Taille maximale du contexte (en caractères) que ce cerveau sait traiter. */
-  tailleMax: number;
-  /** Temps maximal d'une réponse. */
-  delaiMs: number;
-  disponible(): Promise<boolean>;
-  proposer(d: DemandeCerveau, signal: AbortSignal): Promise<ReponseCerveau>;
-  /** Nom affiché (facultatif ; sinon celui des réglages). */
-  libelle?: string;
-  /** Coût maximal (centimes) d'un appel, pour ne jamais dépasser un plafond. Absent = gratuit. */
-  estimer?(d: DemandeCerveau): number;
-  /** Explication en texte libre (diagnostic) : seulement pour les modèles locaux. */
-  expliquer?(consignes: string, texte: string, signal: AbortSignal): Promise<string>;
-}
-
-export type ModeRelais = 'jamais' | 'demander' | 'auto';
-export interface ReglagesIA {
-  active: boolean;
-  /** Relais vers une IA extérieure (Claude, ChatGPT) : jamais, sur accord, automatique. */
-  relaisExterne: ModeRelais;
-  /** Plafond mensuel global de toutes les IA extérieures, en centimes. */
-  plafondMensuelCentimes: number;
-  /** Ordre d'essai des IA extérieures. */
-  ordre: NomExterne[];
-  /** Modèles installés, dans l'ordre d'essai. */
-  locaux: ConfigLocalNomme[];
-  claude: ConfigExterne;
-  chatgpt: ConfigExterne;
-  reunion: ReglagesReunion;
-  /** Bouton « Dicter » (reconnaissance vocale du navigateur : la voix part chez Google ou Apple). */
-  dictee: boolean;
-}
-const REGLAGES_DEFAUT: ReglagesIA = {
-  active: false,
-  dictee: false,
-  relaisExterne: 'demander',
-  plafondMensuelCentimes: 0,
-  ordre: ['claude', 'chatgpt'],
-  locaux: [],
-  claude: { actif: false, modele: 'claude-opus-5-5', prixEntree: TARIFS_CLAUDE['claude-opus-5-5'].entree, prixSortie: TARIFS_CLAUDE['claude-opus-5-5'].sortie, plafondCentimes: null, delaiS: 180, url: '' },
-  chatgpt: { actif: false, modele: '', prixEntree: null, prixSortie: null, plafondCentimes: null, delaiS: 180, url: '' },
-  reunion: { active: false, maxParticipants: 3, payantVerificateur: false, verificateurs: {} },
-};
-/** Domaines des demandes de contenu. */
-export type Domaine = 'textes' | 'donnees';
-export const DOMAINES: Record<Domaine, string> = { textes: 'Textes (accroche, présentation, FAQ…)', donnees: 'Données (tarifs, horaires, dates, coordonnées…)' };
-/** Classement simple et prévisible : chiffres, prix, heures, dates, coordonnées → données ; sinon → textes. */
-export function domaineDe(demande: string): Domaine {
-  return /\d|€|euro|prix|tarif|horaire|heure|ouvert|ferm|congé|vacances|date|jour|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|téléphone|telephone|adresse|e-?mail|durée|minute/i.test(demande)
-    ? 'donnees'
-    : 'textes';
-}
-
-export interface ReglagesReunion {
-  active: boolean;
-  /** Nombre maximal d'IA qui proposent, en plus du vérificateur final. */
-  maxParticipants: number;
-  /** Une IA payante (si activée et dans les plafonds) peut-elle être le vérificateur final ? */
-  payantVerificateur: boolean;
-  /** Vérificateur imposé par domaine (sinon : meilleure note). */
-  verificateurs: Partial<Record<Domaine, string>>;
-}
-interface Note {
-  banc: number | null;
-  acceptes: number;
-  refuses: number;
-}
-
-const CLE: Record<NomExterne, string> = { claude: 'ia_cle_claude', chatgpt: 'ia_cle_chatgpt' };
-
-export type StatutProposition = 'en_cours' | 'proposee' | 'accord_requis' | 'question' | 'repondue' | 'annulee' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
-
-interface Changement {
-  rubrique: string;
-  libelle: string;
-  versionBase: string | null;
-  avant: unknown;
-  apres: unknown;
-}
-
-interface LigneProposition {
-  id: string;
-  site_id: string;
-  user_id: string;
-  demande: string;
-  statut: StatutProposition;
-  cerveau: NomCerveau | null;
-  explication: string | null;
-  raison: string | null;
-  changements: string | null;
-  empreinte: string | null;
-  cout_centimes: number;
-  reunion: string | null;
-  journal: string;
-  cree_le: number;
-  decide_le: number | null;
-}
-
-const ESSAIS_LOCAUX = 2;
-const mois = (t = now()) => new Date(t).toISOString().slice(0, 7);
+export * from './types.js';
+import { CLE, DOMAINES, domaineDe, ESSAIS_LOCAUX, estLocal, LIBELLE, MAX_LOCAUX, mois, NOMS_EXTERNES, REGLAGES_DEFAUT } from './types.js';
+import type { Cerveau, Changement, DemandeCerveau, Domaine, LigneProposition, NomCerveau, NomExterne, Note, ReglagesIA, ReponseCerveau, RubriqueContexte, StatutProposition } from './types.js';
 
 export class Assistant {
   /** Cerveaux imposés (tests uniquement). */
   cerveaux: Record<string, Cerveau> = {};
   surcharge = false;
   private enVol = new Set<AbortController>();
-  private bancEnCours: null | { debut: number; total: number; fait: number; actuel: string; arret: boolean } = null;
+  /** Banc d'essai (exécution déportée dans banc-execution.ts). */
+  readonly banc: GestionBanc;
 
-  constructor(private ctx: Ctx) {}
+  constructor(private ctx: Ctx) {
+    this.banc = new GestionBanc(ctx, this);
+  }
 
   // ------------------------------------------------------------------ réglages
   reglages(): ReglagesIA {
@@ -300,7 +175,7 @@ export class Assistant {
     // Arrêt d'urgence : tout ce qui tourne est coupé, rien ne pourra plus être accepté.
     if (!r.active) {
       for (const c of this.enVol) c.abort();
-      if (this.bancEnCours) this.bancEnCours.arret = true;
+      this.banc.arreterBanc();
     }
     return r;
   }
@@ -495,135 +370,23 @@ export class Assistant {
     for (const c of changements) await this.ecrire(site, user, c.rubrique, c.avant, versions[c.rubrique] ?? null);
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'annulee', decide_le = ? WHERE id = ?").run(now(), id);
     this.noter(id, `Annulée par ${user.name} : les contenus sont revenus comme avant dans le brouillon.`);
-    this.oublierReelle(id);
+    this.banc.oublierReelle(id);
     audit(this.ctx.db, { userId: user.id, action: 'ia_annulee', siteId: site.id, details: { id } });
     return this.lire(site, id);
   }
 
-  private reelles(): DemandeReelle[] {
-    try {
-      return JSON.parse(getSetting(this.ctx.db, 'ia_banc_reelles') ?? '[]');
-    } catch {
-      return [];
-    }
-  }
-  private retenirPourBanc(p: LigneProposition, rubriques: RubriqueContexte[], changements: Changement[]) {
-    if (JSON.stringify(rubriques).length > 60_000) return; // site trop gros pour en faire une demande type
-    const domaine: Domaine = (p.reunion ? JSON.parse(p.reunion).domaine : null) ?? domaineDe(p.demande);
-    const d: DemandeReelle = { id: p.id, le: now(), demande: p.demande, domaine, rubriques, attendu: changements.map((c) => ({ rubrique: c.rubrique, valeur: c.apres })) };
-    setSetting(this.ctx.db, 'ia_banc_reelles', JSON.stringify([...this.reelles().filter((x) => x.id !== p.id), d].slice(-MAX_REELLES)));
-  }
-  private oublierReelle(id: string) {
-    setSetting(this.ctx.db, 'ia_banc_reelles', JSON.stringify(this.reelles().filter((x) => x.id !== id)));
-  }
-  /** Efface les demandes réelles retenues par le banc. */
-  oublierReelles(): void {
-    setSetting(this.ctx.db, 'ia_banc_reelles', '[]');
-  }
-  private tachesBanc(): { t: TacheBanc; rubriques: RubriqueContexte[] }[] {
-    return [...TACHES_BANC.map((t) => ({ t, rubriques: salonFictif(t.piege) })), ...this.reelles().map((r) => ({ t: tacheReelle(r), rubriques: structuredClone(r.rubriques) }))];
-  }
-
-  // ------------------------------------------------------------------ banc d'essai (étape D)
-  /** Derniers résultats, demandes types, essai en cours. */
+  // ------------------------------------------------------------------ banc d'essai (voir banc-execution.ts)
   bancEtat() {
-    let dernier: unknown = null;
-    try {
-      dernier = JSON.parse(getSetting(this.ctx.db, 'ia_banc') ?? 'null');
-    } catch {
-      /* résultats illisibles : comme s'il n'y en avait pas */
-    }
-    const e = this.bancEnCours;
-    return {
-      enCours: e && { debut: e.debut, total: e.total, fait: e.fait, actuel: this.libelle(e.actuel), arret: e.arret },
-      dernier,
-      reelles: this.reelles().length,
-      taches: this.tachesBanc().map(({ t }) => ({ id: t.id, titre: t.titre, domaine: t.domaine, demande: t.demande, reelle: t.id.startsWith('reel:') })),
-      libelles: this.toutesCles(),
-    };
+    return this.banc.bancEtat();
   }
-
-  /**
-   * Lance le banc d'essai en arrière-plan sur les IA choisies (par défaut : tous les modèles locaux en service).
-   * Les IA payantes ne passent le banc que si `payants` est demandé, et toujours dans les plafonds.
-   * Aucun site n'est lu ni modifié : les demandes portent sur un salon fictif en mémoire.
-   */
-  lancerBanc(cles: unknown, payants: boolean): { total: number; cles: string[] } {
-    if (this.bancEnCours) throw new UserError(409, 'Un banc d’essai est déjà en cours.');
-    const actifs = this.cerveauxActifs();
-    let choix: string[];
-    if (Array.isArray(cles) && cles.length) {
-      choix = [...new Set(cles.map(String))];
-      for (const k of choix) {
-        if (!actifs[k]) throw new UserError(400, `« ${this.libelle(k) || k} » n’est pas en service.`);
-        if (!estLocal(k) && !payants) throw new UserError(400, `${this.libelle(k)} est payante : cochez « inclure les IA payantes ».`);
-      }
-    } else choix = Object.keys(actifs).filter((k) => estLocal(k) || payants);
-    if (!choix.length) throw new UserError(400, 'Aucune IA en service à essayer. Ajoutez et autorisez au moins un modèle local.');
-    const total = choix.length * this.tachesBanc().length;
-    this.bancEnCours = { debut: now(), total, fait: 0, actuel: choix[0], arret: false };
-    void this.executerBanc(choix, actifs).finally(() => (this.bancEnCours = null));
-    return { total, cles: choix };
+  lancerBanc(cles: unknown, payants: boolean) {
+    return this.banc.lancerBanc(cles, payants);
   }
-
   arreterBanc(): boolean {
-    if (!this.bancEnCours) return false;
-    this.bancEnCours.arret = true;
-    return true;
+    return this.banc.arreterBanc();
   }
-
-  private async executerBanc(choix: string[], actifs: Record<string, Cerveau>) {
-    const e = this.bancEnCours!;
-    const verif = (chg: { rubrique: string; valeur: unknown }[], rub: RubriqueContexte[]) => {
-      const v = this.verifier(chg, rub, {});
-      return v.ok ? [] : v.erreurs;
-    };
-    for (const cle of choix) {
-      const c = actifs[cle];
-      e.actuel = cle;
-      const details: ResultatTache[] = [];
-      let plafond = false;
-      const taches = this.tachesBanc();
-      for (const { t, rubriques: rubT } of taches) {
-        if (e.arret) break;
-        const d: DemandeCerveau = { demande: t.demande, rubriques: structuredClone(rubT) };
-        let res: ResultatTache;
-        if (!estLocal(cle) && (plafond || !this.budgetPermet(cle, c, d))) {
-          plafond = true;
-          res = { tache: t.id, titre: t.titre, domaine: t.domaine, reussi: false, raison: 'non essayée : plafond de dépense atteint', ms: 0, centimes: 0 };
-        } else {
-          const t0 = Date.now();
-          const r = await this.appeler(c, d);
-          const centimes = !estLocal(cle) ? (r.cout ?? 0) : 0;
-          if (centimes > 0) this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes, fournisseur) VALUES (?, ?, ?, ?, ?)').run(mois(), now(), 'banc', centimes, cle);
-          const j = juger(t, (r.reponse as Parameters<typeof juger>[1]) ?? null, r.erreur ?? null, verif, structuredClone(rubT));
-          res = { tache: t.id, titre: t.titre, domaine: t.domaine, ...j, ms: Date.now() - t0, centimes };
-        }
-        details.push(res);
-        e.fait++;
-      }
-      if (details.length < taches.length) break; // arrêté : on ne note pas un essai incomplet
-      const notes = { textes: noteDomaine(details, 'textes'), donnees: noteDomaine(details, 'donnees') };
-      for (const dom of ['textes', 'donnees'] as const) if (notes[dom] !== null && !plafond) this.noterBanc(cle, dom, notes[dom]!);
-      let tout: { resultats: Record<string, unknown> } = { resultats: {} };
-      try {
-        tout = JSON.parse(getSetting(this.ctx.db, 'ia_banc') ?? '{"resultats":{}}');
-      } catch {
-        /* on repart de zéro */
-      }
-      tout.resultats[cle] = {
-        le: now(),
-        libelle: this.libelle(cle),
-        notes,
-        complet: !plafond,
-        reussies: details.filter((x) => x.reussi).length,
-        total: details.length,
-        msMoyen: Math.round(details.reduce((a, x) => a + x.ms, 0) / details.length),
-        centimes: details.reduce((a, x) => a + x.centimes, 0),
-        details,
-      };
-      setSetting(this.ctx.db, 'ia_banc', JSON.stringify({ le: now(), resultats: tout.resultats }));
-    }
+  oublierReelles(): void {
+    this.banc.oublierReelles();
   }
 
   // ------------------------------------------------------------------ contexte transmis au cerveau
@@ -710,7 +473,7 @@ export class Assistant {
 
     // 1 bis. Salle de réunion (si activée) : chaque IA propose une fois, la plus forte du domaine vérifie en dernier.
     if (depart === 'local' && this.reglages().reunion.active) {
-      const r = await this.reunion(id, site, demande, rubriques, versions, taille, cerveaux);
+      const r = await tenirReunion(this, this.ctx, id, site, demande, rubriques, versions, taille, cerveaux);
       if (r.fini) return;
       raisonRelais = r.raisonRelais;
       this.noter(id, `Relais envisagé vers une IA extérieure : ${raisonRelais}.`);
@@ -840,7 +603,8 @@ export class Assistant {
   }
 
   /** Coût maximal d'un appel payant encore autorisé par les plafonds (global et propre au service). */
-  private budgetPermet(cle: string, c: Cerveau, d: DemandeCerveau): boolean {
+  /** @internal (banc d'essai, réunion) */
+  budgetPermet(cle: string, c: Cerveau, d: DemandeCerveau): boolean {
     if (estLocal(cle)) return true;
     const reg = this.reglages();
     const nom = cle as NomExterne;
@@ -851,155 +615,9 @@ export class Assistant {
     return !(ps !== null && ps !== undefined && depasse(this.depenseDuMois(nom), ps));
   }
 
-  /**
-   * Salle de réunion : un tour par IA.
-   *  1. Le domaine de la demande est déterminé (ou choisi par vous).
-   *  2. Le vérificateur final est l'IA la mieux notée dans ce domaine (ou celle que vous avez désignée).
-   *  3. Les autres IA proposent chacune UNE fois ; PAGINITY vérifie chaque proposition.
-   *  4. Le vérificateur reçoit toutes les propositions (anonymes, avec les remarques de PAGINITY) et rend la version finale.
-   *  5. Si sa version ne passe pas les vérifications, la meilleure proposition valable des autres est retenue.
-   * Les IA payantes ne participent qu'en mode « relais automatique », dans les plafonds.
-   */
-  private async reunion(
-    id: string,
-    site: SiteRow,
-    demande: string,
-    rubriques: RubriqueContexte[],
-    versions: Record<string, string | null>,
-    taille: number,
-    cerveaux: Record<string, Cerveau>,
-  ): Promise<{ fini: true } | { fini: false; raisonRelais: string }> {
-    const reg = this.reglages();
-    const info = JSON.parse((this.ctx.db.prepare('SELECT reunion FROM ia_propositions WHERE id = ?').get(id) as { reunion: string }).reunion);
-    const domaine: Domaine = info.domaine;
-    const base: DemandeCerveau = { demande, rubriques };
-    // Membres possibles : modèles locaux en service et adaptés à la taille ; IA payantes seulement en relais automatique.
-    const membres: string[] = [];
-    for (const [cle, c] of Object.entries(cerveaux)) {
-      if (estLocal(cle)) {
-        if (taille <= c.tailleMax && (await c.disponible().catch(() => false))) membres.push(cle);
-      } else if (reg.relaisExterne === 'auto' && this.budgetPermet(cle, c, base)) membres.push(cle);
-    }
-    if (!membres.length) return { fini: false, raisonRelais: 'aucune IA n’est disponible pour la réunion' };
-    // Vérificateur final : désigné, sinon meilleure note, sinon premier de la liste.
-    const eligibles = membres.filter((k) => estLocal(k) || reg.reunion.payantVerificateur);
-    const designe = reg.reunion.verificateurs[domaine];
-    let verificateur: string;
-    let choix: string;
-    if (designe && eligibles.includes(designe)) {
-      verificateur = designe;
-      choix = 'désigné dans les réglages';
-    } else {
-      const notes = eligibles.map((k) => ({ k, n: this.note(k, domaine) }));
-      const notees = notes.filter((x) => x.n !== null).sort((a, b) => b.n! - a.n!);
-      if (notees.length) {
-        verificateur = notees[0].k;
-        choix = `meilleure note dans ce domaine (${notees[0].n}/100)`;
-      } else {
-        verificateur = eligibles[0] ?? membres[0];
-        choix = 'premier de la liste (pas encore de notes : lancez le banc d’essai)';
-      }
-    }
-    const proposants = membres
-      .filter((k) => k !== verificateur)
-      .sort((a, b) => (this.note(b, domaine) ?? -1) - (this.note(a, domaine) ?? -1))
-      .slice(0, reg.reunion.maxParticipants);
-    this.noter(id, `Réunion — domaine : ${DOMAINES[domaine]}. Vérificateur final : ${this.libelle(verificateur)} (${choix}). Proposants : ${proposants.map((k) => this.libelle(k)).join(', ') || 'aucun'}.`);
-
-    // Tour unique des proposants.
-    const lettres = 'ABCDEFG';
-    let question: { cle: string; texte: string } | null = null;
-    const tour: { cle: string; auteur: string; statut: string; explication: string; changements?: Changement[]; brut?: { rubrique: string; valeur: unknown }[]; remarques: string[] }[] = [];
-    for (const [i, cle] of proposants.entries()) {
-      const c = cerveaux[cle];
-      const auteur = `Proposition ${lettres[i]}`;
-      if (!this.budgetPermet(cle, c, base)) {
-        tour.push({ cle, auteur, statut: 'non sollicitée (plafond)', explication: '', remarques: [] });
-        continue;
-      }
-      const r = await this.appeler(c, base);
-      if (r.cout && !estLocal(cle)) this.compter(id, cle as NomExterne, r.cout);
-      if (r.erreur) {
-        tour.push({ cle, auteur, statut: `erreur (${r.erreur})`, explication: '', remarques: [] });
-        continue;
-      }
-      if (r.reponse!.statut === 'question') {
-        question ??= { cle, texte: r.reponse!.question };
-        tour.push({ cle, auteur, statut: 'demande une précision', explication: r.reponse!.question, remarques: [] });
-        continue;
-      }
-      if (r.reponse!.statut === 'impossible') {
-        tour.push({ cle, auteur, statut: '« je ne sais pas faire »', explication: r.reponse!.raison, remarques: [] });
-        continue;
-      }
-      const v = this.verifier(r.reponse!.changements, rubriques, versions);
-      tour.push({
-        cle,
-        auteur,
-        statut: v.ok ? 'valable' : 'refusée par les vérifications',
-        explication: r.reponse!.explication,
-        changements: v.ok ? v.changements : undefined,
-        brut: r.reponse!.changements,
-        remarques: v.ok ? [] : v.erreurs,
-      });
-    }
-    for (const t of tour) this.noter(id, `${t.auteur} — ${capitale(this.libelle(t.cle))} : ${t.statut}${t.remarques.length ? ` (${t.remarques.join(' ; ')})` : ''}.`);
-
-    // Le vérificateur final, en dernier.
-    const autres = tour
-      .filter((t) => t.brut)
-      .map((t) => ({ auteur: t.auteur, valide: !!t.changements, remarques: t.remarques, explication: t.explication, changements: t.brut! }));
-    const c = cerveaux[verificateur];
-    let finale: { changements: Changement[]; explication: string } | null = null;
-    let statutVerif = '';
-    if (!this.budgetPermet(verificateur, c, base)) statutVerif = 'non sollicité (plafond)';
-    else {
-      const r = await this.appeler(c, { ...base, propositionsAutres: autres });
-      if (r.cout && !estLocal(verificateur)) this.compter(id, verificateur as NomExterne, r.cout);
-      if (r.erreur) statutVerif = `erreur (${r.erreur})`;
-      else if (r.reponse!.statut === 'impossible') statutVerif = `« je ne sais pas faire » (${r.reponse!.raison})`;
-      else if (r.reponse!.statut === 'question') {
-        question = { cle: verificateur, texte: r.reponse!.question };
-        statutVerif = `demande une précision (${r.reponse!.question})`;
-      }
-      else {
-        const v = this.verifier(r.reponse!.changements, rubriques, versions);
-        if (v.ok) {
-          finale = { changements: v.changements, explication: r.reponse!.explication };
-          statutVerif = 'version finale valable';
-        } else statutVerif = `version finale refusée par les vérifications (${v.erreurs.join(' ; ')})`;
-      }
-    }
-    this.noter(id, `Vérificateur final — ${capitale(this.libelle(verificateur))} : ${statutVerif}.`);
-    const resume = {
-      ...info,
-      verificateur,
-      choixVerificateur: choix,
-      participants: tour.map((t) => ({ cle: t.cle, auteur: t.auteur, statut: t.statut, explication: t.explication, changements: t.changements?.map(({ versionBase: _v, ...x }) => x) ?? [] })),
-      statutVerificateur: statutVerif,
-    };
-    this.ctx.db.prepare('UPDATE ia_propositions SET reunion = ? WHERE id = ?').run(JSON.stringify(resume), id);
-    if (finale) {
-      this.finir(id, 'proposee', { cerveau: verificateur, explication: finale.explication, changements: finale.changements, site });
-      return { fini: true };
-    }
-    // Repli : la meilleure proposition valable des autres (meilleure note du domaine).
-    const valables = tour.filter((t) => t.changements).sort((a, b) => (this.note(b.cle, domaine) ?? -1) - (this.note(a.cle, domaine) ?? -1));
-    if (valables.length) {
-      const t = valables[0];
-      this.noter(id, `Le vérificateur final n’a pas abouti : la ${t.auteur.toLowerCase()} (${this.libelle(t.cle)}), valable, est retenue.`);
-      this.finir(id, 'proposee', { cerveau: t.cle, explication: t.explication, changements: t.changements!, site });
-      return { fini: true };
-    }
-    if (question) {
-      this.finir(id, 'question', { cerveau: question.cle, raison: question.texte.slice(0, 300) });
-      return { fini: true };
-    }
-    return { fini: false, raisonRelais: 'la réunion n’a produit aucune proposition valable' };
-  }
-
   /** Appel protégé : délai maximal, arrêt d'urgence, réponse de forme inattendue. */
-  private async appeler(c: Cerveau, d: DemandeCerveau): Promise<{ reponse?: ReponseCerveau; erreur?: string; cout?: number }> {
+  /** @internal (banc d'essai, réunion) */
+  async appeler(c: Cerveau, d: DemandeCerveau): Promise<{ reponse?: ReponseCerveau; erreur?: string; cout?: number }> {
     const ctl = new AbortController();
     this.enVol.add(ctl);
     let minuteur: NodeJS.Timeout | undefined;
@@ -1027,7 +645,8 @@ export class Assistant {
   }
 
   /** Les mêmes règles que les formulaires : rubrique proposée au cerveau, champs valides, vraie modification. */
-  private verifier(chg: { rubrique: string; valeur: unknown }[], rubriques: RubriqueContexte[], versions: Record<string, string | null>) {
+  /** @internal (banc d'essai, réunion) */
+  verifier(chg: { rubrique: string; valeur: unknown }[], rubriques: RubriqueContexte[], versions: Record<string, string | null>) {
     const erreurs: string[] = [];
     const changements: Changement[] = [];
     if (!chg.length) erreurs.push('aucune modification proposée');
@@ -1054,19 +673,22 @@ export class Assistant {
     return erreurs.length ? { ok: false as const, erreurs: erreurs.slice(0, 10) } : { ok: true as const, changements };
   }
 
-  private compter(id: string, nom: NomExterne, centimes: number) {
+  /** @internal (réunion d'IA) */
+  compter(id: string, nom: NomExterne, centimes: number) {
     this.ctx.db.prepare('INSERT INTO ia_usage (mois, at, proposition_id, centimes, fournisseur) VALUES (?, ?, ?, ?, ?)').run(mois(), now(), id, centimes, nom);
     this.ctx.db.prepare('UPDATE ia_propositions SET cout_centimes = cout_centimes + ? WHERE id = ?').run(centimes, id);
   }
 
-  private noter(id: string, texte: string) {
+  /** @internal (réunion d'IA) */
+  noter(id: string, texte: string) {
     const row = this.ctx.db.prepare('SELECT journal FROM ia_propositions WHERE id = ?').get(id) as { journal: string };
     const j = JSON.parse(row.journal) as { le: number; texte: string }[];
     j.push({ le: now(), texte: texte.slice(0, 500) });
     this.ctx.db.prepare('UPDATE ia_propositions SET journal = ? WHERE id = ?').run(JSON.stringify(j), id);
   }
 
-  private finir(
+  /** @internal (réunion d'IA) */
+  finir(
     id: string,
     statut: StatutProposition,
     o: { cerveau?: NomCerveau; explication?: string; raison?: string; changements?: Changement[]; site?: SiteRow },
@@ -1099,7 +721,7 @@ export class Assistant {
     const versionsApres: Record<string, string> = {};
     for (const c of changements) versionsApres[c.rubrique] = await this.ecrire(site, user, c.rubrique, c.apres, c.versionBase);
     this.ctx.db.prepare("UPDATE ia_propositions SET statut = 'acceptee', decide_le = ?, versions_apres = ? WHERE id = ?").run(now(), JSON.stringify(versionsApres), id);
-    if (!pages) this.retenirPourBanc(p, instantane, changements);
+    if (!pages) this.banc.retenirPourBanc(p, instantane, changements);
     this.compterDecision(p.cerveau, p.reunion ? JSON.parse(p.reunion).domaine ?? null : null, true);
     this.noter(id, `Acceptée par ${user.name} : enregistrée dans le brouillon (pas encore publiée).`);
     this.nettoyerApercu(site, id);

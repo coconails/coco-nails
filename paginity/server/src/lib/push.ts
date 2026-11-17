@@ -38,6 +38,17 @@ export function chiffrer(contenu: Buffer, uaPublic: Buffer, auth: Buffer, sel = 
   return Buffer.concat([sel, rs, Buffer.from([asPublic.length]), asPublic, chiffre]);
 }
 
+/**
+ * Seuls les vrais services de notification des navigateurs sont acceptés : sinon, n'importe quelle personne connectée
+ * pourrait faire envoyer des requêtes par le serveur vers une adresse de son choix (machine du réseau local, etc.).
+ * En test seulement : le faux service local est permis.
+ */
+const SERVICES = [/^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^([a-z0-9-]+\.)*push\.apple\.com$/, /^([a-z0-9-]+\.)*notify\.windows\.com$/];
+export function serviceDeNotification(u: URL): boolean {
+  if (process.env.NODE_ENV === 'test' && ['localhost', '127.0.0.1'].includes(u.hostname)) return true;
+  return u.protocol === 'https:' && !u.port && !u.username && !u.password && SERVICES.some((r) => r.test(u.hostname.toLowerCase()));
+}
+
 export class Push {
   constructor(private ctx: Ctx) {}
 
@@ -67,8 +78,7 @@ export class Push {
     } catch {
       throw new UserError(400, 'Abonnement invalide.');
     }
-    const local = ['localhost', '127.0.0.1'].includes(u.hostname);
-    if (u.protocol !== 'https:' && !(local && process.env.NODE_ENV === 'test')) throw new UserError(400, 'Abonnement invalide (adresse non sécurisée).');
+    if (!serviceDeNotification(u)) throw new UserError(400, 'Abonnement refusé : adresse qui n’est pas celle d’un service de notification connu.');
     const p256dh = Buffer.from(String(input.keys?.p256dh ?? ''), 'base64url');
     const auth = Buffer.from(String(input.keys?.auth ?? ''), 'base64url');
     if (p256dh.length !== 65 || p256dh[0] !== 4 || auth.length !== 16) throw new UserError(400, 'Abonnement invalide (clés).');

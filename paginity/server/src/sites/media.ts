@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import sharp from 'sharp';
+import sharp, { type FormatEnum } from 'sharp';
 import { fileTypeFromBuffer } from 'file-type';
 import type { Ctx } from '../context.js';
 import type { UserRow } from '../auth/service.js';
@@ -70,7 +70,7 @@ async function processImage(buf: Buffer, format: string): Promise<{ data: Buffer
   let data = await img.toBuffer();
   if (data.length > MAX_IMAGE) {
     // Deuxième essai plus compressé, puis refus.
-    data = await sharp(data).resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true }).toFormat(ext === 'jpg' ? 'jpeg' : (ext as any), { quality: 70 }).toBuffer();
+    data = await sharp(data).resize({ width: 1920, height: 1920, fit: 'inside', withoutEnlargement: true }).toFormat(ext === 'jpg' ? 'jpeg' : (ext as keyof FormatEnum), { quality: 70 }).toBuffer();
     if (data.length > MAX_IMAGE) throw new UserError(400, 'Même compressée, cette image dépasse 2 Mo.');
   }
   return { data, ext };
@@ -114,7 +114,7 @@ export async function uploadMedia(ctx: Ctx, site: SiteRow, user: UserRow, file: 
       const targetExt = extOf(r.rel).replace('jpeg', 'jpg');
       if (targetExt !== out.ext) {
         if (out.ext === 'pdf' || targetExt === 'pdf' || targetExt === 'gif') throw new UserError(400, `Le remplacement doit être du même type (${targetExt}).`);
-        out = { data: await sharp(out.data).toFormat(targetExt === 'jpg' ? 'jpeg' : (targetExt as any), { quality: 82 }).toBuffer(), ext: targetExt };
+        out = { data: await sharp(out.data).toFormat(targetExt === 'jpg' ? 'jpeg' : (targetExt as keyof FormatEnum), { quality: 82 }).toBuffer(), ext: targetExt };
       }
       rel = r.rel;
     } else {

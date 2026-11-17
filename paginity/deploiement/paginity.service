@@ -13,6 +13,8 @@ Group=paginity
 EnvironmentFile=/etc/paginity/paginity.env
 # Podman sans droits administrateur a besoin du dossier d'exécution de l'utilisateur (« loginctl enable-linger »).
 Environment=XDG_RUNTIME_DIR=/run/user/%U
+# Heure de Paris pour les journaux et les tâches du système (PAGINITY utilise aussi PAGINITY_FUSEAU).
+Environment=TZ=Europe/Paris
 WorkingDirectory=/opt/paginity/actuelle/paginity
 ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning /opt/paginity/actuelle/paginity/server/dist/index.js
 Restart=on-failure

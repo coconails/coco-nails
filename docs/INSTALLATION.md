@@ -44,7 +44,7 @@
 ## Ce qui a été essayé (simulation, 16/11/2026)
 
 - `systemd-analyze verify` sur le service : accepté (seule remarque : Node.js n'était pas en `/usr/bin/node` sur la machine d'essai).
-- Installation simulée complète depuis le dépôt : dépendances, fabrication, **112 tests réussis**, dossiers et droits créés.
+- Installation simulée complète depuis le dépôt : dépendances, fabrication, **tous les tests réussis** (112 à l'époque), dossiers et droits créés.
 - La copie installée démarre avec la même commande et les mêmes réglages que le service : l'administration répond,
   le code d'installation est créé, `paginity-admin etat` fonctionne.
 - Une seconde installation est refusée.

@@ -616,8 +616,8 @@ plus) : les IA sont alors notées sur vos vraies demandes. « Les oublier » eff
 **Sauvegarde automatique (hors de la machine).** Choisissez une **phrase de sauvegarde** (au moins 16 caractères,
 par exemple quatre mots sans rapport) et **notez-la sur papier, hors de la maison** : sans elle, les sauvegardes ne
 s'ouvrent pas. Indiquez ensuite un dossier *hors des données de PAGINITY* : disque USB, ou dossier synchronisé avec
-Google Drive / OneDrive. Chaque nuit à l'heure choisie, PAGINITY y dépose un fichier `paginity-auto-….paginity`,
-chiffré : Google ne peut pas le lire. Les plus anciens sont effacés (14 gardés par défaut). Une fois par mois,
+Google Drive / OneDrive. Chaque nuit à l'heure choisie (heure de Paris), PAGINITY y dépose un fichier `paginity-auto-….paginity`,
+chiffré : Google ne peut pas le lire. Les plus anciens sont effacés (14 gardés par défaut). Pendant la sauvegarde, les sites restent accessibles. Une fois par mois,
 PAGINITY **essaie de restaurer** la dernière sauvegarde dans un dossier temporaire ; en cas d'échec : alerte.
 « Sauvegarder maintenant » et « Essayer de restaurer la dernière » font la même chose à la demande.
 *Panne totale* : sur la nouvelle machine, `paginity-admin ouvrir-sauvegarde <fichier> <dossier>` (la phrase est
@@ -638,7 +638,7 @@ Squarespace, cette bascule est **manuelle** (quelques minutes à quelques heures
 ## 20 quater. Confort
 
 - **Visites** (page de chaque site) : pages vues par jour sur 7, 30 ou 90 jours, et les pages les plus vues. Sans
-  cookies ni donnée personnelle (pas de bandeau à afficher) ; les robots ne sont pas comptés. Ce sont des pages vues,
+  cookies ni donnée personnelle (pas de bandeau à afficher) ; les robots ne sont pas comptés ; les journées vont de minuit à minuit, heure de Paris. Ce sont des pages vues,
   pas des personnes différentes.
 - **Vérifier sur téléphone avant de publier** (page Publier) : le brouillon dans un cadre de téléphone.
 - **Failles de sécurité connues** (Réglages de la plateforme) : « Vérifier maintenant » demande au registre de npm si
@@ -646,7 +646,7 @@ Squarespace, cette bascule est **manuelle** (quelques minutes à quelques heures
   tout seul : PAGINITY prévient, la mise à jour se fait avec `paginity-maj`. Vérification hebdomadaire possible.
 - **Notifications sur le téléphone** (Mon profil) : « Activer sur cet appareil ». Vous recevez les alertes et un
   avis à chaque nouveau message d'un formulaire (le contenu du message n'est pas dans la notification). Sur iPhone,
-  ajoutez d'abord PAGINITY à l'écran d'accueil.
+  ajoutez d'abord PAGINITY à l'écran d'accueil. Seuls les vrais services de notification des navigateurs (Google, Apple, Mozilla, Microsoft) sont acceptés.
 
 ## 20 quinquies. Référencement (audit)
 
@@ -693,6 +693,10 @@ Google Cloud et retirez l'adresse dans Search Console.
 les pages du plan du site à Bing et aux moteurs IndexNow. **Google n'utilise pas IndexNow.** Il faut un nom de domaine
 configuré pour le site.
 
+
+**Opérations qui fabriquent le site** (aperçu, audit de référencement, diagnostic, avant / après de l'assistant, relevés
+Search Console) : pour ne pas surcharger le serveur, chacune est limitée à quelques fois par minute et par site. Au-delà,
+PAGINITY affiche « Trop de demandes rapprochées… réessayez dans N s ».
 
 ## 21. Ce qui n'est pas encore disponible
 

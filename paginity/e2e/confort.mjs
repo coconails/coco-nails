@@ -1,30 +1,13 @@
 // Confort, dans Chromium : compteur de visites (site publié, visites simulées), aperçu téléphone avant publication,
 // failles connues (registre npm SIMULÉ), notifications (carte et service worker ; l'abonnement réel nécessite le
 // service de notification du navigateur, non joignable ici). Lancement : npm run build && node e2e/confort.mjs
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { TOTP, Secret } from 'otpauth';
+import * as E from './lib/paginity.mjs';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
-const root = path.dirname(new URL(import.meta.url).pathname);
-const OUT = process.env.CAPTURES_IA ?? path.join(root, 'captures');
-fs.mkdirSync(OUT, { recursive: true });
-const P = { admin: 18820, preview: 18821, sites: 18822 };
-const ADMIN = `http://localhost:${P.admin}`;
-const MDP = 'une phrase de passe solide';
-const totp = (s, d = 0) => new TOTP({ secret: Secret.fromBase32(s), digits: 6, period: 30 }).generate({ timestamp: Date.now() + d * 30_000 });
-const tmp = fs.mkdtempSync(path.join(process.env.MANUEL_TMP ?? os.tmpdir(), 'paginity-confort-'));
-let echecs = 0;
-const ok = (c, t) => {
-  console.log(`${c ? '✔' : '✘'} ${t}`);
-  if (!c) echecs++;
-};
-
+const { require, chromium, OUT, ok } = E;
+const { P, ADMIN, tmp } = E.preparer('confort', 18820);
 
 // Faux registre npm : une faille « moyenne » sur fastify.
 const registre = http.createServer((req, res) => {
@@ -33,35 +16,13 @@ const registre = http.createServer((req, res) => {
 });
 await new Promise((r) => registre.listen(0, '127.0.0.1', r));
 
-const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(root, '..', 'server', 'dist', 'index.js')], {
-  env: { ...process.env, PAGINITY_DATA_DIR: path.join(tmp, 'donnees'), PAGINITY_ADMIN_PORT: String(P.admin), PAGINITY_PREVIEW_PORT: String(P.preview), PAGINITY_SITES_PORT: String(P.sites), PAGINITY_PUBLIC_URL: ADMIN, PAGINITY_ISOLATION: 'processus', PAGINITY_REGISTRE_URL: `http://127.0.0.1:${registre.address().port}` },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-let out = '';
-server.stdout.on('data', (d) => (out += d));
-const code = await new Promise((res, rej) => {
-  const t = setTimeout(() => rej(new Error('démarrage')), 20000);
-  const i = setInterval(() => {
-    const m = out.match(/code à saisir dans le navigateur : (\w+)/);
-    if (m) {
-      clearInterval(i);
-      clearTimeout(t);
-      res(m[1]);
-    }
-  }, 100);
-});
+const { server, code } = await E.demarrer({ P, ADMIN, tmp }, { PAGINITY_REGISTRE_URL: `http://127.0.0.1:${registre.address().port}` });
 
 const browser = await chromium.launch();
 const erreurs = [];
 try {
   const ctx = await browser.newContext({ locale: 'fr-FR', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-  const etat = await (await ctx.request.get(`${ADMIN}/api/etat`)).json();
-  const h = { 'x-csrf-token': etat.csrf, origin: ADMIN };
-  await ctx.request.post(`${ADMIN}/api/installation`, { data: { code, nom: 'Donaven', email: 'proprietaire@exemple.fr', motDePasse: MDP }, headers: h });
-  const d = await (await ctx.request.post(`${ADMIN}/api/profil/2fa/totp/debut`, { data: {}, headers: h })).json();
-  await ctx.request.post(`${ADMIN}/api/profil/2fa/totp/confirmer`, { data: { code: totp(d.secret) }, headers: h });
-  const site = await (await ctx.request.post(`${ADMIN}/api/sites`, { data: { nom: 'Salon Démo', modele: 'vitrine' }, headers: h })).json();
-  await ctx.request.post(`${ADMIN}/api/confirmation`, { data: { motDePasse: MDP, code: totp(d.secret, 1) }, headers: h });
+  const { h, site } = await E.installer(ctx, ADMIN, code);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erreurs.push(e.message));
   const main = page.locator('main');
@@ -114,13 +75,10 @@ try {
   await capture(notif, 'E7-4-notifications.png');
   ok(erreurs.length === 0, `Aucune erreur JavaScript (${erreurs.join(' | ')})`);
 } catch (e) {
-  console.log('✘ Parcours interrompu :', e.message);
-  echecs++;
+  E.echec(e.message);
 } finally {
   await browser.close();
   server.kill('SIGTERM');
   registre.close();
-  await new Promise((r) => setTimeout(r, 500));
-  fs.rmSync(tmp, { recursive: true, force: true });
 }
-process.exit(echecs ? 1 : 0);
+await E.terminer({ tmp });

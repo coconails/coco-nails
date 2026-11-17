@@ -202,7 +202,7 @@ vérifie signature, périmètre et absence de `sub`) ; parcours `npm run e2e:sea
 | `POST …/assistant/:pid/accepter` | Accepter `{ empreinte }` → brouillon |
 | `POST …/assistant/:pid/refuser` | Refuser |
 
-Code : `server/src/ia/assistant.ts`, `server/src/ia/fournisseurs.ts`, `server/src/http/routes-ia.ts`, écrans
+Code : `server/src/ia/assistant.ts` (cœur), `ia/types.ts` (types et réglages par défaut), `ia/reunion.ts` (salle de réunion), `ia/banc-execution.ts` (banc d'essai), `server/src/ia/fournisseurs.ts`, `server/src/http/routes-ia.ts`, écrans
 `web/src/pages/Assistant.tsx` et `web/src/pages/ReglagesIA.tsx`. Tests : `test/assistant.test.ts` (12, faux cerveaux),
 `test/assistant-services.test.ts` (10, vrais connecteurs face à de faux serveurs locaux), parcours `npm run e2e:ia` (12).
 

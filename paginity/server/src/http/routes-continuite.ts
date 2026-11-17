@@ -1,17 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
-import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
+import { body, ipOf, requireOwner, requireSudoOwner, requireUser } from './helpers.js';
 import { enregistrerFiche, lireFiche, pageSecours } from '../sites/secours.js';
 import { lireVisites } from '../sites/visites.js';
 
 /** Continuité de service : sauvegarde automatique hors machine (propriétaire seulement). */
 export function registerContinuiteRoutes(app: FastifyInstance, ctx: Ctx): void {
-  const sudoProprio = (req: Parameters<typeof requireSudo>[0]) => {
-    const a = requireSudo(req);
-    if (!a.user.is_owner) requireOwner(req);
-    return a;
-  };
+  const sudoProprio = requireSudoOwner;
   app.get('/api/reglages/sauvegarde', async (req) => {
     requireOwner(req);
     return ctx.sauvegardeAuto.resume();

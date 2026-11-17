@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { DatabaseSync } from 'node:sqlite';
 import { Vault } from '../lib/vault.js';
 import { UserError } from '../lib/util.js';
@@ -34,7 +35,18 @@ interface Fiche {
 }
 
 const sha256 = (buf: Buffer | string) => crypto.createHash('sha256').update(buf).digest('hex');
-const sha256File = (f: string) => sha256(fs.readFileSync(f));
+/** Empreinte d'un fichier lue par morceaux : le serveur continue de répondre pendant le calcul. */
+function sha256File(f: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const h = crypto.createHash('sha256');
+    fs.createReadStream(f)
+      .on('data', (d) => h.update(d))
+      .on('error', reject)
+      .on('end', () => resolve(h.digest('hex')));
+  });
+}
+/** Commande lancée sans bloquer le serveur (les sites restent accessibles pendant une sauvegarde). */
+const lancer = promisify(execFile);
 const stamp = () => new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 
 /** Fichiers ordinaires (pas les liens) sous un dossier, en chemins relatifs à « base ». */
@@ -48,7 +60,7 @@ function walk(base: string, rel: string, out: string[] = []): string[] {
   return out;
 }
 
-export function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, opts: { sansCle?: boolean } = {}): { archive: string; cle: string | null; fichiers: number } {
+export async function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, opts: { sansCle?: boolean } = {}): Promise<{ archive: string; cle: string | null; fichiers: number }> {
   if (fs.existsSync(path.join(dataDir, 'coffre', 'cle-maitre.nouvelle'))) {
     throw new UserError(409, 'Un changement de la clé du coffre est inachevé : lancez d’abord « paginity-admin changer-cle --confirmer ».');
   }
@@ -69,11 +81,11 @@ export function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, 
     const versionDonnees = (db.prepare('SELECT version FROM schema_version').get() as { version: number }).version;
     // 2. Fichiers à emporter (hors base, clé et éléments recréables).
     const racines = fs.readdirSync(dataDir).filter((n) => !EXCLUS.has(n) && fs.statSync(path.join(dataDir, n)).isDirectory());
-    const fichiers: Record<string, string> = { 'base.db': sha256File(path.join(travail, 'base.db')) };
+    const fichiers: Record<string, string> = { 'base.db': await sha256File(path.join(travail, 'base.db')) };
     for (const r of racines) {
       for (const f of walk(dataDir, r)) {
         if (/^plateforme\/paginity\.db(-wal|-shm)?$/.test(f)) continue;
-        fichiers[f] = sha256File(path.join(dataDir, f));
+        fichiers[f] = await sha256File(path.join(dataDir, f));
       }
     }
     const cle = fs.readFileSync(path.join(dataDir, 'coffre', 'cle-maitre'), 'utf8').trim();
@@ -82,7 +94,7 @@ export function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, 
     // 3. Archive : fiche + base, puis les dossiers de données (liens « en ligne » compris).
     const exclusions = ['--exclude=plateforme/paginity.db', '--exclude=plateforme/paginity.db-wal', '--exclude=plateforme/paginity.db-shm'];
     const partiel = `${archive}.partiel`;
-    execFileSync('tar', ['-czf', partiel, '-C', travail, 'sauvegarde.json', 'base.db', ...exclusions, '-C', dataDir, ...racines], { stdio: ['ignore', 'ignore', 'pipe'] });
+    await lancer('tar', ['-czf', partiel, '-C', travail, 'sauvegarde.json', 'base.db', ...exclusions, '-C', dataDir, ...racines], { maxBuffer: 16 * 1024 * 1024 });
     fs.chmodSync(partiel, 0o600);
     fs.renameSync(partiel, archive);
     let cleEcrite: string | null = null;
@@ -97,10 +109,10 @@ export function sauvegarder(dataDir: string, db: DatabaseSync, destDir: string, 
 }
 
 /** Liste et contrôle le contenu d'une archive AVANT de l'extraire. */
-function controlerArchive(archive: string): void {
+async function controlerArchive(archive: string): Promise<void> {
   let liste: string;
   try {
-    liste = execFileSync('tar', ['-tvzf', archive], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    liste = (await lancer('tar', ['-tvzf', archive], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })).stdout;
   } catch {
     throw new UserError(400, 'Archive illisible ou incomplète (fichier tronqué ou abîmé).');
   }
@@ -120,7 +132,7 @@ function controlerArchive(archive: string): void {
   }
 }
 
-export function restaurer(archiveIn: string, cleFichier: string, dataDir: string): { sites: number; fichiers: number; fiche: Omit<Fiche, 'fichiers'> } {
+export async function restaurer(archiveIn: string, cleFichier: string, dataDir: string): Promise<{ sites: number; fichiers: number; fiche: Omit<Fiche, 'fichiers'> }> {
   const archive = path.resolve(archiveIn);
   const cible = path.resolve(dataDir);
   if (!fs.existsSync(archive)) throw new UserError(404, `Archive introuvable : ${archive}`);
@@ -131,11 +143,11 @@ export function restaurer(archiveIn: string, cleFichier: string, dataDir: string
   const cle = fs.readFileSync(cleFichier, 'utf8').trim();
   if (Buffer.from(cle, 'base64').length !== 32) throw new UserError(400, 'Ce fichier ne contient pas une clé du coffre valide.');
 
-  controlerArchive(archive);
+  await controlerArchive(archive);
   fs.mkdirSync(path.dirname(cible), { recursive: true });
   const travail = fs.mkdtempSync(`${cible}.restauration-`);
   try {
-    execFileSync('tar', ['-xzf', archive, '-C', travail, '--no-same-owner'], { stdio: ['ignore', 'ignore', 'pipe'] });
+    await lancer('tar', ['-xzf', archive, '-C', travail, '--no-same-owner']);
     const fiche = JSON.parse(fs.readFileSync(path.join(travail, 'sauvegarde.json'), 'utf8')) as Fiche;
     if (fiche.format !== FORMAT || fiche.version !== 1) throw new UserError(400, 'Ce fichier n’est pas une sauvegarde PAGINITY reconnue.');
     if (sha256(cle) !== fiche.empreinteCle) throw new UserError(400, 'Cette clé ne correspond pas à cette sauvegarde : prenez le fichier de clé enregistré avec elle.');
@@ -143,7 +155,7 @@ export function restaurer(archiveIn: string, cleFichier: string, dataDir: string
     const presents = new Set(walk(travail, '').filter((f) => f !== 'sauvegarde.json'));
     for (const [f, h] of Object.entries(fiche.fichiers)) {
       if (!presents.has(f)) throw new UserError(400, `Sauvegarde incomplète : ${f} manque.`);
-      if (sha256File(path.join(travail, f)) !== h) throw new UserError(400, `Sauvegarde abîmée : ${f} a été modifié.`);
+      if ((await sha256File(path.join(travail, f))) !== h) throw new UserError(400, `Sauvegarde abîmée : ${f} a été modifié.`);
       presents.delete(f);
     }
     if (presents.size) throw new UserError(400, `Sauvegarde refusée : fichiers non prévus (${[...presents].slice(0, 3).join(', ')}).`);

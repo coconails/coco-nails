@@ -250,8 +250,14 @@ export class SearchConsole {
       if (dernier.le && now() - dernier.le < 20 * 3_600_000) continue;
       try {
         await this.collecter(site);
+        this.ctx.db.prepare('DELETE FROM settings WHERE key = ?').run(`gsc_alerte:${site.id}`);
       } catch (e) {
-        raiseAlert(this.ctx, 'attention', `Search Console (« ${site.name} ») : relevé impossible — ${(e as Error).message}`, site.id);
+        // Une alerte au premier échec, puis au plus une par semaine tant que le problème dure.
+        const derniere = Number(getSetting(this.ctx.db, `gsc_alerte:${site.id}`) ?? 0);
+        if (now() - derniere > 7 * 86_400_000) {
+          raiseAlert(this.ctx, 'attention', `Search Console (« ${site.name} ») : relevé impossible — ${(e as Error).message}`, site.id);
+          setSetting(this.ctx.db, `gsc_alerte:${site.id}`, String(now()));
+        }
       }
     }
   }

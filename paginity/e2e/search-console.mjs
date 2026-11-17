@@ -1,31 +1,14 @@
 // M2 — Search Console en lecture seule, dans Chromium, face à un FAUX Google (aucune connexion réelle) :
 // envoi de la clé, propriétés, liaison du site, relevé, rapport, graphiques, inspection, IndexNow.
 // Lancement : npm run build && node e2e/search-console.mjs
-import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
-import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { TOTP, Secret } from 'otpauth';
+import * as E from './lib/paginity.mjs';
 
-const require = createRequire(import.meta.url);
-const { chromium } = require('playwright');
-const root = path.dirname(new URL(import.meta.url).pathname);
-const OUT = process.env.CAPTURES_IA ?? path.join(root, 'captures');
-fs.mkdirSync(OUT, { recursive: true });
-const P = { admin: 18840, preview: 18841, sites: 18842 };
-const ADMIN = `http://localhost:${P.admin}`;
-const MDP = 'une phrase de passe solide';
-const totp = (s, d = 0) => new TOTP({ secret: Secret.fromBase32(s), digits: 6, period: 30 }).generate({ timestamp: Date.now() + d * 30_000 });
-const tmp = fs.mkdtempSync(path.join(process.env.MANUEL_TMP ?? os.tmpdir(), 'paginity-gsc-'));
-let echecs = 0;
-const ok = (c, t) => {
-  console.log(`${c ? '✔' : '✘'} ${t}`);
-  if (!c) echecs++;
-};
-
+const { require, chromium, OUT, ok } = E;
+const { P, ADMIN, tmp } = E.preparer('gsc', 18840);
 
 // Faux Google : jeton (signature vérifiée), propriétés, statistiques, inspection.
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -70,35 +53,13 @@ const google = http.createServer((req, res) => {
 await new Promise((r) => google.listen(0, '127.0.0.1', r));
 const G = `http://127.0.0.1:${google.address().port}`;
 
-const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(root, '..', 'server', 'dist', 'index.js')], {
-  env: { ...process.env, PAGINITY_DATA_DIR: path.join(tmp, 'donnees'), PAGINITY_ADMIN_PORT: String(P.admin), PAGINITY_PREVIEW_PORT: String(P.preview), PAGINITY_SITES_PORT: String(P.sites), PAGINITY_PUBLIC_URL: ADMIN, PAGINITY_ISOLATION: 'processus', PAGINITY_GOOGLE_TOKEN_URL: `${G}/token`, PAGINITY_GOOGLE_API_URL: G, PAGINITY_GOOGLE_INSPECTION_URL: G },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-let out = '';
-server.stdout.on('data', (d) => (out += d));
-const code = await new Promise((res, rej) => {
-  const t = setTimeout(() => rej(new Error('démarrage')), 20000);
-  const i = setInterval(() => {
-    const m = out.match(/code à saisir dans le navigateur : (\w+)/);
-    if (m) {
-      clearInterval(i);
-      clearTimeout(t);
-      res(m[1]);
-    }
-  }, 100);
-});
+const { server, code } = await E.demarrer({ P, ADMIN, tmp }, { PAGINITY_GOOGLE_TOKEN_URL: `${G}/token`, PAGINITY_GOOGLE_API_URL: G, PAGINITY_GOOGLE_INSPECTION_URL: G });
 
 const browser = await chromium.launch();
 const erreurs = [];
 try {
   const ctx = await browser.newContext({ locale: 'fr-FR', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-  const etat = await (await ctx.request.get(`${ADMIN}/api/etat`)).json();
-  const h = { 'x-csrf-token': etat.csrf, origin: ADMIN };
-  await ctx.request.post(`${ADMIN}/api/installation`, { data: { code, nom: 'Donaven', email: 'proprietaire@exemple.fr', motDePasse: MDP }, headers: h });
-  const d = await (await ctx.request.post(`${ADMIN}/api/profil/2fa/totp/debut`, { data: {}, headers: h })).json();
-  await ctx.request.post(`${ADMIN}/api/profil/2fa/totp/confirmer`, { data: { code: totp(d.secret) }, headers: h });
-  const site = await (await ctx.request.post(`${ADMIN}/api/sites`, { data: { nom: 'Salon Démo', modele: 'vitrine' }, headers: h })).json();
-  await ctx.request.post(`${ADMIN}/api/confirmation`, { data: { motDePasse: MDP, code: totp(d.secret, 1) }, headers: h });
+  const { h, site } = await E.installer(ctx, ADMIN, code);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => erreurs.push(e.message));
   const main = page.locator('main');
@@ -138,13 +99,10 @@ try {
   ok(await g.getByText('Prévenir Bing et les moteurs IndexNow après chaque publication').isVisible(), 'Option IndexNow proposée (désactivée par défaut)');
   ok(erreurs.length === 0, `Aucune erreur JavaScript (${erreurs.join(' | ')})`);
 } catch (e) {
-  console.log('✘ Parcours interrompu :', e.message);
-  echecs++;
+  E.echec(e.message);
 } finally {
   await browser.close();
   server.kill('SIGTERM');
   google.close();
-  await new Promise((r) => setTimeout(r, 500));
-  fs.rmSync(tmp, { recursive: true, force: true });
 }
-process.exit(echecs ? 1 : 0);
+await E.terminer({ tmp });

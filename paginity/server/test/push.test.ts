@@ -3,6 +3,7 @@ import http from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setupOwner, startPaginity, stopPaginity, type Client } from './helpers.js';
 import { raiseAlert } from '../src/lib/alerts.js';
+import { serviceDeNotification } from '../src/lib/push.js';
 
 /**
  * Notifications Web Push : un « téléphone » simulé (ses propres clés) reçoit des messages chiffrés qu'il DÉCHIFFRE
@@ -61,6 +62,28 @@ describe('Notifications sur le téléphone (Web Push)', () => {
     service.close();
   });
   const abonnement = (endpoint: string) => ({ endpoint, keys: { p256dh: telephone.getPublicKey().toString('base64url'), auth: auth.toString('base64url') } });
+
+  it('n’accepte que les vrais services de notification (pas le réseau local)', async () => {
+    const ok = (u: string) => serviceDeNotification(new URL(u));
+    expect(ok('https://fcm.googleapis.com/fcm/send/abc')).toBe(true);
+    expect(ok('https://web.push.apple.com/QWER')).toBe(true);
+    expect(ok('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true);
+    expect(ok('https://wns2-par02p.notify.windows.com/w/?token=x')).toBe(true);
+    for (const mauvais of ['https://192.168.1.1/push', 'https://ma-box.local/', 'https://fcm.googleapis.com.pirate.fr/x', 'http://fcm.googleapis.com/x', 'https://fcm.googleapis.com:8443/x', 'https://evil.example/fcm.googleapis.com']) {
+      expect(ok(mauvais), mauvais).toBe(false);
+    }
+    const avant = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      expect(ok('https://127.0.0.1/x')).toBe(false);
+    } finally {
+      process.env.NODE_ENV = avant;
+    }
+    const k = { p256dh: telephone.getPublicKey().toString('base64url'), auth: auth.toString('base64url') };
+    const r = await c.call('POST', '/api/push/abonnement', { endpoint: 'https://192.168.1.1/espion', keys: k });
+    expect(r.status).toBe(400);
+    expect(r.json.erreur).toMatch(/service de notification connu/);
+  });
 
   it('refuse un abonnement aux clés invalides', async () => {
     expect((await c.call('POST', '/api/push/abonnement', { endpoint: `${base}/x`, keys: { p256dh: 'abc', auth: 'abc' } })).status).toBe(400);

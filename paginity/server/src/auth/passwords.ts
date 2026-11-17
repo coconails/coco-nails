@@ -27,7 +27,9 @@ export function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(stored: string, password: string): Promise<boolean> {
   try {
     return await verify(stored, password);
-  } catch {
+  } catch (e) {
+    // Empreinte de mot de passe abîmée ou illisible : refus, mais on le note pour pouvoir réparer le compte.
+    console.error('[connexion] empreinte de mot de passe illisible :', (e as Error).message);
     return false;
   }
 }

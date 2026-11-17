@@ -85,10 +85,16 @@ Pour arrêter : `Ctrl+C` dans le terminal. Les données sont dans `paginity/data
 ## 5. Tests automatiques
 
 ```bash
-npm test                      # 102 tests du serveur (connexion, sécurité, publication, fonctions, tâches, import…)
+npm test                      # tous les tests du serveur (connexion, sécurité, publication, fonctions, IA, référencement…)
+npm run couverture            # les mêmes, avec la part du code exercée par les tests
 npm run build && npm run e2e  # parcours complet dans Chromium (nécessite Playwright)
 npm run verifier              # contrôle des types (serveur, tests, interface) et de la syntaxe des scripts
 ```
+
+Autres parcours dans Chromium (après `npm run build`) : `e2e:phase3` (Coco Nail's), `e2e:ia`, `e2e:panneau`,
+`e2e:reunion`, `e2e:banc`, `e2e:continuite`, `e2e:assistant-plus`, `e2e:confort`, `e2e:referencement`,
+`e2e:search-console`. Le nombre exact de tests figure dans le compte rendu de chaque étape (il augmente avec le
+logiciel) ; le manuel PDF se fabrique à la demande avec `npm run manuel`.
 
 Les tests de Coco Nail's s'exécutent seulement si le dépôt du site est présent (variable `COCO_NAILS_DIR`).
 `test/coco-nails-simule.test.ts` fait tourner ses vraies fonctions (réservation, confirmation, refus, rappel SMS, compta,

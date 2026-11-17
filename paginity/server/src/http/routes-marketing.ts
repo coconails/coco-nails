@@ -1,7 +1,8 @@
+import { limiter } from '../lib/limiteur.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
-import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
+import { body, ipOf, requireOwner, requireSudoOwner, requireUser } from './helpers.js';
 import type { Cible } from '../marketing/service.js';
 
 /** PAGINITY Marketing — M1 : audit de référencement local (lecture seule, aucun compte extérieur). */
@@ -15,6 +16,7 @@ export function registerMarketingRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/referencement/audit', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`audit:${site.id}`, 6, 60000);
     return ctx.referencement.lancer(site, (body<{ cible?: string }>(req).cible ?? 'brouillon') as Cible, user.id);
   });
   app.put('/api/sites/:id/referencement/reglages', async (req) => {
@@ -26,11 +28,7 @@ export function registerMarketingRoutes(app: FastifyInstance, ctx: Ctx): void {
   });
 
   // ---- M2 : Search Console (lecture seule). Compte : propriétaire + confirmation d'identité.
-  const sudoProprio = (req: FastifyRequest) => {
-    const a = requireSudo(req);
-    if (!a.user.is_owner) requireOwner(req);
-    return a;
-  };
+  const sudoProprio = requireSudoOwner;
   app.get('/api/reglages/search-console', async (req) => {
     requireOwner(req);
     return ctx.searchConsole.compte();
@@ -64,12 +62,14 @@ export function registerMarketingRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/search-console/releve', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`gsc-releve:${site.id}`, 4, 60000);
     await ctx.searchConsole.collecter(site);
     return ctx.searchConsole.lire(site);
   });
   app.post('/api/sites/:id/search-console/inspection', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`gsc-inspection:${site.id}`, 3, 600000);
     await ctx.searchConsole.inspecter(site);
     return ctx.searchConsole.lire(site);
   });

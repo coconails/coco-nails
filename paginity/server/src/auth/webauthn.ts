@@ -4,6 +4,7 @@ import {
   verifyAuthenticationResponse,
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { Ctx } from '../context.js';
 import { adminOrigin } from '../config.js';
 import { now, UserError } from '../lib/util.js';
@@ -55,8 +56,7 @@ export async function registerPasskey(ctx: Ctx, user: UserRow, sessionIdHash: st
   let verification;
   try {
     verification = await verifyRegistrationResponse({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      response: response as any,
+      response: response as RegistrationResponseJSON,
       expectedChallenge: row.webauthn_challenge,
       expectedOrigin: adminOrigin(ctx.config),
       expectedRPID: ctx.config.rpId,
@@ -91,8 +91,7 @@ export async function verifyPasskey(ctx: Ctx, userId: string, expectedChallenge:
   if (!pk) return false;
   try {
     const v = await verifyAuthenticationResponse({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      response: response as any,
+      response: response as AuthenticationResponseJSON,
       expectedChallenge,
       expectedOrigin: adminOrigin(ctx.config),
       expectedRPID: ctx.config.rpId,

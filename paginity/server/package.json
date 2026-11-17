@@ -1,13 +1,14 @@
 {
   "name": "@paginity/server",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node --disable-warning=ExperimentalWarning dist/index.js",
     "dev": "tsx watch --disable-warning=ExperimentalWarning src/index.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "couverture": "vitest run --coverage --coverage.include=src/** --coverage.reporter=text-summary --coverage.reporter=html --coverage.reportsDirectory=couverture"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.4.0",
@@ -37,6 +38,7 @@
     "@types/smtp-server": "^3.5.13",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
+    "@vitest/coverage-v8": "^5.1.0",
     "marked": "^15.0.12",
     "otpauth": "^9.6.0",
     "smtp-server": "^3.21.4",

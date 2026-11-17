@@ -63,6 +63,12 @@ export function requireSudo(req: FastifyRequest): { user: UserRow; session: Sess
   return a;
 }
 
+/** Propriétaire de la plateforme ET identité confirmée récemment (réglages sensibles de la plateforme). */
+export function requireSudoOwner(req: FastifyRequest): { user: UserRow; session: SessionRow } {
+  requireOwner(req);
+  return requireSudo(req);
+}
+
 export function setSessionCookie(ctx: Ctx, reply: FastifyReply, token: string): void {
   reply.setCookie(SESSION_COOKIE, token, {
     path: '/',

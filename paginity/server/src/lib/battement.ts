@@ -27,6 +27,8 @@ const DEFAUT: ReglagesBattement = { active: false, url: '', minutes: 5 };
 export class Battement {
   private minuteur: NodeJS.Timeout | null = null;
   private dernierEnvoi = 0;
+  /** Contrôle complet de la base au plus une fois par heure (coûteux sur une grosse base). */
+  private controleBase: { le: number; ok: boolean } | null = null;
   constructor(
     private ctx: Ctx,
     private sitesEnLigne: () => boolean = () => true,
@@ -81,8 +83,11 @@ export class Battement {
   /** Contrôles internes : null si tout va bien, sinon la raison. */
   panne(): string | null {
     try {
-      const r = this.ctx.db.prepare('PRAGMA quick_check').get() as Record<string, string>;
-      if (Object.values(r)[0] !== 'ok') return 'base de données abîmée';
+      if (!this.controleBase || Date.now() - this.controleBase.le > 3_600_000) {
+        const r = this.ctx.db.prepare('PRAGMA quick_check').get() as Record<string, string>;
+        this.controleBase = { le: Date.now(), ok: Object.values(r)[0] === 'ok' };
+      } else this.ctx.db.prepare('SELECT 1').get();
+      if (!this.controleBase.ok) return 'base de données abîmée';
     } catch {
       return 'base de données illisible';
     }

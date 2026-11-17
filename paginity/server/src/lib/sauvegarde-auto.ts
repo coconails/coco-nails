@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { pipeline } from 'node:stream/promises';
 import type { Ctx } from '../context.js';
 import { getSetting, setSetting } from '../db.js';
@@ -9,6 +10,7 @@ import { raiseAlert } from './alerts.js';
 import { audit } from './audit.js';
 import { UserError } from './util.js';
 import { restaurer, sauvegarder } from '../cli/sauvegarde.js';
+import { heureLocale, jourLocal } from './fuseau.js';
 
 /**
  * Sauvegarde automatique, chiffrée, hors de la machine.
@@ -25,6 +27,8 @@ import { restaurer, sauvegarder } from '../cli/sauvegarde.js';
  * c'est ne plus pouvoir ouvrir ces sauvegardes (les sauvegardes manuelles restent possibles).
  */
 
+/** Commandes lancées sans bloquer le serveur. */
+const lancer = promisify(execFile);
 const ENTETE = 'PAGINITY-SAUVEGARDE-CHIFFREE 1';
 const EXT = '.paginity';
 const PREFIXE = 'paginity-auto-';
@@ -34,7 +38,7 @@ const ESSAI_TOUS_LES_JOURS = 30;
 export interface ReglagesSauvegarde {
   active: boolean;
   dossier: string;
-  /** Heure locale du serveur (0 à 23). */
+  /** Heure de Paris (0 à 23), quel que soit le réglage du système. */
   heure: number;
   /** Nombre de sauvegardes gardées dans le dossier. */
   garder: number;
@@ -50,7 +54,10 @@ const DEFAUT: ReglagesSauvegarde = { active: false, dossier: '', heure: 3, garde
 const lire = <T>(ctx: Ctx, cle: string, defaut: T): T => {
   try {
     return { ...defaut, ...JSON.parse(getSetting(ctx.db, cle) ?? '{}') };
-  } catch {
+  } catch (e) {
+    // Ne jamais laisser la sauvegarde s'arrêter en silence : on prévient.
+    console.error(`[sauvegarde] réglage « ${cle} » illisible :`, (e as Error).message);
+    raiseAlert(ctx, 'critique', `Les réglages de la sauvegarde automatique sont illisibles (${cle}) : vérifiez-les dans les Réglages de la plateforme.`);
     return defaut;
   }
 };
@@ -115,11 +122,11 @@ export async function ouvrirSauvegarde(fichier: string, cleOuPhrase: string | Bu
     throw new UserError(400, 'Impossible d’ouvrir cette sauvegarde : phrase incorrecte, ou fichier abîmé.');
   }
   try {
-    const noms = execFileSync('tar', ['-tf', tar], { encoding: 'utf8' }).split('\n').filter(Boolean);
+    const noms = (await lancer('tar', ['-tf', tar], { encoding: 'utf8' })).stdout.split('\n').filter(Boolean);
     if (noms.length !== 2 || noms.some((n) => n.includes('/') || !/^paginity-(sauvegarde|cle-coffre)-[\d-]+\.(tar\.gz|txt)$/.test(n))) {
       throw new UserError(400, 'Contenu inattendu dans la sauvegarde.');
     }
-    execFileSync('tar', ['-xf', tar, '-C', dossier, '--no-same-owner']);
+    await lancer('tar', ['-xf', tar, '-C', dossier, '--no-same-owner']);
     return {
       archive: path.join(dossier, noms.find((n) => n.endsWith('.tar.gz'))!),
       cle: path.join(dossier, noms.find((n) => n.endsWith('.txt'))!),
@@ -231,9 +238,9 @@ export class SauvegardeAuto {
     const travail = path.join(this.ctx.config.dataDir, 'sauvegardes', `.auto-${crypto.randomBytes(4).toString('hex')}`);
     const final = path.join(r.dossier, `${PREFIXE}${stamp()}${EXT}`);
     try {
-      const s = sauvegarder(this.ctx.config.dataDir, this.ctx.db, travail);
+      const s = await sauvegarder(this.ctx.config.dataDir, this.ctx.db, travail);
       const tar = path.join(travail, 'tout.tar');
-      execFileSync('tar', ['-cf', tar, '-C', travail, path.basename(s.archive), path.basename(s.cle!)]);
+      await lancer('tar', ['-cf', tar, '-C', travail, path.basename(s.archive), path.basename(s.cle!)]);
       fs.rmSync(s.archive);
       fs.rmSync(s.cle!);
       // Écrit d'abord sous un autre nom : un fichier « .paginity » est toujours complet.
@@ -273,7 +280,7 @@ export class SauvegardeAuto {
     const travail = path.join(this.ctx.config.dataDir, 'sauvegardes', `.essai-${crypto.randomBytes(4).toString('hex')}`);
     try {
       const o = await ouvrirSauvegarde(dernier, k.cle, path.join(travail, 'fichiers'));
-      const res = restaurer(o.archive, o.cle, path.join(travail, 'restaure'));
+      const res = await restaurer(o.archive, o.cle, path.join(travail, 'restaure'));
       const message = `Restauration d’essai réussie : ${res.sites} site(s), ${res.fichiers} fichiers vérifiés.`;
       this.ecrireEtat({ dernierEssai: { le: Date.now(), fichier: path.basename(dernier), ok: true, message } });
       audit(this.ctx.db, { action: 'sauvegarde_essai', details: { fichier: path.basename(dernier), ok: true } });
@@ -293,9 +300,9 @@ export class SauvegardeAuto {
   async tic(maintenant = new Date()): Promise<void> {
     const r = this.reglages();
     if (!r.active || this.enCours) return;
-    const jour = `${maintenant.getFullYear()}-${maintenant.getMonth()}-${maintenant.getDate()}`;
+    const jour = jourLocal(maintenant);
     const e = this.etat();
-    if (maintenant.getHours() !== r.heure || this.dernierJour === jour || e.dernierAutoJour === jour) return;
+    if (heureLocale(maintenant) !== r.heure || this.dernierJour === jour || e.dernierAutoJour === jour) return;
     this.dernierJour = jour;
     this.ecrireEtat({ dernierAutoJour: jour });
     try {

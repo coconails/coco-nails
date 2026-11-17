@@ -16,6 +16,8 @@
     "start": "npm run start -w server",
     "dev": "npm run dev -w server",
     "test": "npm test -w server",
+    "couverture": "npm run couverture -w server",
+    "audit-production": "npm audit --omit=dev",
     "e2e": "node e2e/parcours.mjs",
     "e2e:phase3": "node e2e/phase3.mjs",
     "manuel": "node e2e/captures-manuel.mjs && node e2e/manuel-pdf.mjs",

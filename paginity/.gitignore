@@ -4,3 +4,4 @@ data/
 *.log
 .tmp-tests/
 e2e/captures/
+server/couverture/

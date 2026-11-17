@@ -1,3 +1,4 @@
+import { limiter } from '../lib/limiteur.js';
 import path from 'node:path';
 import { buildPreview } from '../publish/pipeline.js';
 import { createPreviewLink } from '../servers/sites.js';
@@ -7,7 +8,7 @@ import { CONSIGNES_DIAGNOSTIC, diagnostiquer } from '../ia/diagnostic.js';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Ctx } from '../context.js';
 import { audit } from '../lib/audit.js';
-import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
+import { body, ipOf, requireOwner, requireSudo, requireSudoOwner, requireUser } from './helpers.js';
 import { UserError } from '../lib/util.js';
 import type { NomExterne } from '../ia/assistant.js';
 
@@ -27,24 +28,21 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     return ctx.ia.etat();
   });
   app.put('/api/reglages/ia', async (req) => {
-    const { user } = requireSudo(req);
-    if (!user.is_owner) requireOwner(req);
+    const { user } = requireSudoOwner(req);
     const r = ctx.ia.modifierReglages(body<Record<string, unknown>>(req));
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_reglages', details: { active: r.active, relais: r.relaisExterne, plafond: r.plafondMensuelCentimes } });
     return ctx.ia.etat();
   });
   // Clés d'API (Claude, ChatGPT) : saisies par le propriétaire, chiffrées, jamais réaffichées.
   app.put('/api/reglages/ia/cle/:nom', async (req) => {
-    const { user } = requireSudo(req);
-    if (!user.is_owner) requireOwner(req);
+    const { user } = requireSudoOwner(req);
     const nom = externe(req);
     ctx.ia.definirCle(nom, body<{ cle?: string }>(req).cle);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_cle_enregistree', details: { service: nom } });
     return ctx.ia.etat();
   });
   app.delete('/api/reglages/ia/cle/:nom', async (req) => {
-    const { user } = requireSudo(req);
-    if (!user.is_owner) requireOwner(req);
+    const { user } = requireSudoOwner(req);
     const nom = externe(req);
     ctx.ia.effacerCle(nom);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_cle_effacee', details: { service: nom } });
@@ -89,8 +87,7 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
     return ctx.ia.detecter(body<{ url?: string }>(req).url);
   });
   app.post('/api/reglages/ia/ajouter-detectes', async (req) => {
-    const { user } = requireSudo(req);
-    if (!user.is_owner) requireOwner(req);
+    const { user } = requireSudoOwner(req);
     const b = body<{ url?: string; ids?: string[] }>(req);
     await ctx.ia.ajouterDetectes(b.url, b.ids);
     audit(ctx.db, { userId: user.id, ip: ipOf(req), action: 'ia_modeles_detectes', details: { ids: b.ids } });
@@ -122,6 +119,7 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/assistant/:pid/apercu', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`avant-apres:${site.id}`, 6, 60000);
     const p = ctx.ia.lire(site, pid(req));
     if (p.portee !== 'pages' || p.statut !== 'proposee') throw new UserError(409, 'L’aperçu avant / après concerne les propositions « pages et styles » à valider.');
     await buildPreview(ctx, site);
@@ -134,6 +132,7 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/diagnostic', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`diagnostic:${site.id}`, 4, 60000);
     const d = await diagnostiquer(ctx, site);
     const explication = body<{ ia?: boolean }>(req).ia === false ? null : await expliquerDiagnostic(ctx.ia, CONSIGNES_DIAGNOSTIC, d.rapport);
     return { ...d, explication };

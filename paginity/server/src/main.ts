@@ -100,9 +100,9 @@ export async function createPaginity(
     pruneSubmissions(ctx);
     ctx.functions.prune();
     purgerVisites(ctx);
-    void ctx.misesAJour.tic().catch(() => {});
-    void ctx.referencement.tic().catch(() => {});
-    void ctx.searchConsole.tic().catch(() => {});
+    void ctx.misesAJour.tic().catch((e) => console.error('[failles] ', (e as Error).message));
+    void ctx.referencement.tic().catch((e) => console.error('[référencement] ', (e as Error).message));
+    void ctx.searchConsole.tic().catch((e) => console.error('[search console] ', (e as Error).message));
     void ctx.sauvegardeAuto.tic().catch((e) => console.error('[sauvegarde] ', (e as Error).message));
     // Récapitulatif quotidien des alertes, vers 6 h UTC.
     const d = new Date();

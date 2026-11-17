@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -78,6 +79,30 @@ describe('Sauvegarde automatique chiffrée', () => {
     expect(fs.readdirSync(path.join(p.dir, 'sauvegardes'))).toEqual([]);
   });
 
+  it('le serveur reste réactif pendant la sauvegarde et l’essai de restauration (rien ne bloque)', async () => {
+    // 40 Mo de données peu compressibles : assez pour que l'ancienne version bloque le serveur plus d'une seconde.
+    const gros = path.join(p.dir, 'espaces', 'gros-fichier-essai.bin');
+    fs.writeFileSync(gros, crypto.randomBytes(40 * 1024 * 1024));
+    let ecartMax = 0;
+    let dernier = Date.now();
+    const minuteur = setInterval(() => {
+      const t = Date.now();
+      ecartMax = Math.max(ecartMax, t - dernier);
+      dernier = t;
+    }, 10);
+    try {
+      const debut = Date.now();
+      expect((await c.call('POST', '/api/reglages/sauvegarde/maintenant')).status).toBe(200);
+      expect((await c.call('POST', '/api/reglages/sauvegarde/essai')).json.dernierEssai.ok).toBe(true);
+      const duree = Date.now() - debut;
+      expect(duree).toBeGreaterThan(500); // l'opération a bien duré…
+      expect(ecartMax, `plus long blocage : ${ecartMax} ms sur ${duree} ms`).toBeLessThan(300); // …sans figer le serveur
+    } finally {
+      clearInterval(minuteur);
+      fs.rmSync(gros);
+    }
+  }, 60_000);
+
   it('ne garde que le nombre demandé de sauvegardes', async () => {
     for (let i = 0; i < 2; i++) expect((await c.call('POST', '/api/reglages/sauvegarde/maintenant')).status).toBe(200);
     expect(fichiers()).toHaveLength(2);
@@ -103,11 +128,11 @@ describe('Sauvegarde automatique chiffrée', () => {
 
   it('se déclenche seule à l’heure choisie, une fois par jour', async () => {
     const avant = fichiers();
-    const t = new Date();
-    t.setHours(4);
+    // Heure de Paris, quel que soit le fuseau de la machine : 18 novembre (heure d'hiver, UTC+1).
+    let t = new Date(Date.UTC(2026, 10, 18, 3, 0)); // 4 h à Paris
     await p.ctx.sauvegardeAuto.tic(t);
     expect(fichiers()).toEqual(avant); // pas l'heure
-    t.setHours(3);
+    t = new Date(Date.UTC(2026, 10, 18, 2, 0)); // 3 h à Paris
     await p.ctx.sauvegardeAuto.tic(t);
     const apres = fichiers();
     expect(apres).not.toEqual(avant);
@@ -123,7 +148,7 @@ describe('Sauvegarde automatique chiffrée', () => {
     const bon = await admin(p.dir, ['ouvrir-sauvegarde', f, path.join(racine, 'ouvert-2')], PHRASE);
     expect(bon.code, bon.sortie).toBe(0);
     const archive = /restaurer (\S+) --cle (\S+)/.exec(bon.sortie)!;
-    const r = restaurer(archive[1], archive[2], path.join(racine, 'nouvelle-machine'));
+    const r = await restaurer(archive[1], archive[2], path.join(racine, 'nouvelle-machine'));
     expect(r.sites).toBe(1);
   });
 });

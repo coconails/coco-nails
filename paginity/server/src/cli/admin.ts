@@ -68,7 +68,7 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
       const i = args.indexOf('--cle');
       const archive = args.find((a, k) => !a.startsWith('--') && k !== i + 1);
       if (!archive || i < 0 || !args[i + 1]) throw new UserError(400, 'Utilisation : paginity-admin restaurer <archive> --cle <fichier de clé>');
-      const r = restaurer(archive, args[i + 1], config.dataDir);
+      const r = await restaurer(archive, args[i + 1], config.dataDir);
       const db = openDb(config.dataDir);
       audit(db, { action: 'secours_restauration', details: { archive: path.basename(archive), sauvegardeDu: r.fiche.creeLe } });
       db.close();
@@ -200,7 +200,7 @@ export async function main(argv: string[], out: Out = { log: (s) => console.log(
         if (!dest) throw new UserError(400, 'Indiquez le dossier où ranger la sauvegarde.');
         const enCours = (db.prepare("SELECT COUNT(*) AS n FROM publications WHERE status = 'en_cours'").get() as { n: number }).n;
         if (enCours) out.err('Attention : une publication est en cours ; il est préférable de sauvegarder une fois terminée.');
-        const r = sauvegarder(config.dataDir, db, dest, { sansCle: args.includes('--sans-cle') });
+        const r = await sauvegarder(config.dataDir, db, dest, { sansCle: args.includes('--sans-cle') });
         audit(db, { action: 'secours_sauvegarde', details: { archive: path.basename(r.archive), fichiers: r.fichiers } });
         out.log(`Sauvegarde : ${r.archive} (${r.fichiers} fichiers, empreintes notées).`);
         if (r.cle) out.log(`Clé du coffre : ${r.cle}\n→ Rangez la clé À PART de l’archive : qui possède les deux possède tout ; sans la clé, la sauvegarde est inutilisable.`);

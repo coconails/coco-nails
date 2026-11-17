@@ -1,3 +1,4 @@
+import { limiter } from '../lib/limiteur.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -486,6 +487,7 @@ export function registerSiteRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/apercu', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'voir');
+    limiter(`apercu:${site.id}`, 12, 60000);
     const r = await buildPreview(ctx, site);
     return { ...r, url: `${previewOrigin(ctx.config, createPreviewLink(ctx, site.id, site.slug, user.id))}/` };
   });

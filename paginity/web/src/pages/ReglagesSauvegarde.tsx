@@ -101,7 +101,7 @@ export function ReglagesSauvegarde() {
           error={s.reglages.dossier && s.reglages.dossier === r.dossier && !s.dossierOk ? 'Dossier introuvable ou impossible d’y écrire.' : undefined}
         />
         <Group grow>
-          <NumberInput label="Heure de la sauvegarde" description="Heure du serveur, 0 à 23" min={0} max={23} value={r.heure} onChange={(v) => setR({ ...r, heure: Number(v) || 0 })} />
+          <NumberInput label="Heure de la sauvegarde" description="Heure de Paris, 0 à 23" min={0} max={23} value={r.heure} onChange={(v) => setR({ ...r, heure: Number(v) || 0 })} />
           <NumberInput label="Sauvegardes gardées" description="Les plus anciennes sont effacées" min={1} max={90} value={r.garder} onChange={(v) => setR({ ...r, garder: Number(v) || 1 })} />
         </Group>
         <Group>
