@@ -57,7 +57,7 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   page `public/404.html`. Nom commercial : toujours « Coco Nail's » (pas « Coco Nails 72 »). Pas de texte caché, pas de llms.txt.
   Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
 - Comptoir iPad (18/11/2026) : `public/compta/comptoir/index.html` (adresse /compta/comptoir, même mot de passe et mêmes données que
-  /compta via `/api/compta`). iPad Air 1 (A1475, iOS 12.5.7) : JavaScript ES5 uniquement, pas de `gap` en flexbox ni `inset`
+  /compta via `/api/compta`). iPad Air 1 (A1475, iOS 12.5.7) : JavaScript ES5 uniquement, pas de `gap` en flexbox ni `inset`, pas d'images WebP (logo en PNG)
   (test automatique). 6 onglets de widgets (Aujourd'hui, Caisse, Rendez-vous, Semaine, Compta, Clientes), choix/ordre/taille
   enregistrés dans Réglages (clé `comptoir`), note `note_comptoir`, `objectif_mois`, `seuil_ca`. `vue.comptoir` = agenda 8 jours
   (RDV perso anonymes « Occupé »), fermetures, horaires, paiements SumUp du jour. Action `decider` (confirmer/refuser une demande,
