@@ -56,6 +56,16 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   Saint-Jean-du-Bois (Sarthe) | Coco Nail's », phrase Val de Sarthe + accès/parking dans « Un espace rien que pour vous »,
   page `public/404.html`. Nom commercial : toujours « Coco Nail's » (pas « Coco Nails 72 »). Pas de texte caché, pas de llms.txt.
   Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
+- Comptoir iPad (18/11/2026) : `public/compta/comptoir/index.html` (adresse /compta/comptoir, même mot de passe et mêmes données que
+  /compta via `/api/compta`). iPad Air 1 (A1475, iOS 12.5.7) : JavaScript ES5 uniquement, pas de `gap` en flexbox ni `inset`
+  (test automatique). 6 onglets de widgets (Aujourd'hui, Caisse, Rendez-vous, Semaine, Compta, Clientes), choix/ordre/taille
+  enregistrés dans Réglages (clé `comptoir`), note `note_comptoir`, `objectif_mois`, `seuil_ca`. `vue.comptoir` = agenda 8 jours
+  (RDV perso anonymes « Occupé »), fermetures, horaires, paiements SumUp du jour. Action `decider` (confirmer/refuser une demande,
+  logique partagée avec rdv.mjs dans `netlify/lib/rendezvous.mjs`), origine de ligne « Sur place », GET `/api/compta?sumup=jour`
+  (guet du paiement carte pendant l'encaissement). WhatsApp impossible sur l'iPad (iOS 15.5 requis) : QR code wa.me à scanner
+  avec l'iPhone pro (`qrcode.js` MIT). Appels/SMS via « Appels sur d'autres appareils » / « Transfert de SMS ».
+  Aperçu local : `node outils-de-test/serveur-comptoir.mjs` (mot de passe « demo », données d'exemple).
+  SumUp : lecteur **Solo** choisi (autonome) ; plus tard, envoi du montant au Solo via la Cloud API (clé affiliée à créer).
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (relié le 15/11/2026) : `SUMUP_API_KEY` (clé SECRÈTE `sup_sk_…`, pas la clé publique `sup_pk_` ; ne jamais la demander),
@@ -88,11 +98,12 @@ Toujours tester localement avant (Google simulé) et montrer un aperçu avant de
   dans Pages CMS > Horaires et coordonnées. Vérifier qu'il n'existe pas de fiche en double.
 - Assurance (avenant habitation), bio Instagram, double authentification sur tous les comptes.
 
+- En attente (décision de l'utilisateur) : rubrique « Avis clientes » (quand ~5 avis) et e-mail de demande d'avis le lendemain.
 - Compta, idées restantes : argent à mettre de côté, alerte des seuils, sauvegarde, demande d'avis Google, tableau de bord,
   export annuel, avoirs, bons cadeaux, fidélité, compteur de visites sans cookies.
 - Netlify gratuit (300 crédits/mois, 15 par publication) ; badge « Powered by Netlify » non désactivable gratuitement
   (boutons flottants du site remontés au-dessus). Brevo écarté (SMS réservés aux forfaits payants) → OVHcloud.
-- SumUp : compte créé et relié à la compta (15/11/2026) ; lecteur conseillé Solo Lite (sans abonnement, 1,75 %).
+- SumUp : compte créé et relié à la compta (15/11/2026) ; lecteur choisi : SumUp Solo (autonome, l'appli SumUp exige iPadOS 16).
   Workspace payé au mois, pas de Freebox. Netlify : formule Personal prise en novembre 2026 pour finir les publications,
   retour possible à la formule gratuite ensuite (penser à le faire avant le renouvellement).
 
