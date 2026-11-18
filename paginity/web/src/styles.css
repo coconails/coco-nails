@@ -1,19 +1,47 @@
 html, body, #root { min-height: 100%; }
 body { -webkit-tap-highlight-color: transparent; }
 
-.pg-logo-texte {
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  background: linear-gradient(90deg, #e6eaf0 0%, #e6eaf0 50%, #e8a93a 50%, #f5c355 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* ---- Logo PAGINITY (bouclier argenté, « P » qui tourne, nom argent et or) ---- */
+:root {
+  --pg-argent-1: #ffffff;
+  --pg-argent-2: #c9ced6;
+  --pg-argent-3: #8a929e;
+  --pg-or-1: #f3d48a;
+  --pg-or-2: #c99a3e;
 }
-[data-mantine-color-scheme='light'] .pg-logo-texte {
-  background: linear-gradient(90deg, #13213a 0%, #13213a 50%, #a06d12 50%, #c98a1c 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
+[data-mantine-color-scheme='dark'] {
+  --pg-argent-1: #ffffff;
+  --pg-argent-2: #c9ced6;
+  --pg-argent-3: #8a929e;
+  --pg-or-1: #f3d48a;
+  --pg-or-2: #c99a3e;
 }
+[data-mantine-color-scheme='light'] {
+  --pg-argent-1: #5b6575;
+  --pg-argent-2: #2b3442;
+  --pg-argent-3: #11161f;
+  --pg-or-1: #c9902a;
+  --pg-or-2: #8d5f12;
+}
+.pg-logo-bouclier { position: relative; display: inline-block; flex: none; perspective: 200px; }
+.pg-logo-bouclier svg { position: absolute; inset: 0; animation: pg-bouclier-tourne 5s linear infinite; }
+.pg-logo-p {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-bottom: 6%;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 800; line-height: 1;
+  background: linear-gradient(135deg, var(--pg-argent-1), var(--pg-argent-2) 55%, var(--pg-argent-3));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pg-p-tourne 5s linear infinite;
+  transform-style: preserve-3d;
+}
+/* Le « P » et le bouclier tournent sur eux-mêmes, en sens opposés. */
+@keyframes pg-p-tourne { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+@keyframes pg-bouclier-tourne { from { transform: rotateY(0deg); } to { transform: rotateY(-360deg); } }
+@media (prefers-reduced-motion: reduce) { .pg-logo-p, .pg-logo-bouclier svg { animation: none; } }
+.pg-logo-nom { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 500; letter-spacing: 0.14em; line-height: 1; white-space: nowrap; }
+.pg-logo-argent, .pg-logo-or { -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pg-logo-argent { background-image: linear-gradient(180deg, var(--pg-argent-1), var(--pg-argent-2) 60%, var(--pg-argent-3)); }
+.pg-logo-or { background-image: linear-gradient(180deg, var(--pg-or-1), var(--pg-or-2)); }
 
 .pg-diff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
 .pg-diff .ajout { background: rgba(46, 160, 67, 0.22); }

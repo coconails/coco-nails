@@ -1,6 +1,7 @@
+import { Logo } from './Logo';
 import { useEffect, type ReactNode } from 'react';
 import {
-  ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Image, Indicator, Menu, NavLink, ScrollArea, Text, Tooltip, UnstyledButton, useMantineColorScheme,
+  ActionIcon, AppShell, Avatar, Badge, Box, Burger, Divider, Group, Indicator, Menu, NavLink, ScrollArea, Text, Tooltip, UnstyledButton, useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -92,13 +93,12 @@ export function Shell({ children }: { children: ReactNode }) {
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Ouvrir le menu" />
             <UnstyledButton component={Link} to="/" aria-label="PAGINITY, tableau de bord">
-              <Group gap={8} wrap="nowrap">
-                <Image src="/symbole-paginity.png" h={34} w="auto" alt="" lightHidden />
-                <Image src="/icone-192.png" h={34} w={34} radius="sm" alt="" darkHidden />
-                <Text className="pg-logo-texte" fz={22} visibleFrom="xs">
-                  PAGINITY
-                </Text>
-              </Group>
+              <Box visibleFrom="xs">
+                <Logo taille={36} tailleTexte={22} />
+              </Box>
+              <Box hiddenFrom="xs">
+                <Logo taille={34} texte={false} />
+              </Box>
             </UnstyledButton>
           </Group>
           <Group gap="xs" wrap="nowrap">
