@@ -31,6 +31,7 @@
     "e2e:assistant-plus": "node e2e/assistant-plus.mjs",
     "e2e:confort": "node e2e/confort.mjs",
     "e2e:referencement": "node e2e/referencement.mjs",
-    "e2e:search-console": "node e2e/search-console.mjs"
+    "e2e:search-console": "node e2e/search-console.mjs",
+    "e2e:referencement-p1": "node e2e/referencement-p1.mjs"
   }
 }

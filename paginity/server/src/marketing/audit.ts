@@ -31,6 +31,7 @@ export interface ResultatAudit {
 
 const MAX_HTML = 2 * 1024 * 1024;
 const POIDS_IMAGE = 300 * 1024;
+const POIDS_RESSOURCE = 250 * 1024;
 
 // ---------------------------------------------------------------------------- lecture HTML (légère, sans dépendance)
 /** Attributs d'une balise : <meta name="x" content="y"> → { name: 'x', content: 'y' }. */
@@ -185,6 +186,10 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
   const telsJsonLd = new Set<string>();
   let indexables = 0;
   let imagesSansAlt = 0;
+  /** Pages qui reçoivent au moins un lien depuis UNE AUTRE page (pour repérer les pages orphelines). */
+  const recoitLien = new Set<string>();
+  const pagesIndexables: string[] = [];
+  const ressourcesVues = new Set<string>();
   for (const p of pages) {
     const h = p.html;
     const est404 = /(^|\/)404\.html$/.test(p.fichier);
@@ -198,6 +203,17 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
     }
     if (est404) continue;
     indexables++;
+    pagesIndexables.push(p.fichier);
+
+    // Adresse de la page : simple, en minuscules, sans espace ni accent
+    const chemin = p.url;
+    const defauts: string[] = [];
+    if (/[A-Z]/.test(chemin)) defauts.push('des majuscules');
+    if (/\s|%20/.test(chemin)) defauts.push('des espaces');
+    if (/[^\x00-\x7F]/.test(chemin)) defauts.push('des accents ou caractères spéciaux');
+    if (/_/.test(chemin)) defauts.push('des tirets bas « _ »');
+    if (chemin.length > 100) defauts.push(`une longueur de ${chemin.length} caractères`);
+    if (defauts.length) ajouter('adresse-page', 'info', p.url, `L’adresse de la page contient ${defauts.join(', ')}.`, 'Des adresses courtes, en minuscules, avec des tirets « - », sont plus lisibles et plus sûres à partager. Ne la changez que si la page est récente : une adresse déjà connue de Google doit garder une redirection.');
     if (bloqueParRobots(p.url)) ajouter('page-bloquee-robots', 'attention', p.url, 'Page interdite aux moteurs par robots.txt.', 'Si elle doit apparaître dans Google, ajustez robots.txt.');
     if (cheminSitemap && !dansSitemap.has(p.url)) ajouter('hors-sitemap', 'attention', p.url, 'Page indexable absente du sitemap.', 'Ajoutez-la au sitemap (ou marquez-la « noindex » si elle ne doit pas apparaître).');
 
@@ -229,6 +245,12 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
 
     // Titre principal
     const h1 = [...h.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].map((m) => texte(m[1]));
+    // Hiérarchie des intertitres : pas de niveau sauté, pas d'intertitre vide.
+    const niveaux = [...h.matchAll(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi)].map((m) => ({ n: Number(m[1]), t: texte(m[2]), img: /<img\b[^>]*\balt\s*=\s*["'][^"']+/i.test(m[2]) }));
+    const saut = niveaux.findIndex((x, i) => i > 0 && x.n > niveaux[i - 1].n + 1);
+    if (saut > 0) ajouter('intertitres-hierarchie', 'attention', p.url, `Niveau d’intertitre sauté : <h${niveaux[saut - 1].n}> suivi de <h${niveaux[saut].n}> (« ${niveaux[saut].t.slice(0, 50)} »).`, 'Les intertitres forment le plan de la page : h1 puis h2, puis h3… sans sauter de niveau. Les moteurs et les lecteurs d’écran s’en servent.');
+    const vides = niveaux.filter((x) => !x.t && !x.img).length;
+    if (vides) ajouter('intertitre-vide', 'attention', p.url, `${vides} intertitre(s) vide(s) (<h1> à <h6> sans texte).`, 'Un intertitre vide trouble le plan de la page. S’il est rempli plus tard par JavaScript (événement, actualité…), c’est sans gravité pour les visiteurs, mais les moteurs le voient vide : mieux vaut écrire son texte directement dans la page. Sinon, retirez-le.');
     if (!h1.length) ajouter('h1-absent', 'attention', p.url, 'Pas de titre principal (<h1>).', 'Chaque page devrait avoir un titre principal visible qui dit de quoi elle parle.');
     else if (h1.length > 1) ajouter('h1-multiple', 'info', p.url, `${h1.length} titres principaux (<h1>).`, 'Un seul <h1> par page est plus clair ; les sous-parties utilisent <h2>.');
 
@@ -275,7 +297,20 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
       const href = a.href;
       if (!href || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\{|\$)/i.test(href)) continue;
       const cible = href.startsWith('/') ? href : path.posix.join(path.posix.dirname(p.url.endsWith('/') ? `${p.url}x` : p.url), href);
-      if (!fichierPour(racine, cible)) ajouter('lien-casse', 'probleme', p.url, `Lien vers une page qui n’existe pas : ${href}.`, 'Corrigez le lien ou recréez la page.');
+      const f = fichierPour(racine, cible);
+      if (f && f !== p.fichier) recoitLien.add(f);
+      if (!f) ajouter('lien-casse', 'probleme', p.url, `Lien vers une page qui n’existe pas : ${href}.`, 'Corrigez le lien ou recréez la page.');
+    }
+
+    // Scripts et feuilles de style lourds (fichiers du site)
+    const ressources = [...balises(h, 'script').map((x) => x.src), ...balises(h, 'link').filter((l) => /stylesheet/i.test(l.rel ?? '')).map((l) => l.href)];
+    for (const src of ressources) {
+      if (!src || /^(?:[a-z]+:|\/\/)/i.test(src)) continue;
+      const f = fichierPour(racine, src.startsWith('/') ? src : path.posix.join(path.posix.dirname(p.url.endsWith('/') ? `${p.url}x` : p.url), src));
+      if (!f || ressourcesVues.has(f)) continue;
+      ressourcesVues.add(f);
+      const poids = fs.statSync(path.join(racine, f)).size;
+      if (poids > POIDS_RESSOURCE) ajouter('ressource-lourde', 'attention', p.url, `Fichier lourd chargé par la page : ${f} (${Math.round(poids / 1024)} Ko).`, 'Un gros script ou une grosse feuille de style ralentit l’affichage sur téléphone. Retirez ce qui ne sert pas ou allégez le fichier.');
     }
 
     // Téléphones visibles (liens tel: et texte)
@@ -297,6 +332,12 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
   }
   if (imagesSansAlt) ajouter('image-sans-alt', 'attention', null, `${imagesSansAlt} image(s) sans texte alternatif (attribut alt absent).`, 'Le texte alternatif décrit l’image aux personnes malvoyantes et aux moteurs. Mettez alt="" pour une image purement décorative.');
 
+  // Pages orphelines : aucune autre page n'y mène (seul le sitemap peut les faire découvrir).
+  if (pagesIndexables.length > 1) {
+    const orphelines = pagesIndexables.filter((f) => f !== 'index.html' && !recoitLien.has(f));
+    for (const f of orphelines) ajouter('page-orpheline', 'attention', adresseDe(f), 'Aucune autre page du site ne mène à cette page (page « orpheline »).', 'Ajoutez un lien vers elle depuis une page proche (menu, accueil ou page sur le même sujet) : visiteurs et moteurs la trouveront plus facilement.');
+    if (!orphelines.length) verifie.push('chaque page reçoit au moins un lien d’une autre page');
+  }
   for (const [t, urls] of titres) if (urls.length > 1) ajouter('titre-double', 'attention', urls.join(', '), `Même titre sur ${urls.length} pages : « ${t} ».`, 'Chaque page devrait avoir son propre titre.');
   for (const [, urls] of descriptions) if (urls.length > 1) ajouter('description-double', 'info', urls.join(', '), `Même description sur ${urls.length} pages.`, 'Une description propre à chaque page est plus utile.');
 
@@ -309,6 +350,7 @@ export function auditer(racine: string, domaines: string[] = []): ResultatAudit 
   if (indexables && !constats.some((c) => c.regle.startsWith('titre-'))) verifie.push('chaque page a un titre');
   if (indexables && !constats.some((c) => c.regle === 'lien-casse')) verifie.push('aucun lien interne cassé');
   if (indexables && !constats.some((c) => c.regle === 'viewport')) verifie.push('pages adaptées au téléphone (viewport)');
+  if (indexables && !constats.some((c) => c.regle.startsWith('intertitre'))) verifie.push('intertitres dans l’ordre (h1, h2, h3…) et non vides');
 
   const ordre: Record<Niveau, number> = { probleme: 0, attention: 1, info: 2 };
   constats.sort((a, b) => ordre[a.niveau] - ordre[b.niveau] || (a.page ?? '').localeCompare(b.page ?? ''));

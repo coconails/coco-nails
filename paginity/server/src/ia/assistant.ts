@@ -433,7 +433,7 @@ export class Assistant {
   }
 
   // ------------------------------------------------------------------ demande
-  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcer?: NomExterne; domaine?: unknown; portee?: unknown } = {}) {
+  async demander(site: SiteRow, user: UserRow, texte: unknown, opts: { forcer?: NomExterne; domaine?: unknown; portee?: unknown; seo?: { regle: string; page: string | null; message: string } } = {}) {
     const reg = this.reglages();
     if (!reg.active) throw new UserError(409, 'L’assistant est désactivé. Le propriétaire peut l’activer dans les Réglages de la plateforme.');
     const demande = typeof texte === 'string' ? texte.trim() : '';
@@ -442,7 +442,7 @@ export class Assistant {
     const domaine: Domaine = opts.domaine === 'textes' || opts.domaine === 'donnees' ? opts.domaine : domaineDe(demande);
     this.ctx.db
       .prepare("INSERT INTO ia_propositions (id, site_id, user_id, demande, statut, journal, cree_le, reunion) VALUES (?, ?, ?, ?, 'en_cours', '[]', ?, ?)")
-      .run(id, site.id, user.id, demande, now(), JSON.stringify({ domaine, choixDomaine: opts.domaine === 'textes' || opts.domaine === 'donnees' ? 'vous' : 'automatique', ...(opts.portee === 'pages' ? { portee: 'pages' } : {}) }));
+      .run(id, site.id, user.id, demande, now(), JSON.stringify({ domaine, choixDomaine: opts.domaine === 'textes' || opts.domaine === 'donnees' ? 'vous' : 'automatique', ...(opts.portee === 'pages' ? { portee: 'pages' } : {}), ...(opts.seo ? { seo: opts.seo } : {}) }));
     audit(this.ctx.db, { userId: user.id, action: 'ia_demande', siteId: site.id, details: { id } });
     await this.traiter(id, site, opts.forcer ?? 'local');
     return this.lire(site, id);
@@ -511,7 +511,7 @@ export class Assistant {
             raisons.push('« je ne sais pas faire »');
             break;
           }
-          const v = this.verifier(r.reponse!.changements, rubriques, versions);
+          const v = this.verifier(r.reponse!.changements, rubriques, versions, demande);
           if (v.ok) return this.finir(id, 'proposee', { cerveau: cle, explication: r.reponse!.explication, changements: v.changements, site });
           this.noter(id, `${nomL}, essai ${essai} : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
           corrections = v.erreurs;
@@ -591,7 +591,7 @@ export class Assistant {
         derniere = `${nomL} ne sait pas faire cette demande : ${r.reponse!.raison}`;
         continue;
       }
-      const v = this.verifier(r.reponse!.changements, rubriques, versions);
+      const v = this.verifier(r.reponse!.changements, rubriques, versions, demande);
       if (!v.ok) {
         this.noter(id, `${nomL} : proposition refusée par les vérifications (${v.erreurs.join(' ; ')}).`);
         derniere = `la proposition de ${LIBELLE[nom]} ne passe pas les vérifications de PAGINITY`;
@@ -646,7 +646,7 @@ export class Assistant {
 
   /** Les mêmes règles que les formulaires : rubrique proposée au cerveau, champs valides, vraie modification. */
   /** @internal (banc d'essai, réunion) */
-  verifier(chg: { rubrique: string; valeur: unknown }[], rubriques: RubriqueContexte[], versions: Record<string, string | null>) {
+  verifier(chg: { rubrique: string; valeur: unknown }[], rubriques: RubriqueContexte[], versions: Record<string, string | null>, demande?: string) {
     const erreurs: string[] = [];
     const changements: Changement[] = [];
     if (!chg.length) erreurs.push('aucune modification proposée');
@@ -662,7 +662,7 @@ export class Assistant {
         continue;
       }
       vues.add(r.nom);
-      if (estFichier(r.nom)) erreurs.push(...verifierFichier(r.libelle, String(r.valeur), c.valeur));
+      if (estFichier(r.nom)) erreurs.push(...verifierFichier(r.libelle, String(r.valeur), c.valeur, demande));
       else {
         const errs = validateEntryValue({ name: r.nom, label: r.libelle, type: 'file', path: '', format: 'json', list: r.liste, fields: r.champs }, c.valeur);
         for (const e of errs) erreurs.push(`${r.libelle} : ${e.message}`);
@@ -729,6 +729,14 @@ export class Assistant {
     return this.lire(site, id);
   }
 
+  /** Après une correction de référencement acceptée : résultat du nouvel audit du brouillon, gardé avec la proposition. */
+  noterVerificationSeo(site: SiteRow, id: string, v: { corrige: boolean; message: string }) {
+    const p = this.ligne(site, id);
+    const r = p.reunion ? JSON.parse(p.reunion) : {};
+    this.ctx.db.prepare('UPDATE ia_propositions SET reunion = ? WHERE id = ?').run(JSON.stringify({ ...r, verificationSeo: { ...v, le: now() } }), id);
+    this.noter(id, v.message);
+  }
+
   refuser(site: SiteRow, user: UserRow, id: string) {
     const p = this.ligne(site, id);
     if (!['proposee', 'accord_requis'].includes(p.statut)) throw new UserError(409, 'Cette proposition est déjà terminée.');
@@ -768,6 +776,8 @@ export class Assistant {
       journal: JSON.parse(p.journal) as { le: number; texte: string }[],
       reunion: this.reunionLisible(p.reunion),
       portee: p.reunion && JSON.parse(p.reunion).portee === 'pages' ? 'pages' : 'contenus',
+      seo: (p.reunion ? JSON.parse(p.reunion).seo ?? null : null) as { regle: string; page: string | null; message: string } | null,
+      verificationSeo: (p.reunion ? JSON.parse(p.reunion).verificationSeo ?? null : null) as { corrige: boolean; message: string; le: number } | null,
       annulable: p.statut === 'acceptee' && !!(p as { versions_apres?: string | null }).versions_apres,
       creeLe: p.cree_le,
     };

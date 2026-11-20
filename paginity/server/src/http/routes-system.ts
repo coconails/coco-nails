@@ -59,7 +59,7 @@ export function serverHealth(ctx: Ctx) {
   };
 }
 
-export function computeAlerts(ctx: Ctx, health: ReturnType<typeof serverHealth> | null, siteIds: string[] | null): Alert[] {
+export function computeAlerts(ctx: Ctx, health: ReturnType<typeof serverHealth> | null, siteIds: string[] | null, pour?: string): Alert[] {
   const alerts: Alert[] = [];
   if (health) {
     if (health.disque && health.disque.utilisePct >= 90) alerts.push({ niveau: 'critique', message: `Disque presque plein (${health.disque.utilisePct.toLocaleString('fr-FR')} %).` });
@@ -70,7 +70,7 @@ export function computeAlerts(ctx: Ctx, health: ReturnType<typeof serverHealth> 
     if (!health.messagerie) alerts.push({ niveau: 'information', message: 'L’envoi d’e-mails (alertes, messages des formulaires) n’est pas configuré : Réglages de la plateforme.' });
     if (health.isolation === 'processus') alerts.push({ niveau: 'information', message: 'Podman n’est pas installé : les fonctions des sites tournent dans des processus restreints (isolation plus faible).' });
   }
-  for (const a of listAlerts(ctx, siteIds)) alerts.push({ id: a.id, niveau: a.niveau, message: a.message, siteId: a.siteId });
+  for (const a of listAlerts(ctx, siteIds, true, pour)) alerts.push({ id: a.id, niveau: a.niveau, message: a.message, siteId: a.siteId });
   const sites = ctx.sites.all().filter((s) => siteIds === null || siteIds.includes(s.id));
   for (const s of sites) {
     if (s.last_publication_status === 'echouee') {
@@ -95,7 +95,7 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: Ctx): void {
     return {
       sites: await Promise.all(ctx.sites.accessibleSites(user).map((s) => ctx.sites.summary(s, ctx.sites.role(user, s.id)!))),
       serveur: health,
-      alertes: computeAlerts(ctx, health, ids),
+      alertes: computeAlerts(ctx, health, ids, user.is_owner ? undefined : user.id),
       activites: ctx.jobs.list({ siteIds: ids, limit: 5 }),
     };
   });

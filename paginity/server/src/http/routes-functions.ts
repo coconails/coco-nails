@@ -4,7 +4,7 @@ import { audit } from '../lib/audit.js';
 import { now, UserError } from '../lib/util.js';
 import { deleteSecret, isSecretEnv, listSecrets, setSecret } from '../functions/secrets.js';
 import { listSubmissions } from '../functions/forms.js';
-import { listAlerts, markAlertRead } from '../lib/alerts.js';
+import { listAlerts, markAlertRead, markAlertReadFor } from '../lib/alerts.js';
 import { body, ipOf, requireOwner, requireSudo, requireUser } from './helpers.js';
 
 function siteParam(req: FastifyRequest): string {
@@ -156,7 +156,7 @@ export function registerFunctionRoutes(app: FastifyInstance, ctx: Ctx): void {
   // ------------------------------------------------------------------ alertes
   app.get('/api/alertes', async (req) => {
     const { user } = requireUser(req);
-    return listAlerts(ctx, user.is_owner ? null : ctx.sites.accessibleSites(user).map((s) => s.id));
+    return user.is_owner ? listAlerts(ctx, null) : listAlerts(ctx, ctx.sites.accessibleSites(user).map((s) => s.id), true, user.id);
   });
 
   app.post('/api/alertes/:id/lue', async (req) => {
@@ -169,7 +169,8 @@ export function registerFunctionRoutes(app: FastifyInstance, ctx: Ctx): void {
       const a = ctx.db.prepare('SELECT site_id FROM alerts WHERE id = ?').get(Number(id)) as { site_id: string | null } | undefined;
       if (!a) throw new UserError(404, 'Alerte introuvable.');
       if (!user.is_owner && (!a.site_id || !ctx.sites.role(user, a.site_id))) throw new UserError(404, 'Alerte introuvable.');
-      markAlertRead(ctx, Number(id));
+      if (user.is_owner) markAlertRead(ctx, Number(id));
+      else markAlertReadFor(ctx, Number(id), user.id);
     }
     return { ok: true };
   });

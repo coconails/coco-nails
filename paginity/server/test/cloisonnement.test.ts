@@ -168,6 +168,21 @@ describe('Cloisonnement entre sites et secrets', () => {
     expect(recu.join('')).not.toContain(siteB);
   });
 
+  it('une alerte marquée lue par un membre reste visible pour le propriétaire et pour le récapitulatif', async () => {
+    const id = Number(p.ctx.db.prepare("INSERT INTO alerts (at, level, message, site_id) VALUES (?, 'attention', 'Alerte du site A à lire', ?)").run(Date.now(), siteA).lastInsertRowid);
+    expect(JSON.stringify((await admin.call('GET', '/api/alertes')).json)).toContain('Alerte du site A à lire');
+    expect((await admin.call('POST', `/api/alertes/${id}/lue`, {})).status).toBe(200);
+    // Masquée pour ce membre (liste et tableau de bord)…
+    expect(JSON.stringify((await admin.call('GET', '/api/alertes')).json)).not.toContain('Alerte du site A à lire');
+    expect(JSON.stringify((await admin.call('GET', '/api/tableau-de-bord')).json.alertes)).not.toContain('Alerte du site A à lire');
+    // … mais toujours non lue pour le propriétaire et pour l'e-mail quotidien.
+    expect((p.ctx.db.prepare('SELECT read_at FROM alerts WHERE id = ?').get(id) as { read_at: number | null }).read_at).toBeNull();
+    expect(JSON.stringify((await c.call('GET', '/api/alertes')).json)).toContain('Alerte du site A à lire');
+    // Le propriétaire, lui, la marque lue pour tout le monde.
+    expect((await c.call('POST', `/api/alertes/${id}/lue`, {})).status).toBe(200);
+    expect((p.ctx.db.prepare('SELECT read_at FROM alerts WHERE id = ?').get(id) as { read_at: number | null }).read_at).not.toBeNull();
+  });
+
   it('une tâche en échec ne divulgue pas son secret (alerte, e-mail, historique, journal)', async () => {
     const r = await c.call('POST', `/api/sites/${siteA}/taches/panne/lancer`, {});
     expect(r.status, r.body).toBe(200);

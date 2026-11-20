@@ -24,7 +24,12 @@ export function raiseAlert(ctx: Ctx, level: AlertLevel, messageIn: string, siteI
   }
 }
 
-export function listAlerts(ctx: Ctx, siteIds: string[] | null, unreadOnly = true) {
+/**
+ * Alertes visibles. `pour` : la personne qui regarde (hors propriétaire) — les alertes qu'elle a marquées lues
+ * pour elle-même sont masquées, sans changer ce que voient les autres.
+ */
+export function listAlerts(ctx: Ctx, siteIds: string[] | null, unreadOnly = true, pour?: string) {
+  const luesParMoi = pour ? new Set((ctx.db.prepare('SELECT alerte_id FROM alertes_lues WHERE user_id = ?').all(pour) as { alerte_id: number }[]).map((r) => r.alerte_id)) : null;
   const rows = ctx.db.prepare(`SELECT * FROM alerts ${unreadOnly ? 'WHERE read_at IS NULL' : ''} ORDER BY id DESC LIMIT 200`).all() as {
     id: number;
     at: number;
@@ -35,9 +40,16 @@ export function listAlerts(ctx: Ctx, siteIds: string[] | null, unreadOnly = true
   }[];
   return rows
     .filter((r) => siteIds === null || (r.site_id && siteIds.includes(r.site_id)))
+    .filter((r) => !(unreadOnly && luesParMoi?.has(r.id)))
     .map((r) => ({ id: r.id, le: r.at, niveau: r.level, message: r.message, siteId: r.site_id, lue: !!r.read_at }));
 }
 
+/** Un membre (non propriétaire) marque une alerte lue POUR LUI SEUL. */
+export function markAlertReadFor(ctx: Ctx, id: number, userId: string): void {
+  ctx.db.prepare('INSERT OR IGNORE INTO alertes_lues (alerte_id, user_id, le) VALUES (?, ?, ?)').run(id, userId, now());
+}
+
+/** Le propriétaire marque une alerte lue pour tout le monde (elle ne part plus dans le récapitulatif). */
 export function markAlertRead(ctx: Ctx, id: number | 'toutes'): void {
   if (id === 'toutes') ctx.db.prepare('UPDATE alerts SET read_at = ? WHERE read_at IS NULL').run(now());
   else ctx.db.prepare('UPDATE alerts SET read_at = ? WHERE id = ?').run(now(), id);

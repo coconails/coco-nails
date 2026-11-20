@@ -657,7 +657,9 @@ l'occasion, sans toucher à votre aperçu) ou le **site en ligne**. Il vérifie 
 chaque page, titre principal, langue, affichage sur téléphone, plan du site (`sitemap.xml`) et `robots.txt`, pages
 exclues des moteurs (« noindex »), adresse « canonical », aperçu de partage (Facebook, WhatsApp), données pour Google
 (fiche d'entreprise, FAQ), **téléphone identique** sur le site et dans ces données, liens cassés, images lourdes ou
-sans texte alternatif.
+sans texte alternatif. Depuis le 20/11/2026, aussi : **intertitres** dans l'ordre (h1, h2, h3… sans niveau sauté, sans
+intertitre vide), pages **orphelines** (aucune autre page n'y mène), **adresses** de pages peu lisibles (majuscules,
+espaces, accents, « _ »), **scripts ou feuilles de style lourds**.
 
 Les constats sont classés en **Problèmes** (gênent nettement l'affichage dans les moteurs), **À améliorer** et **À
 savoir** (souvent volontaire, comme une page de remerciement exclue des moteurs). Chacun indique la page concernée et
@@ -670,6 +672,28 @@ pas des règles officielles de Google.
 
 **Chaque semaine** (case à cocher, Administrateur du site) : PAGINITY refait l'audit du site en ligne et crée une
 alerte uniquement s'il apparaît un **nouveau** problème.
+
+**Proposer une correction** (rôle Administrateur du site, assistant activé) : sur les constats du **brouillon** qu'on
+peut corriger dans le HTML sans rien inventer (titre, description, h1, intertitres, langue, texte alternatif des images,
+lien cassé, page orpheline, aperçu de partage…), ce bouton confie le constat à l'assistant. Sa proposition arrive dans
+le panneau **Assistant**, avec l'avant / après. PAGINITY la vérifie d'abord : elle est **refusée** si elle ajoute un
+« noindex », change l'adresse canonique, rend les données pour Google illisibles, ou fait apparaître un **téléphone ou
+un prix** qui n'était ni sur la page ni dans la demande. Si vous acceptez, la modification va dans le **brouillon** et
+PAGINITY refait aussitôt l'audit : le panneau dit si le constat **a disparu**. Rien n'est publié automatiquement. Les
+constats qui demanderaient d'inventer une information (horaires, plan du site, adresse…) n'ont pas de bouton : à
+corriger vous-même.
+
+**Contrôle en ligne** (rôle Éditeur, site publié, à la demande seulement, 2 fois par 10 minutes) : PAGINITY interroge le
+site publié comme un visiteur. Chaque page répond-elle sans erreur ni chaîne de redirections ? Une adresse inconnue
+renvoie-t-elle bien « introuvable » (code 404) ? Avec un domaine, l'adresse en http mène-t-elle à https ? Les liens vers
+**d'autres sites** fonctionnent-ils encore (40 au plus, un à la fois) ? Seule une page disparue (404) est comptée comme
+lien cassé ; un site qui refuse les vérifications automatiques est simplement signalé « à vérifier vous-même ». Par
+sécurité, PAGINITY ne contacte jamais une adresse de votre réseau (box, NAS…).
+
+**Rapport mensuel** : « Voir le rapport de ce mois-ci » affiche un résumé clair (audit, contrôle en ligne, Google si
+Search Console est reliée, visites, trois conseils au plus). En cochant la case (Administrateur du site), PAGINITY
+l'envoie **le 1er de chaque mois** à partir de 8 h : il est gardé dans la page (12 derniers), signalé sur le tableau de
+bord et envoyé par e-mail si l'envoi est configuré (à l'adresse de notification du site, sinon à celle des alertes).
 
 **Dans Google (Search Console, lecture seule).** Une fois Search Console connecté (voir ci-dessous), la page
 Référencement d'un site montre, sur les 28 derniers jours : le nombre d'**apparitions** dans les résultats de Google,

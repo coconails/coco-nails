@@ -189,6 +189,31 @@ Adresses remplaçables pour les tests : `PAGINITY_GOOGLE_TOKEN_URL`, `PAGINITY_G
 vérifie signature, périmètre et absence de `sub`) ; parcours `npm run e2e:search-console` (7).
 **Non testé avec le vrai Google** (aucun compte connecté pendant le développement).
 
+## Marketing — priorité 1 (20/11/2026)
+
+- **Règles d'audit ajoutées** (`marketing/audit.ts`, sans réseau) : `intertitres-hierarchie`, `intertitre-vide`,
+  `page-orpheline` (aucune autre page indexable n'y mène ; jamais l'accueil), `adresse-page` (info), `ressource-lourde`
+  (script ou CSS local > 250 Ko).
+- **Contrôle en ligne** (`marketing/en-ligne.ts`, cible `controle` de `POST …/referencement/audit`, rôle Publier,
+  2 par 10 min, jamais automatique) : réponses des pages publiées (50 max, redirections suivies et revérifiées),
+  vraie 404, http → https avec domaine, liens externes (40 max, HEAD puis GET si refusé, pause 300 ms, durée max 3 min).
+  Requêtes par `lib/requete-sure.ts` : http/https, ports 80/443, IP vérifiée à la connexion (aucune adresse privée,
+  locale ou réservée, y compris après redirection) ; sans domaine, le serveur des sites est interrogé en direct.
+  Adresses locales permises seulement si `NODE_ENV=test`.
+- **Correction assistée** (`marketing/corrections.ts`, `POST /api/sites/:id/referencement/corriger { regle, page,
+  message }`, rôle Code) : seulement un constat présent dans le dernier audit du brouillon et d'une règle de la liste
+  `CONSIGNES` ; PAGINITY rédige la demande (portée `pages`, `seo` gardé avec la proposition). Vérifications ajoutées à
+  `verifierFichier` pour toutes les propositions « pages » : pas de `noindex` ajouté, canonical inchangée, JSON-LD
+  lisible, aucun téléphone ni prix absent du fichier ET de la demande. Après `accepter`, l'audit du brouillon est refait
+  (`verifierCorrection`) et le résultat est gardé (`verificationSeo`).
+- **Rapport mensuel** (`marketing/rapport.ts`) : `GET /api/sites/:id/referencement/rapport` (aperçu + 12 envoyés),
+  réglage `mensuel` ; envoi le 1er du mois dès 8 h (heure de Paris), une fois (`seo-rapport:<site>`), stocké dans
+  `seo_gsc_releves` (type `rapport-mensuel`), alerte « information », e-mail si configuré.
+- **Alertes lues par personne** (migration 13, `alertes_lues`) : un membre masque une alerte pour lui seul ; seul le
+  propriétaire la marque lue pour tous (et pour le récapitulatif).
+- Tests : `referencement-p1.test.ts` (8), `referencement-correction.test.ts` (4), `cloisonnement.test.ts` (+1) ;
+  parcours `npm run e2e:referencement-p1` (16).
+
 ## API
 
 | Adresse | Rôle |

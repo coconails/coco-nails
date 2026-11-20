@@ -59,8 +59,33 @@ export function contexteFichiers(ctx: Ctx, site: SiteRow): { rubriques: Rubrique
 const compter = (s: string, re: RegExp) => (s.match(re) ?? []).length;
 const hotes = (s: string) => new Set([...s.matchAll(/(?:https?:)?\/\/([a-z0-9.-]+\.[a-z]{2,})/gi)].map((m) => m[1].toLowerCase()));
 
-/** Vérifications d'un fichier proposé ; renvoie les erreurs (vide = accepté). */
-export function verifierFichier(rel: string, avant: string, apres: unknown): string[] {
+const robotsNoindex = (s: string) => /<meta\b[^>]*name\s*=\s*["']?(?:robots|googlebot)["']?[^>]*content\s*=\s*["'][^"']*(?:noindex|none)/i.test(s);
+const canonicals = (s: string) => [...s.matchAll(/<link\b[^>]*rel\s*=\s*["']?canonical["']?[^>]*>/gi)].map((m) => /href\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1] ?? '').join('|');
+const jsonLdIllisibles = (s: string) =>
+  [...s.matchAll(/<script\b[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)].filter((m) => {
+    try {
+      JSON.parse(m[1]);
+      return false;
+    } catch {
+      return true;
+    }
+  }).length;
+const sansBalises = (s: string) => s.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ');
+/** Numéros de téléphone (France) et montants en euros d'un texte, normalisés. */
+export function chiffresSensibles(s: string): Set<string> {
+  const t = sansBalises(s);
+  const tels = [...t.matchAll(/(?:\+33\s?|0)[1-9](?:[\s.-]?\d{2}){4}/g)].map((m) => `tel:${m[0].replace(/\D/g, '').replace(/^33/, '0')}`);
+  const prix = [...t.matchAll(/(\d+(?:[.,]\d{1,2})?)\s?(?:€|euros?\b)/gi)].map((m) => `prix:${Number(m[1].replace(',', '.'))}`);
+  return new Set([...tels, ...prix]);
+}
+
+/**
+ * Vérifications d'un fichier proposé ; renvoie les erreurs (vide = accepté).
+ * `demande` : texte de la demande. Un téléphone ou un prix qui n'était ni dans le fichier ni dans la demande est
+ * refusé (l'IA ne doit pas inventer de chiffres). Côté référencement, l'IA ne peut ni ajouter « noindex », ni changer
+ * l'adresse canonique, ni casser les données structurées.
+ */
+export function verifierFichier(rel: string, avant: string, apres: unknown, demande?: string): string[] {
   if (typeof apres !== 'string') return [`${rel} : le contenu doit être le texte complet du fichier`];
   const e: string[] = [];
   if (!apres.trim()) e.push(`${rel} : fichier vidé`);
@@ -72,6 +97,14 @@ export function verifierFichier(rel: string, avant: string, apres: unknown): str
   const nouveaux = [...hotes(apres)].filter((h) => !hotes(avant).has(h));
   if (nouveaux.length) e.push(`${rel} : adresse d’un autre site ajoutée (${nouveaux.slice(0, 3).join(', ')}) refusée`);
   if (/\.html?$/i.test(rel) && /<html/i.test(avant) && !/<\/html>/i.test(apres)) e.push(`${rel} : page HTML incomplète (</html> manquant)`);
+  if (robotsNoindex(apres) && !robotsNoindex(avant)) e.push(`${rel} : ajout de « noindex » refusé (la page disparaîtrait de Google)`);
+  if (canonicals(apres) !== canonicals(avant)) e.push(`${rel} : modification de l’adresse canonique refusée`);
+  if (jsonLdIllisibles(apres) > jsonLdIllisibles(avant)) e.push(`${rel} : données structurées (JSON-LD) rendues illisibles`);
+  if (demande !== undefined) {
+    const connus = new Set([...chiffresSensibles(avant), ...chiffresSensibles(demande)]);
+    const inventes = [...chiffresSensibles(apres)].filter((x) => !connus.has(x));
+    if (inventes.length) e.push(`${rel} : téléphone ou prix absent du site et de la demande (${inventes.slice(0, 3).map((x) => x.replace(/^\w+:/, '')).join(', ')}) refusé`);
+  }
   if (/\.css$/i.test(rel) && compter(apres, /{/g) !== compter(apres, /}/g)) e.push(`${rel} : accolades déséquilibrées dans le CSS`);
   e.push(...validateText(rel, apres).map((x) => `${rel} : ${x}`));
   return e;

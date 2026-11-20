@@ -150,7 +150,18 @@ export function registerIaRoutes(app: FastifyInstance, ctx: Ctx): void {
   app.post('/api/sites/:id/assistant/:pid/accepter', async (req) => {
     const { user } = requireUser(req);
     const { site } = ctx.sites.require(user, siteParam(req), 'contenus');
-    return ctx.ia.accepter(site, user, pid(req), body<{ empreinte?: string }>(req).empreinte);
+    const r = await ctx.ia.accepter(site, user, pid(req), body<{ empreinte?: string }>(req).empreinte);
+    // Correction de référencement : on refait l'audit du brouillon pour montrer si le constat a disparu.
+    if (r.seo) {
+      try {
+        const v = await ctx.referencement.verifierCorrection(site, r.seo, user.id);
+        ctx.ia.noterVerificationSeo(site, r.id, v);
+      } catch (e) {
+        ctx.ia.noterVerificationSeo(site, r.id, { corrige: false, message: `Nouvel audit impossible pour l’instant (${(e as Error).message}) : relancez l’audit du brouillon.` });
+      }
+      return ctx.ia.lire(site, r.id);
+    }
+    return r;
   });
   app.post('/api/sites/:id/assistant/:pid/refuser', async (req) => {
     const { user } = requireUser(req);

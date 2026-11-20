@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Accordion, Alert, Badge, Button, Card, Group, List, SegmentedControl, Stack, Switch, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useQuery } from '@tanstack/react-query';
-import { IconCircleCheck, IconSearch } from '@tabler/icons-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { IconCircleCheck, IconFileReport, IconSearch, IconWand } from '@tabler/icons-react';
 import { useParams } from 'react-router-dom';
 import { errorMessage, get, post, put } from '../api';
 import { Loading, Page } from '../components/Page';
@@ -17,6 +17,7 @@ interface Constat {
   message: string;
   conseil: string;
   nouveau?: boolean;
+  corrigeable?: boolean;
 }
 interface Audit {
   id: string;
@@ -30,11 +31,12 @@ interface Audit {
   comparaison: number | null;
 }
 interface Etat {
-  reglages: { hebdo: boolean };
+  reglages: { hebdo: boolean; mensuel?: boolean };
   enCours: boolean;
   publie: boolean;
   brouillon: Audit | null;
   enLigne: Audit | null;
+  controle: Audit | null;
   historique: { id: string; le: number; cible: string; automatique: boolean; problemes: number; attention: number; info: number }[];
 }
 const NIVEAU: Record<Niveau, { libelle: string; couleur: string; titre: string }> = {
@@ -49,11 +51,29 @@ export function ReferencementPage() {
   const { id } = useParams();
   const site = useSite();
   const q = useQuery({ queryKey: ['referencement', id], queryFn: () => get<Etat>(`/api/sites/${id}/referencement`) });
-  const [cible, setCible] = useState<'brouillon' | 'en-ligne'>('brouillon');
+  const qc = useQueryClient();
+  const [cible, setCible] = useState<'brouillon' | 'en-ligne' | 'controle'>('brouillon');
   const [busy, setBusy] = useState(false);
+  const [correction, setCorrection] = useState<string | null>(null);
   if (!q.data || !site.data) return <Loading />;
   const e = q.data;
-  const a = cible === 'brouillon' ? e.brouillon : e.enLigne;
+  const a = cible === 'brouillon' ? e.brouillon : cible === 'en-ligne' ? e.enLigne : e.controle;
+  const peutCorriger = !!site.data.droits.code && cible === 'brouillon';
+  const corriger = async (c: Constat, cle: string) => {
+    setCorrection(cle);
+    try {
+      const r = await post<{ statut: string; raison: string | null; journal: { texte: string }[] }>(`/api/sites/${id}/referencement/corriger`, { regle: c.regle, page: c.page, message: c.message });
+      void qc.invalidateQueries({ queryKey: ['assistant', id] });
+      if (r.statut === 'proposee')
+        notifications.show({ color: 'green', autoClose: 12_000, title: 'Proposition prête', message: 'Vérifiez-la dans le panneau « Assistant » (avant / après), puis acceptez ou refusez. Rien n’est modifié sans votre accord.' });
+      else
+        notifications.show({ color: 'orange', autoClose: 15_000, title: 'Pas de proposition utilisable', message: r.raison ?? r.journal.at(-1)?.texte ?? 'L’assistant n’a pas pu proposer de correction sûre.' });
+    } catch (err) {
+      notifications.show({ color: 'red', message: errorMessage(err), autoClose: 10_000 });
+    } finally {
+      setCorrection(null);
+    }
+  };
   const lancer = async () => {
     setBusy(true);
     try {
@@ -83,16 +103,30 @@ export function ReferencementPage() {
               data={[
                 { value: 'brouillon', label: 'Brouillon (avant publication)' },
                 { value: 'en-ligne', label: 'Site en ligne', disabled: !e.publie },
+                { value: 'controle', label: 'Contrôle en ligne', disabled: !e.publie || !site.data.droits.publier },
               ]}
             />
             <Button leftSection={<IconSearch size={16} />} loading={busy || e.enCours} onClick={() => void lancer()}>
-              Lancer l’audit
+              {cible === 'controle' ? 'Lancer le contrôle' : 'Lancer l’audit'}
             </Button>
           </Group>
           <Text size="sm" c="dimmed">
             L’audit lit le site tel que les moteurs le reçoivent (avant que le JavaScript ne s’exécute). Les repères de longueur sont des usages courants,
             pas des règles de Google. Il n’y a pas de « note » : seulement des constats vérifiables.
           </Text>
+          {cible === 'controle' && (
+            <Text size="sm" c="dimmed" data-explication="controle">
+              Le contrôle en ligne interroge le site publié comme un visiteur : chaque page répond-elle sans erreur ni détour, une adresse inconnue
+              renvoie-t-elle bien « introuvable », les liens vers d’autres sites marchent-ils encore (40 au plus, un à la fois) ? Lecture seule,
+              jamais automatique, 2 contrôles par 10 minutes.
+            </Text>
+          )}
+          {peutCorriger && (
+            <Text size="sm" c="dimmed">
+              <b>Proposer une correction</b> confie un constat à l’assistant : il prépare une modification du HTML, PAGINITY la vérifie (pas de
+              « noindex », pas de prix ni de téléphone inventé…), vous voyez l’avant / après et vous décidez. Rien n’est publié automatiquement.
+            </Text>
+          )}
           {e.reglages && site.data.droits.reglages && (
             <Switch
               label="Refaire l’audit chaque semaine (site en ligne) et m’alerter s’il y a un nouveau problème"
@@ -112,7 +146,9 @@ export function ReferencementPage() {
 
       {!a ? (
         <Alert color="blue" variant="light">
-          Aucun audit {cible === 'brouillon' ? 'du brouillon' : 'du site en ligne'} pour l’instant : « Lancer l’audit ».
+          {cible === 'controle'
+            ? 'Aucun contrôle du site en ligne pour l’instant : « Lancer le contrôle ».'
+            : `Aucun audit ${cible === 'brouillon' ? 'du brouillon' : 'du site en ligne'} pour l’instant : « Lancer l’audit ».`}
         </Alert>
       ) : (
         <>
@@ -174,6 +210,20 @@ export function ReferencementPage() {
                           <Text size="sm" c="dimmed">
                             {c.conseil}
                           </Text>
+                          {peutCorriger && c.corrigeable && (
+                            <Group>
+                              <Button
+                                size="xs"
+                                variant="light"
+                                leftSection={<IconWand size={14} />}
+                                loading={correction === `${n}-${i}`}
+                                disabled={!!correction}
+                                onClick={() => void corriger(c, `${n}-${i}`)}
+                              >
+                                Proposer une correction
+                              </Button>
+                            </Group>
+                          )}
                         </Stack>
                       </Group>
                     </Card>
@@ -207,6 +257,8 @@ export function ReferencementPage() {
         </>
       )}
 
+      <RapportMensuelCarte siteId={id!} mensuel={!!e.reglages.mensuel} peutRegler={!!site.data.droits.reglages} actualiser={() => void q.refetch()} />
+
       <SearchConsoleSite siteId={id!} peutRegler={!!site.data.droits.reglages} />
 
       {e.historique.length > 0 && (
@@ -232,7 +284,7 @@ export function ReferencementPage() {
                           {date(h.le)}
                           {h.automatique ? ' (auto)' : ''}
                         </Table.Td>
-                        <Table.Td>{h.cible === 'brouillon' ? 'brouillon' : 'en ligne'}</Table.Td>
+                        <Table.Td>{h.cible === 'brouillon' ? 'brouillon' : h.cible === 'controle' ? 'contrôle en ligne' : 'en ligne'}</Table.Td>
                         <Table.Td>{h.problemes}</Table.Td>
                         <Table.Td>{h.attention}</Table.Td>
                         <Table.Td>{h.info}</Table.Td>
@@ -246,5 +298,99 @@ export function ReferencementPage() {
         </Accordion>
       )}
     </Page>
+  );
+}
+
+interface Rapport {
+  le: number;
+  mois: string;
+  site: string;
+  sections: { titre: string; lignes: string[] }[];
+}
+const MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const nomMois = (m: string) => `${MOIS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
+
+function Sections({ r }: { r: Rapport }) {
+  return (
+    <Stack gap="sm">
+      {r.sections.map((s) => (
+        <Stack key={s.titre} gap={4}>
+          <Text fw={600} size="sm">
+            {s.titre}
+          </Text>
+          <List size="sm" spacing={2}>
+            {s.lignes.map((l, i) => (
+              <List.Item key={i} style={{ wordBreak: 'break-word' }}>
+                {l}
+              </List.Item>
+            ))}
+          </List>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+/** Rapport mensuel en langage simple : aperçu à la demande, envoi le 1er du mois si activé. */
+function RapportMensuelCarte({ siteId, mensuel, peutRegler, actualiser }: { siteId: string; mensuel: boolean; peutRegler: boolean; actualiser: () => void }) {
+  const [ouvert, setOuvert] = useState(false);
+  const q = useQuery({ queryKey: ['rapport-seo', siteId], queryFn: () => get<{ apercu: Rapport; envoyes: Rapport[] }>(`/api/sites/${siteId}/referencement/rapport`), enabled: ouvert });
+  return (
+    <Card withBorder radius="lg" padding="lg" data-section="rapport-mensuel">
+      <Stack gap="sm">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <IconFileReport size={20} color="var(--mantine-color-or-5)" />
+            <Title order={3} fz="md">
+              Rapport mensuel
+            </Title>
+          </Group>
+          <Button size="xs" variant="light" onClick={() => setOuvert((o) => !o)}>
+            {ouvert ? 'Masquer' : 'Voir le rapport de ce mois-ci'}
+          </Button>
+        </Group>
+        <Text size="sm" c="dimmed">
+          Un résumé clair : audit, contrôle en ligne, Google (si Search Console est reliée), visites et trois conseils au plus. Des faits vérifiés, aucune
+          promesse de position.
+        </Text>
+        {peutRegler && (
+          <Switch
+            label="M’envoyer ce rapport le 1er de chaque mois (tableau de bord, et e-mail si l’envoi est configuré)"
+            checked={mensuel}
+            onChange={async (ev) => {
+              try {
+                await put(`/api/sites/${siteId}/referencement/reglages`, { mensuel: ev.currentTarget.checked });
+                actualiser();
+              } catch (err) {
+                notifications.show({ color: 'red', message: errorMessage(err) });
+              }
+            }}
+          />
+        )}
+        {ouvert && !q.data && <Loading />}
+        {ouvert && q.data && (
+          <>
+            <Card withBorder radius="md" padding="md" data-rapport="apercu">
+              <Text fw={600} mb="xs">
+                Aperçu — {nomMois(q.data.apercu.mois)}
+              </Text>
+              <Sections r={q.data.apercu} />
+            </Card>
+            {q.data.envoyes.length > 0 && (
+              <Accordion variant="separated">
+                {q.data.envoyes.map((r) => (
+                  <Accordion.Item key={r.le} value={String(r.le)}>
+                    <Accordion.Control>Rapport de {nomMois(r.mois)}</Accordion.Control>
+                    <Accordion.Panel>
+                      <Sections r={r} />
+                    </Accordion.Panel>
+                  </Accordion.Item>
+                ))}
+              </Accordion>
+            )}
+          </>
+        )}
+      </Stack>
+    </Card>
   );
 }

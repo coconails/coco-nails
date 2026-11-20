@@ -309,6 +309,16 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX seo_gsc_releves_site ON seo_gsc_releves(site_id, type, le);
   `,
+  // 13 — Alertes « lues » par personne : un membre d'un site ne masque plus une alerte pour le propriétaire
+  // ni pour le récapitulatif par e-mail (seul le propriétaire marque une alerte lue pour tout le monde).
+  `
+  CREATE TABLE alertes_lues (
+    alerte_id INTEGER NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL,
+    le INTEGER NOT NULL,
+    PRIMARY KEY (alerte_id, user_id)
+  );
+  `,
 ];
 
 export function openDb(dataDir: string): Db {

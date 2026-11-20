@@ -17,6 +17,8 @@ interface Proposition {
   statut: 'en_cours' | 'proposee' | 'accord_requis' | 'question' | 'repondue' | 'annulee' | 'impossible' | 'acceptee' | 'refusee' | 'perimee' | 'interrompue';
   annulable?: boolean;
   portee?: 'contenus' | 'pages';
+  seo?: { regle: string; page: string | null; message: string } | null;
+  verificationSeo?: { corrige: boolean; message: string; le: number } | null;
   cerveau: string | null;
   cerveauLibelle: string | null;
   explication: string | null;
@@ -181,7 +183,7 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
           <Stack gap="sm">
             <Group justify="space-between" align="flex-start">
               <Stack gap={2} style={{ flex: 1 }}>
-                <Text fw={600} style={{ whiteSpace: 'pre-line' }}>« {p.demande} »</Text>
+                <Text fw={600} style={{ whiteSpace: 'pre-line' }}>{p.seo ? `Corriger : ${p.seo.message}${p.seo.page ? ` (page ${p.seo.page})` : ''}` : `« ${p.demande} »`}</Text>
                 <Text size="xs" c="dimmed">
                   {dateHeure(p.creeLe)}
                   {p.cerveauLibelle ? ` · préparée par ${p.cerveauLibelle}` : ''}
@@ -198,7 +200,17 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 {p.reunion.choixDomaine === 'vous' ? ' (choisi par vous)' : ''} · vérificateur final : {p.reunion.verificateur} ({p.reunion.choixVerificateur})
               </Text>
             )}
+            {p.seo && (
+              <Badge size="sm" variant="light" color="blue" data-correction-seo>
+                Correction de référencement
+              </Badge>
+            )}
             {p.explication && <Text size="sm">{p.explication}</Text>}
+            {p.verificationSeo && (
+              <Alert color={p.verificationSeo.corrige ? 'green' : 'orange'} variant="light" data-verification-seo>
+                <Text size="sm">{p.verificationSeo.message}</Text>
+              </Alert>
+            )}
             {p.raison && p.statut === 'question' ? (
               <Reponse
                 question={p.raison}
@@ -268,7 +280,16 @@ export function FilAssistant({ siteId, compact = false }: { siteId: string; comp
                 <>
                   <Button
                     loading={busy === `ok-${p.id}`}
-                    onClick={() => agir(`ok-${p.id}`, () => post(`/api/sites/${id}/assistant/${p.id}/accepter`, { empreinte: p.empreinte }), 'Modification enregistrée dans le brouillon. Vérifiez l’aperçu, puis publiez.')}
+                    onClick={() =>
+                      agir(
+                        `ok-${p.id}`,
+                        async () => {
+                          await post(`/api/sites/${id}/assistant/${p.id}/accepter`, { empreinte: p.empreinte });
+                          if (p.seo) void qc.invalidateQueries({ queryKey: ['referencement', id] });
+                        },
+                        'Modification enregistrée dans le brouillon. Vérifiez l’aperçu, puis publiez.',
+                      )
+                    }
                   >
                     Accepter (brouillon)
                   </Button>
