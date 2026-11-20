@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 import { Box, Center, Paper, Stack, Text } from '@mantine/core';
-import { Logo } from './Logo';
+import { LogoSaturne } from './Logo';
 
 export function AuthLayout({ titre, children }: { titre: string; children: ReactNode }) {
   return (
     <Center mih="100vh" p="md" style={{ background: 'radial-gradient(ellipse at top, #13213a 0%, #0b1626 60%)' }}>
       <Stack w="100%" maw={440} gap="lg">
         <Box ta="center" data-mantine-color-scheme="dark" style={{ background: 'transparent' }}>
-          <Logo taille={64} tailleTexte={38} />
+          <LogoSaturne />
           <Text c="#c9ced6" size="sm" mt={8} style={{ letterSpacing: '0.08em' }}>
             Créer · Gérer · Publier · Suivre
           </Text>

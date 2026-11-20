@@ -1,47 +1,58 @@
 html, body, #root { min-height: 100%; }
 body { -webkit-tap-highlight-color: transparent; }
 
-/* ---- Logo PAGINITY (bouclier argenté, « P » qui tourne, nom argent et or) ---- */
-:root {
-  --pg-argent-1: #ffffff;
-  --pg-argent-2: #c9ced6;
-  --pg-argent-3: #8a929e;
-  --pg-or-1: #f3d48a;
-  --pg-or-2: #c99a3e;
-}
-[data-mantine-color-scheme='dark'] {
-  --pg-argent-1: #ffffff;
-  --pg-argent-2: #c9ced6;
-  --pg-argent-3: #8a929e;
+/* ---- Logo PAGINITY : « P A G [bouclier] I N I T Y » ; bouclier bleu nuit bordé d'or, « P » blanc ---- */
+:root, [data-mantine-color-scheme='dark'] {
+  --pg-nuit: #13213a;
+  --pg-lettres: #ffffff;
   --pg-or-1: #f3d48a;
   --pg-or-2: #c99a3e;
 }
 [data-mantine-color-scheme='light'] {
-  --pg-argent-1: #5b6575;
-  --pg-argent-2: #2b3442;
-  --pg-argent-3: #11161f;
+  --pg-lettres: #13213a;
   --pg-or-1: #c9902a;
   --pg-or-2: #8d5f12;
 }
-.pg-logo-bouclier { position: relative; display: inline-block; flex: none; perspective: 200px; }
-.pg-logo-bouclier svg { position: absolute; inset: 0; animation: pg-bouclier-tourne 5s linear infinite; }
-.pg-logo-p {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  padding-bottom: 6%;
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 800; line-height: 1;
-  background: linear-gradient(135deg, var(--pg-argent-1), var(--pg-argent-2) 55%, var(--pg-argent-3));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: pg-p-tourne 5s linear infinite;
-  transform-style: preserve-3d;
+.pg-logo { display: inline-flex; align-items: center; gap: 0.55em; line-height: 1; white-space: nowrap; }
+.pg-lettre { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 600; color: var(--pg-lettres); }
+.pg-lettre-or { color: transparent; background-image: linear-gradient(180deg, var(--pg-or-1), var(--pg-or-2)); -webkit-background-clip: text; background-clip: text; }
+.pg-bouclier { position: relative; display: inline-block; flex: none; perspective: 240px; margin: 0 0.1em; }
+.pg-bouclier svg { position: absolute; inset: 0; animation: pg-tourne-gauche 20s linear infinite; }
+.pg-bouclier-p {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 800; line-height: 1; color: #ffffff;
+  animation: pg-tourne-droite 24s linear infinite;
 }
-/* Le « P » et le bouclier tournent sur eux-mêmes, en sens opposés. */
-@keyframes pg-p-tourne { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
-@keyframes pg-bouclier-tourne { from { transform: rotateY(0deg); } to { transform: rotateY(-360deg); } }
-@media (prefers-reduced-motion: reduce) { .pg-logo-p, .pg-logo-bouclier svg { animation: none; } }
-.pg-logo-nom { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 500; letter-spacing: 0.14em; line-height: 1; white-space: nowrap; }
-.pg-logo-argent, .pg-logo-or { -webkit-background-clip: text; background-clip: text; color: transparent; }
-.pg-logo-argent { background-image: linear-gradient(180deg, var(--pg-argent-1), var(--pg-argent-2) 60%, var(--pg-argent-3)); }
-.pg-logo-or { background-image: linear-gradient(180deg, var(--pg-or-1), var(--pg-or-2)); }
+.pg-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-bottom: 8%; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.pg-dos { transform: rotateY(180deg); }
+@keyframes pg-tourne-gauche { from { transform: rotateY(0deg); } to { transform: rotateY(-360deg); } }
+@keyframes pg-tourne-droite { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+
+/* Pages d'accès : lettres en orbite autour du bouclier (45 s par tour). */
+.pg-saturne { position: relative; display: inline-block; font-size: 28px; }
+.pg-saturne-centre { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; display: flex; }
+.pg-orbite {
+  position: absolute; left: 0; top: 0; offset-anchor: center; offset-rotate: 0deg;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-weight: 600; line-height: 1; color: #ffffff;
+  animation: pg-orbite 45s linear infinite;
+}
+@keyframes pg-orbite {
+  0%     { offset-distance: 0%;   z-index: 3; opacity: 0.75; scale: 0.9; }
+  25%    { offset-distance: 25%;  z-index: 3; opacity: 1;    scale: 1.12; }
+  49.9%  { offset-distance: 49.9%; z-index: 3; opacity: 0.75; scale: 0.9; }
+  50%    { offset-distance: 50%;  z-index: 1; opacity: 0.75; scale: 0.9; }
+  75%    { offset-distance: 75%;  z-index: 1; opacity: 0.3;  scale: 0.72; }
+  99.9%  { offset-distance: 99.9%; z-index: 1; opacity: 0.75; scale: 0.9; }
+  100%   { offset-distance: 100%; z-index: 3; opacity: 0.75; scale: 0.9; }
+}
+.pg-saturne-immobile { display: none; }
+
+/* Réduire les animations : tout est immobile ; sur les pages d'accès, le logo en ligne remplace l'orbite. */
+@media (prefers-reduced-motion: reduce) {
+  .pg-bouclier svg, .pg-bouclier-p { animation: none; }
+  .pg-saturne { display: none; }
+  .pg-saturne-immobile { display: inline-flex; }
+}
 
 .pg-diff { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
 .pg-diff .ajout { background: rgba(46, 160, 67, 0.22); }

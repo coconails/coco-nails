@@ -1,4 +1,4 @@
-import { Logo } from './Logo';
+import { HAUTEUR_ENTETE, Logo } from './Logo';
 import { useEffect, type ReactNode } from 'react';
 import {
   ActionIcon, AppShell, Avatar, Badge, Box, Burger, Divider, Group, Indicator, Menu, NavLink, ScrollArea, Text, Tooltip, UnstyledButton, useMantineColorScheme,
@@ -87,19 +87,20 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AppShell header={{ height: 60 }} navbar={{ width: 270, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
+    <AppShell header={{ height: HAUTEUR_ENTETE }} navbar={{ width: 270, breakpoint: 'sm', collapsed: { mobile: !opened } }} padding="md">
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap" pos="relative">
+          {/* Logo centré sur toute la largeur de la barre ; sur téléphone, le bouclier seul. */}
+          <UnstyledButton component={Link} to="/" aria-label="PAGINITY, tableau de bord" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', display: 'flex' }}>
+            <Box visibleFrom="xs" style={{ display: 'flex' }}>
+              <Logo taille={56} tailleTexte={26} />
+            </Box>
+            <Box hiddenFrom="xs" style={{ display: 'flex' }}>
+              <Logo taille={50} texte={false} />
+            </Box>
+          </UnstyledButton>
           <Group gap="sm" wrap="nowrap">
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Ouvrir le menu" />
-            <UnstyledButton component={Link} to="/" aria-label="PAGINITY, tableau de bord">
-              <Box visibleFrom="xs">
-                <Logo taille={36} tailleTexte={22} />
-              </Box>
-              <Box hiddenFrom="xs">
-                <Logo taille={34} texte={false} />
-              </Box>
-            </UnstyledButton>
           </Group>
           <Group gap="xs" wrap="nowrap">
             <Tooltip label={colorScheme === 'dark' ? 'Mode clair' : 'Mode sombre'}>

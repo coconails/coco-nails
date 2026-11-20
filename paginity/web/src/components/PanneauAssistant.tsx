@@ -5,6 +5,7 @@ import { IconMinus, IconPlus, IconRobot } from '@tabler/icons-react';
 import { useLocation } from 'react-router-dom';
 import { FilAssistant } from '../pages/Assistant';
 import type { SiteResume } from '../types';
+import { HAUTEUR_ENTETE } from './Logo';
 
 /**
  * Panneau de l'assistant, toujours présent :
@@ -155,7 +156,7 @@ export function PanneauAssistant({ etat, siteRoute, sites }: { etat: ReturnType<
   const fond = { background: 'var(--mantine-color-body)', borderColor: 'var(--mantine-color-default-border)' };
 
   if (mobile) {
-    const hauteur = reduit ? `${BARRE}px` : `calc(${m.mobile.hauteurVh}dvh - ${m.mobile.hauteurVh === 100 ? 60 : 0}px)`;
+    const hauteur = reduit ? `${BARRE}px` : `calc(${m.mobile.hauteurVh}dvh - ${m.mobile.hauteurVh === 100 ? HAUTEUR_ENTETE : 0}px)`;
     return (
       <Box
         component="aside"
@@ -195,7 +196,7 @@ export function PanneauAssistant({ etat, siteRoute, sites }: { etat: ReturnType<
       component="aside"
       aria-label="Assistant"
       data-panneau-assistant={reduit ? 'reduit' : 'ouvert'}
-      style={{ ...fond, position: 'fixed', top: 60, right: 0, bottom: 0, width: largeur, zIndex: 150, borderLeft: '1px solid', display: 'flex', flexDirection: 'column' }}
+      style={{ ...fond, position: 'fixed', top: HAUTEUR_ENTETE, right: 0, bottom: 0, width: largeur, zIndex: 150, borderLeft: '1px solid', display: 'flex', flexDirection: 'column' }}
     >
       {!reduit && (
         <Box
