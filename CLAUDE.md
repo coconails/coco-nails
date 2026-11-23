@@ -56,6 +56,16 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   Saint-Jean-du-Bois (Sarthe) | Coco Nail's », phrase Val de Sarthe + accès/parking dans « Un espace rien que pour vous »,
   page `public/404.html`. Nom commercial : toujours « Coco Nail's » (pas « Coco Nails 72 »). Pas de texte caché, pas de llms.txt.
   Mesures locales Lighthouse mobile : CLS 0,158 → 0,002, performance 91-93 → 97-99, accessibilité 97 → 100.
+- Inspirations du moment (23/11/2026) : rubrique `#inspirations` après les réalisations, contenu `public/contenu/inspirations.json`
+  (menu Pages CMS « Inspirations du moment » : photo, nom, description, étiquette, options du décor, coup de cœur, dates du/au).
+  Thèmes = décors tout faits posés sur le soin de base choisi par la cliente : AUCUN prix affiché (« Prix selon le soin de base
+  choisi »), la carte et la réservation ne changent pas. Cartes écrites au build par preparer-page (`htmlInspirations`, expirés
+  retirés, coups de cœur en premier) ; la page gère défilement, tri par étiquette, dates « du », bouton « Je veux ce look »
+  (bandeau dans la réservation, options pré-cochées, message « Inspiration : nom (photo : url) » → agenda, e-mail, Comptoir).
+  Attributs des cartes en `data-insp-*` (ne pas réutiliser `data-options` etc., déjà pris par la page). Photos Pages CMS réduites
+  à 800 px WebP au build via `sharp` (optionalDependencies, ignoré s'il manque). Les 5 visuels de départ sont générés par IA :
+  l'utilisateur ne veut pas l'indiquer ; mention « Visuels d'inspiration non contractuels », ne jamais les présenter comme des
+  réalisations de Coralie ni les mélanger aux vraies photos.
 - Comptoir iPad (18/11/2026) : `public/compta/comptoir/index.html` (adresse /compta/comptoir, même mot de passe et mêmes données que
   /compta via `/api/compta`). iPad Air 1 (A1475, iOS 12.5.7) : JavaScript ES5 uniquement, pas de `gap` en flexbox ni `inset`, pas d'images WebP (logo en PNG)
   (test automatique). 6 onglets de widgets (Aujourd'hui, Caisse, Rendez-vous, Semaine, Compta, Clientes), choix/ordre/taille
