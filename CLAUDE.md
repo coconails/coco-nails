@@ -76,6 +76,13 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   avec l'iPhone pro (`qrcode.js` MIT). Appels/SMS via « Appels sur d'autres appareils » / « Transfert de SMS ».
   Aperçu local : `node outils-de-test/serveur-comptoir.mjs` (mot de passe « demo », données d'exemple).
   SumUp : lecteur **Solo** choisi (autonome) ; plus tard, envoi du montant au Solo via la Cloud API (clé affiliée à créer).
+  Livraison 1 (27/11/2026) : onglet **Absences** (action `absence` : journées entières = événement « toute la journée » dont le
+  titre contient Vacances/Congés/Formation/Fermeture exceptionnelle/« Fermé – absence » → fermeture du site ; heures = événement
+  minuté opaque ; private.absence="1", motif, note ; alerte 409 `conflits` si des RDV existent, jamais supprimés ; `supprimer_absence`
+  refuse les RDV clientes). Onglet **Rendez-vous** façon compta : actions (téléphone, message, depuis une inspiration), liste
+  À venir/À confirmer/Passés/Annulés, Modifier (`modifier` + verifier/forcer/prevenir : agenda déplacé, durée et titre suivent le
+  soin, e-mail `changementCliente`), Annuler (`annuler` + liberer/prevenir : événement supprimé, e-mail `annulationCliente`),
+  Retard (SMS prérempli sms:…&body=, QR WhatsApp, e-mail), Reprendre dans N semaines. Agenda du Comptoir sur 45 jours.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (relié le 15/11/2026) : `SUMUP_API_KEY` (clé SECRÈTE `sup_sk_…`, pas la clé publique `sup_pk_` ; ne jamais la demander),
