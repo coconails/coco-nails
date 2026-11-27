@@ -83,6 +83,11 @@ Règle de travail : quand il annonce une liste d'instructions, ne rien modifier 
   À venir/À confirmer/Passés/Annulés, Modifier (`modifier` + verifier/forcer/prevenir : agenda déplacé, durée et titre suivent le
   soin, e-mail `changementCliente`), Annuler (`annuler` + liberer/prevenir : événement supprimé, e-mail `annulationCliente`),
   Retard (SMS prérempli sms:…&body=, QR WhatsApp, e-mail), Reprendre dans N semaines. Agenda du Comptoir sur 45 jours.
+  Livraison 2 (27/11/2026) : notes clientes (`note_cliente`, Réglages `notes_clientes` JSON, clé = cleCliente ou « nom:… »,
+  affichées sur la prochaine cliente, les RDV, Modifier, les listes clientes), liste d'attente (`attente_ajouter`/`attente_retirer`,
+  Réglages `attente` JSON ; après une annulation ou un refus au Comptoir, fenêtre « Un créneau s'est libéré » avec SMS prérempli),
+  onglet **Agenda** dans la compta téléphone (RDV à venir + Modifier/Annuler/Confirmer/Refuser, fermer des créneaux, absences,
+  liste d'attente). Barre d'onglets de la compta défilante sur téléphone.
 - Variables Netlify : `GOOGLE_CLIENT_EMAIL`, `GOOGLE_CALENDAR_ID` (= contact@coconails72.com), `GOOGLE_PRIVATE_KEY` (secrète, ne jamais la demander ni l'afficher).
   Compta : `COMPTA_SHEET_ID` (identifiant du tableau), `COMPTA_MOT_DE_PASSE` (secret, choisi par l'utilisateur, ne jamais le demander).
   SumUp (relié le 15/11/2026) : `SUMUP_API_KEY` (clé SECRÈTE `sup_sk_…`, pas la clé publique `sup_pk_` ; ne jamais la demander),
